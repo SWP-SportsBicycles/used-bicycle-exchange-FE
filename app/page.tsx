@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Grid3X3, List, TrendingUp, Sparkles } from 'lucide-react'
+import { Grid3X3, List, Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike } from 'lucide-react'
+import Image from 'next/image'
 import { Header } from '@/components/header'
 import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/components/filter-sidebar'
 import { ListingCard } from '@/components/listing-card'
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MOCK_LISTINGS, type Listing } from '@/lib/mock-data'
+import { MOCK_LISTINGS } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 const initialFilters: FilterState = {
@@ -29,10 +30,57 @@ const initialFilters: FilterState = {
   veloSafeOnly: false,
 }
 
+const categorySections = [
+  {
+    title: 'Xe đạp thể thao',
+    image: 'https://images.unsplash.com/photo-1511994298241-608e28f14fde?w=1200&q=80',
+  },
+  {
+    title: 'Xe đạp địa hình',
+    image: 'https://images.unsplash.com/photo-1544191696-102dbdaeeaa0?w=1200&q=80',
+  },
+  {
+    title: 'Xe đạp đua',
+    image: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=1200&q=80',
+  },
+  {
+    title: 'Xe đạp touring',
+    image: 'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=1200&q=80',
+  },
+]
+
+const cityOptions = [
+  { value: 'all', label: 'Toàn quốc' },
+  { value: 'hanoi', label: 'Hà Nội' },
+  { value: 'hcm', label: 'TP Hồ Chí Minh' },
+  { value: 'danang', label: 'Đà Nẵng' },
+] as const
+
+const bikeTypeOptions = [
+  { value: 'all', label: 'Tất cả xe đạp' },
+  { value: 'road', label: 'Xe đạp đua' },
+  { value: 'mtb', label: 'Xe đạp địa hình' },
+  { value: 'gravel', label: 'Xe đạp gravel' },
+  { value: 'urban', label: 'Xe đạp touring' },
+] as const
+
 export default function MarketplacePage() {
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('hcm')
+  const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
+
+  const applyHeroSearch = () => {
+    setAppliedSearch(searchInput.trim())
+    setFilters(prev => ({
+      ...prev,
+      cities: selectedCity === 'all' ? [] : [selectedCity],
+      categories: selectedBikeType === 'all' ? [] : [selectedBikeType],
+    }))
+  }
 
   // Filter and sort listings
   const filteredListings = useMemo(() => {
@@ -61,6 +109,16 @@ export default function MarketplacePage() {
       // Price range filter
       if (listing.price < filters.priceRange[0] || listing.price > filters.priceRange[1]) return false
 
+      if (appliedSearch) {
+        const term = appliedSearch.toLowerCase()
+        const match =
+          listing.title.toLowerCase().includes(term) ||
+          listing.brand.toLowerCase().includes(term) ||
+          listing.model.toLowerCase().includes(term) ||
+          listing.description.toLowerCase().includes(term)
+        if (!match) return false
+      }
+
       return true
     })
 
@@ -81,7 +139,7 @@ export default function MarketplacePage() {
     }
 
     return result
-  }, [filters, sortBy])
+  }, [filters, sortBy, appliedSearch])
 
   const veloSafeCount = MOCK_LISTINGS.filter(l => l.isVeloSafeVerified).length
 
@@ -91,64 +149,131 @@ export default function MarketplacePage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-border/60">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/8 via-background to-background" />
-        <div className="relative mx-auto max-w-7xl px-4 py-14 lg:py-20 lg:px-6">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: "url('/hero-bike-art.png')",
+          }}
+        />
+        <div className="absolute left-0 top-0 h-full w-[22%] bg-[#034C5F]/95 [clip-path:polygon(0_0,100%_0,56%_100%,0_100%)]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A]/65 via-[#0B1F3A]/45 to-[#0B1F3A]/65" />
+        <div className="absolute inset-0 opacity-25 [background:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_42%),radial-gradient(circle_at_80%_15%,rgba(255,255,255,0.25),transparent_38%)]" />
+        <div className="relative mx-auto max-w-7xl px-4 py-16 lg:py-24 lg:px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="text-center"
           >
-            <Badge variant="secondary" className="mb-5 gap-1.5 px-4 py-1.5 text-sm font-medium">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <Badge variant="secondary" className="mb-5 gap-1.5 px-4 py-1.5 text-sm font-medium bg-white/20 text-white border-white/30">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-100" />
               Marketplace Xe Đạp Uy Tín #1 Việt Nam
             </Badge>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl text-balance" style={{ fontFamily: 'var(--font-archivo)' }}>
+            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl text-balance" style={{ fontFamily: 'var(--font-archivo)' }}>
               Tìm Xe Đạp Thể Thao
               <br />
-              <span className="text-primary">Đã Qua Sử Dụng</span> Chất Lượng
+              <span className="text-cyan-200">Đã Qua Sử Dụng</span> Chất Lượng
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground text-pretty">
+            <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-100/95 text-pretty">
               Mua bán xe đạp thể thao đã qua sử dụng tại Hà Nội, TP.HCM và Đà Nẵng. 
               Mỗi xe đều có thể được kiểm định bởi đội ngũ VeloSafe chuyên nghiệp.
             </p>
 
-            {/* Stats */}
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-5">
-              <div className="flex items-center gap-4 px-6 py-4 rounded-lg bg-card border border-border/60 shadow-athletic transition-all duration-300 hover:shadow-athletic-lg hover:-translate-y-0.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <TrendingUp className="h-6 w-6 text-primary" />
+            {/* Hero Search Bar */}
+            <div className="mx-auto mt-10 w-full max-w-5xl rounded-2xl border border-white/75 bg-white p-2 shadow-2xl">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+                  <input
+                    type="text"
+                    placeholder="Tìm xe đạp theo tên, thương hiệu..."
+                    className="h-12 w-full rounded-xl border border-transparent bg-slate-50 pl-11 pr-4 text-sm text-foreground outline-none transition-colors focus:border-primary/40 focus:bg-white"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') applyHeroSearch()
+                    }}
+                  />
                 </div>
-                <div className="text-left">
-                  <p className="text-3xl font-extrabold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>{MOCK_LISTINGS.length}</p>
-                  <p className="text-sm text-muted-foreground font-medium">Xe đang bán</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 px-6 py-4 rounded-lg bg-card border border-success/30 shadow-athletic transition-all duration-300 hover:shadow-athletic-lg hover:-translate-y-0.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/15">
-                  <svg className="h-6 w-6 text-success" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-3xl font-extrabold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>{veloSafeCount}</p>
-                  <p className="text-sm text-muted-foreground font-medium">VeloSafe Verified</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 px-6 py-4 rounded-lg bg-card border border-border/60 shadow-athletic transition-all duration-300 hover:shadow-athletic-lg hover:-translate-y-0.5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <p className="text-3xl font-extrabold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>3</p>
-                  <p className="text-sm text-muted-foreground font-medium">Thành phố</p>
-                </div>
+
+                <Select value={selectedCity} onValueChange={(value) => setSelectedCity(value as typeof selectedCity)}>
+                  <SelectTrigger className="h-12 rounded-xl border-[#034C5F]/15 bg-slate-50 text-[#0B1F3A] font-semibold">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-[#034C5F]" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cityOptions.map((city) => (
+                      <SelectItem key={city.value} value={city.value}>
+                        {city.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedBikeType} onValueChange={(value) => setSelectedBikeType(value as typeof selectedBikeType)}>
+                  <SelectTrigger className="h-12 rounded-xl border-[#034C5F]/15 bg-slate-50 text-[#0B1F3A] font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Bike className="h-4 w-4 text-[#034C5F]" />
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bikeTypeOptions.map((bikeType) => (
+                      <SelectItem key={bikeType.value} value={bikeType.value}>
+                        {bikeType.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  onClick={applyHeroSearch}
+                  className="h-12 rounded-xl bg-[#034C5F] px-7 text-sm font-semibold text-white hover:bg-[#0B1F3A]"
+                >
+                  Tìm xe
+                </Button>
               </div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Category Headings */}
+      <section className="border-b border-border/60 bg-gradient-to-b from-background to-slate-50/70">
+        <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
+          <div className="mb-6 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Danh mục sản phẩm</p>
+              <h2 className="mt-2 text-2xl font-bold text-foreground uppercase tracking-wide" style={{ fontFamily: 'var(--font-archivo)' }}>
+                Danh mục sản phẩm
+              </h2>
+            </div>
+            <Button variant="outline" size="sm" className="hidden md:inline-flex">
+              Xem tất cả danh mục
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {categorySections.map((section) => (
+              <article
+                key={section.title}
+                className="group overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-athletic"
+              >
+                <div className="relative aspect-[16/10] w-full bg-slate-100">
+                  <Image
+                    src={section.image}
+                    alt={section.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                  />
+                </div>
+                <h3 className="px-3 py-2 text-center text-base font-bold text-foreground">{section.title}</h3>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -255,6 +380,55 @@ export default function MarketplacePage() {
           </div>
         </div>
       </main>
+
+      <footer className="mt-6 border-t border-border/70 bg-[#0B1F3A] text-slate-200">
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-3 lg:px-6">
+          <div>
+            <h3 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-archivo)' }}>
+              VeloTrust
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định VeloSafe.
+            </p>
+            <div className="mt-4 flex items-center gap-2 text-sm text-cyan-200">
+              <ShieldCheck className="h-4 w-4" />
+              Cam kết xe rõ nguồn gốc - giao dịch an toàn
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Thông tin chính sách</h4>
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-cyan-200" /> Chính sách giao hàng toàn quốc</li>
+              <li>Chính sách kiểm định VeloSafe</li>
+              <li>Chính sách đổi trả và hoàn tiền</li>
+              <li>Chính sách bảo mật dữ liệu</li>
+              <li>Điều khoản sử dụng nền tảng</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Liên hệ</h4>
+            <ul className="mt-4 space-y-3 text-sm text-slate-300">
+              <li className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-cyan-200" />
+                Hotline: 028.9996.5775
+              </li>
+              <li className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-cyan-200" />
+                Email: support@velotrust.vn
+              </li>
+              <li className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-cyan-200" />
+                330 Hùng Vương, Châu Đức, BR-VT
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div className="border-t border-slate-700/70 py-4 text-center text-xs text-slate-400">
+          Copyright {new Date().getFullYear()} VeloTrust. All rights reserved.
+        </div>
+      </footer>
     </div>
   )
 }

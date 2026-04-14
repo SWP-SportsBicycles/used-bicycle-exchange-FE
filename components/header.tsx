@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Search, User, Heart, Menu, Globe, ChevronDown, LayoutDashboard, ClipboardCheck, Shield, LogOut } from 'lucide-react'
+import { User, Heart, Menu, Globe, ChevronDown, LayoutDashboard, ClipboardCheck, Shield, LogOut, CircleCheckBig } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -16,9 +15,8 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { useState } from 'react'
 import { useAuth, type UserRole } from '@/lib/auth-context'
-import { useLanguage, type Language } from '@/lib/language-context'
+import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
 
 const roleLabels: Record<UserRole, { vi: string; en: string }> = {
@@ -38,7 +36,6 @@ const roleColors: Record<UserRole, string> = {
 }
 
 export function Header() {
-  const [searchQuery, setSearchQuery] = useState('')
   const { user, isAuthenticated, switchRole, logout } = useAuth()
   const { language, setLanguage, t } = useLanguage()
   const pathname = usePathname()
@@ -75,17 +72,13 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Search - Desktop */}
-        <div className="hidden flex-1 max-w-xl md:flex">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t('search.placeholder')}
-              className="w-full pl-10 bg-secondary border-border"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Assurance Marquee */}
+        <div className="hidden md:flex flex-1 max-w-2xl">
+          <div className="header-marquee w-full">
+            <span className="header-marquee-item">
+              <CircleCheckBig className="h-4 w-4 shrink-0 text-[#034C5F]" />
+              Xe đạp được kiểm định khắt khe bởi các chuyên gia
+            </span>
           </div>
         </div>
 
@@ -268,18 +261,6 @@ export function Header() {
                   </div>
                 </div>
               )}
-
-              {/* Mobile Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder={t('search.placeholder')}
-                  className="pl-10 bg-secondary"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
 
               <nav className="flex flex-col gap-2">
                 <Button variant="ghost" className="justify-start" asChild>
