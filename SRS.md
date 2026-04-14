@@ -10,7 +10,7 @@
 
 ### 1.1 Mục đích
 
-Mô tả yêu cầu chức năng và phi chức năng cho MVP nền tảng kết nối mua bán xe đạp thể thao đã qua sử dụng tại **Hà Nội, TP.HCM, Đà Nẵng**, Seller **cá nhân**, **cọc 10% tối đa 2.000.000đ** kích hoạt **kiểm định tại nhà Seller**, Admin duyệt tin (serial + ảnh groupset), trung gian thanh toán + phí thành công **2–3%**, và đánh giá sau giao dịch.
+Mô tả yêu cầu chức năng và phi chức năng cho MVP nền tảng kết nối mua bán xe đạp thể thao đã qua sử dụng tại **Hà Nội, TP.HCM, Đà Nẵng**, Seller **cá nhân**, mô hình **cọc 2 lớp** (Soft Reserve 200k-500k và Inspection Deposit 5%-10% trần 2.000.000đ khi yêu cầu kiểm định), quy trình kiểm định tại nhà Seller, Admin duyệt tin (serial + ảnh groupset), trung gian thanh toán + phí thành công **2–3%**, và đánh giá sau giao dịch.
 
 ### 1.2 Phạm vi
 
@@ -34,7 +34,7 @@ Guest, Buyer, Seller, Inspector, Admin — như phân tích nghiệp vụ gốc.
 
 - Một listing tại một thời điểm chỉ có **một** giao dịch cọc/mua **active**.
 - **Địa lý V1:** chỉ listing / giao dịch trong **Hà Nội, TP.HCM, Đà Nẵng** (validate địa chỉ hoặc tỉnh/thành).
-- **PII Seller:** SĐT và địa chỉ đầy đủ chỉ sau **cọc đã xác nhận** (03-B.2).
+- **PII Seller:** SĐT và địa chỉ đầy đủ chỉ sau **Soft Reserve đã xác nhận** (03-B.2).
 - **Sàn:** vừa **cầu nối** vừa **trung gian thanh toán** theo 03-A.1.
 - Thời gian máy chủ UTC; hiển thị mặc định `Asia/Ho_Chi_Minh`.
 
@@ -61,9 +61,10 @@ Guest, Buyer, Seller, Inspector, Admin — như phân tích nghiệp vụ gốc.
 | FR-LIST-03 | Gửi duyệt: `draft` → `pending_review`. | P0 |
 | FR-LIST-04 | Admin duyệt: `pending_review` → `published` hoặc `rejected` (lý do); có thể gắn cờ “nghi trùng serial”. | P0 |
 | FR-LIST-05 | Seller ẩn/gỡ: `published` → `withdrawn`; không cho nếu có order `active` (trừ Admin). | P0 |
-| FR-LIST-06 | Guest/Buyer xem danh sách + chi tiết; **SĐT + địa chỉ đầy đủ của Seller chỉ hiển thị sau khi Buyer có Order cọc ở trạng thái đã xác nhận** (không chỉ sau đăng nhập). | P0 |
+| FR-LIST-06 | Guest/Buyer xem danh sách + chi tiết; **SĐT + địa chỉ đầy đủ của Seller chỉ hiển thị sau khi Buyer có Soft Reserve ở trạng thái đã xác nhận** (không chỉ sau đăng nhập). | P0 |
 | FR-LIST-07 | Khi tin `published`: nếu sửa **giá > 10%** hoặc **cấu hình xe vượt ngưỡng 10%** (theo metric spec hoặc danh sách trường major — 03-C.2) → tin về **`pending_review`**; bản chỉnh sửa không public cho đến khi duyệt lại. | P0 |
 | FR-LIST-08 | Khi có Order **active** trên listing: **chặn** sửa giá/spec material (01 mục 2). | P0 |
+| FR-LIST-09 | Hệ thống lưu **lịch sử thay đổi giá** của listing (`ListingPriceHistory`) gồm giá cũ/giá mới, thời điểm, actor và lý do. | P1 |
 
 ### 3.3 Tìm kiếm & wishlist (FR-SEARCH)
 
@@ -76,23 +77,26 @@ Guest, Buyer, Seller, Inspector, Admin — như phân tích nghiệp vụ gốc.
 
 | ID | Mô tả | Ưu tiên |
 |----|--------|---------|
-| FR-ORDER-01 | Buyer tạo `Order` kiểu `deposit` (và tùy chọn `full_purchase`) trên listing `published` trong phạm vi địa lý cho phép. | P0 |
-| FR-ORDER-01a | Số tiền cọc = **min(10% × giá niêm yết, 2.000.000đ)**; cọc kích hoạt **dịch vụ kiểm định** (01). | P0 |
-| FR-ORDER-02 | Sau khi cọc được xác nhận, listing → `reserved`; hệ thống cho phép lộ PII Seller cho Buyer trên đơn đó. | P0 |
-| FR-ORDER-03 | Hủy kèo / phân bổ cọc / hoàn theo [01-order-and-deposit-rules.md](./01-order-and-deposit-rules.md) (Buyer hủy: 50% Seller + 50% Sàn; Seller hủy: hoàn 100% + kỷ luật Seller). | P0 |
-| FR-ORDER-04 | Trạng thái đơn tối thiểu: `pending_payment` → `payment_received` → `inspection` / `pending_fulfillment` → `completed` / `cancelled` / `disputed`. | P0 |
-| FR-ORDER-05 | Offline payment: buyer upload chứng từ; seller xác nhận; Admin override; sổ nội bộ ghi nhận phân bổ 50/50 khi áp dụng. | P0 |
-| FR-ORDER-06 | `completed` khi Buyer bấm **Đã nhận hàng** **hoặc** **48h** sau trạng thái logistics **giao thành công** mà không có khiếu nại mở (01 mục 4). | P0 |
+| FR-ORDER-01 | Buyer tạo `Order` trên listing `published` trong phạm vi địa lý cho phép; bước đầu thanh toán **Soft Reserve** để giữ chỗ. | P0 |
+| FR-ORDER-01a | Soft Reserve = **200.000đ - 500.000đ** (config Admin theo gói). | P0 |
+| FR-ORDER-01b | Khi Buyer bấm yêu cầu kiểm định, hệ thống thu **Inspection Deposit** = `min(rate_inspection × giá niêm yết, 2.000.000đ)` với `rate_inspection` trong khoảng **5%-10%**. | P0 |
+| FR-ORDER-02 | Sau khi Soft Reserve được xác nhận, listing → `reserved`; hệ thống cho phép lộ PII Seller cho Buyer trên đơn đó. | P0 |
+| FR-ORDER-03 | Hủy kèo / phân bổ cọc / hoàn theo ma trận fault trong [01-order-and-deposit-rules.md](./01-order-and-deposit-rules.md): `buyer_no_fault_cancel` 70/30, `buyer_no_show` 80/20, `seller_fault` hoàn 100%, `system_fault` hoàn 100%. | P0 |
+| FR-ORDER-04 | Trạng thái đơn tối thiểu: `pending_payment` → `soft_reserved` → `inspection_deposit_pending` → `inspection` / `pending_fulfillment` → `delivered` → `pending_confirmation` → `completed` / `cancelled` / `disputed`. | P0 |
+| FR-ORDER-05 | Offline payment: buyer upload chứng từ; seller xác nhận; Admin override; áp dụng cho Inspection Deposit và phần thanh toán còn lại. | P0 |
+| FR-ORDER-06 | `completed` khi Buyer bấm **Đã nhận hàng** trong `pending_confirmation` **hoặc** **48h** sau trạng thái `delivered` mà không có khiếu nại mở. | P0 |
 | FR-ORDER-07 | Khi `completed`: áp dụng **phí thành công 2–3%** (config Admin) theo 03-A.2. | P0 |
+| FR-ORDER-08 | Hệ thống gửi nhắc Buyer ở mốc 24h và 47h trong `pending_confirmation`; nếu có dispute mở thì chặn auto-complete. | P1 |
 
 ### 3.5 Kiểm định (FR-INSP)
 
 | ID | Mô tả | Ưu tiên |
 |----|--------|---------|
-| FR-INSP-01 | **Luồng chuẩn V1:** sau cọc xác nhận → Inspector **đến nhà Seller** → upload báo cáo lên app → Buyer chọn **Tiếp tục mua** hoặc **Hủy** (hoàn **100% cọc** nếu lỗi nặng hơn mô tả — 01 mục 5–6). | P0 |
+| FR-INSP-01 | **Luồng chuẩn V1 (on-demand):** sau Soft Reserve, Buyer yêu cầu kiểm định + thanh toán Inspection Deposit → Inspector **đến nhà Seller** → upload báo cáo lên app → Buyer chọn **Tiếp tục mua** hoặc **Hủy** (hoàn **100% cọc** nếu lỗi nặng hơn mô tả — 01 mục 5–6). | P0 |
 | FR-INSP-02 | Checklist: khung, phanh, truyền động + ảnh/PDF báo cáo; kết quả phục vụ badge / quyết định Buyer. | P0 |
 | FR-INSP-03 | **Phí kiểm định:** nếu xe đúng mô tả → **Buyer** trả; nếu sai lệch nghiêm trọng → **Seller** trả (trừ ví / cọc — 01 mục 6). | P0 |
 | FR-INSP-04 | SLA nội bộ gợi ý: assign 24h làm việc; báo cáo trong 48h sau buổi kiểm (01 mục 8). | P1 |
+| FR-INSP-05 | MVP chỉ triển khai mode `on_demand`; kiến trúc dữ liệu mở sẵn cho mode khác ở hậu MVP. | P1 |
 
 ### 3.6 Đánh giá (FR-REV)
 
@@ -109,7 +113,8 @@ Guest, Buyer, Seller, Inspector, Admin — như phân tích nghiệp vụ gốc.
 | FR-ADM-03 | Khiếu nại / tranh chấp: ưu tiên tạo từ **nút Khiếu nại trên đơn** — auto đính kèm `order_id`, chat, bên liên quan; email hỗ trợ cho lỗi kỹ thuật/pháp lý nặng (03-F.1). | P0 |
 | FR-ADM-04 | SLA: **8h làm việc** xác nhận đã nhận; **48h làm việc** quyết định cuối kể từ đủ bằng chứng (03-F.2). | P0 |
 | FR-ADM-05 | Ma trận xử lý Admin theo 03-F.3 (hàng không đúng mô tả, hỏng do VC, Buyer đổi ý, Seller không giao). | P0 |
-| FR-ADM-06 | Dashboard: listing/order theo trạng thái, SLA khiếu nại & kiểm định. | P1 |
+| FR-ADM-06 | Dashboard: listing/order theo trạng thái, SLA khiếu nại & kiểm định, và 2 chỉ số trust tối thiểu của Seller: `cancel_rate`, `dispute_rate`. | P1 |
+| FR-ADM-07 | Quyết định phân bổ cọc bắt buộc gắn `fault_code`, bằng chứng và audit trail cho mỗi case. | P0 |
 
 ---
 
@@ -132,6 +137,7 @@ Guest, Buyer, Seller, Inspector, Admin — như phân tích nghiệp vụ gốc.
 - Lưu trữ object (ảnh/PDF) qua S3-compatible hoặc local disk dev; job chuyển cold storage theo G.1.
 - Email SMTP cho thông báo và kênh hỗ trợ thứ 2.
 - Module **SellerWallet** (hoặc tương đương) khuyến nghị để thực hiện phạt tiền / trừ phí kiểm định theo 01–03.
+- Cần job nền để gửi nhắc việc `pending_confirmation` và tự động đóng đơn khi đạt điều kiện timeout.
 
 ---
 

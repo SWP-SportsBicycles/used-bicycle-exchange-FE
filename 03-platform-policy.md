@@ -19,7 +19,9 @@ Tài liệu tổng hợp các quyết định nghiệp vụ **A, B, C, F, G** �
 | Loại phí | V1 | Ghi chú |
 |-----------|-----|---------|
 | **Phí niêm yết** | **Miễn phí** | Có thể bật sau khi thị trường ổn định. |
+| **Soft Reserve** | **200.000đ - 500.000đ** (config Admin) | Giữ chỗ + mở quyền tương tác theo policy; phân bổ theo ma trận fault. |
 | **Phí kiểm định** | Thu theo bảng giá `FeeRule` | Phân bổ người trả theo [01](./01-order-and-deposit-rules.md) mục kiểm định. |
+| **Inspection Deposit** | **5%-10%** giá xe, trần **2.000.000đ** | Thu khi Buyer bấm yêu cầu kiểm định; cấu hình rate bởi Admin. |
 | **Phí thành công** | **2%–3%** giá trị giao dịch (config Admin, áp khi `completed`) | Trừ vào tiền về Seller hoặc ghi nhận công nợ theo cấu hình thanh toán. |
 
 ### A.3 Phạm vi địa lý V1
@@ -37,7 +39,7 @@ Tài liệu tổng hợp các quyết định nghiệp vụ **A, B, C, F, G** �
 
 ### B.2 Quy tắc hiển thị SĐT & địa chỉ cụ thể
 
-- **Số điện thoại** và **địa chỉ cụ thể** của Seller **chỉ hiển thị** sau khi Buyer đã thực hiện **Đặt cọc** và cọc ở trạng thái **đã xác nhận** (đã thanh toán / đã khóa theo chính sách thanh toán).
+- **Số điện thoại** và **địa chỉ cụ thể** của Seller **chỉ hiển thị** sau khi Buyer đã thực hiện **Soft Reserve (lớp 1)** và khoản này ở trạng thái **đã xác nhận**.
 - Mục đích: giảm **“nhảy deal”** ra ngoài sàn để trốn phí; đồng thời vẫn cho Guest/Buyer chưa cọc xem mô tả, ảnh, thông số.
 
 *(Có thể vẫn hiển thị quận/huyện mức thô trước cọc — tùy sản phẩm UI; chốt tối thiểu: không lộ SĐT + địa chỉ đầy đủ trước cọc.)*
@@ -89,8 +91,10 @@ Các tiêu chí khác (ảnh tổng thể, giá, danh mục…) giữ theo SRS.
 |-------------|-------------------|--------------------------------|
 | Buyer báo **hàng không đúng mô tả** (sau nhận) | Ảnh thực tế + clip đồng kiểm (nếu có) + **báo cáo Inspector** | Nếu đúng sai lệch: **hoàn tiền** theo đơn; **Seller chịu phí ship hai chiều** (ghi nhận công nợ / trừ thanh toán). |
 | **Hư hỏng do vận chuyển** | Clip khui hàng + biên bản với **đơn vị logistics** | Sàn **giữ tiền** (escrow) để làm việc logistics **bồi thường**; cập nhật Buyer khi có kết quả. |
-| Buyer **đổi ý**, không nhận hàng (không lỗi Seller) | Lịch sử chat (không chứng minh lỗi Seller) | **Giữ / cấn trừ cọc** bồi thường phiền hà cho Seller (theo [01](./01-order-and-deposit-rules.md)). |
+| Buyer **đổi ý**, không nhận hàng (không lỗi Seller) | Lịch sử chat, log hẹn, bằng chứng không có lỗi xe/Seller | Áp dụng **fault-based matrix**: `buyer_no_fault_cancel` = **70% Seller / 30% Sàn** (khoản cọc đã thu tương ứng case). |
+| Buyer **no-show / quá hạn cam kết** | Log hẹn, log nhắc việc, timeline SLA | Áp dụng `buyer_no_show` = **80% Seller / 20% Sàn** (khoản cọc đã thu tương ứng case). |
 | **Seller không giao** | Quá hạn vận chuyển + Seller không phản hồi chat | **Hoàn 100% cọc** cho Buyer + **phạt / cảnh báo** tài khoản Seller. |
+| **Lỗi hệ thống** ảnh hưởng giao dịch | Audit kỹ thuật, incident report, log payment/state | Áp dụng `system_fault` = **hoàn 100%** khoản đã thu cho Buyer. |
 
 *(Chi tiết số tiền hoàn từng bước neo theo trạng thái `Payment` / escrow.)*
 
