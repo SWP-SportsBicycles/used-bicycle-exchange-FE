@@ -43,7 +43,7 @@ Open `http://localhost:3000`.
 
 ## Team Lane Ownership (3 dev)
 
-### Dev 1 — Lead FE / Core (40%)
+### Dev 1 — Lead FE / Core
 
 Owns:
 
@@ -57,7 +57,7 @@ Rules:
 - Review all PRs touching contracts in `types/lib/mocks`
 - Keep query keys + DTO shape stable
 
-### Dev 2 — Buyer UI/UX (30%)
+### Dev 2 — Buyer UI/UX
 
 Owns:
 
@@ -70,7 +70,7 @@ Focus:
 - Home, browse filters, PDP
 - Responsive + motion polish
 
-### Dev 3 — Dashboards & Forms (30%)
+### Dev 3 — Dashboards & Forms
 
 Owns:
 
