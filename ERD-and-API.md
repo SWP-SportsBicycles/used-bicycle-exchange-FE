@@ -25,6 +25,7 @@ erDiagram
   User ||--o{ Order : buys
   Order ||--o{ Payment : has
   Order ||--o{ OrderStatusHistory : logs
+  Listing ||--o{ ListingPriceHistory : tracks_price
 
   Listing ||--o| Inspection : optional
   User ||--o{ Inspection : performs
@@ -64,6 +65,8 @@ erDiagram
     string phone
     text bio
     decimal reputation_score
+    decimal cancel_rate
+    decimal dispute_rate
   }
 
   BuyerProfile {
@@ -113,7 +116,8 @@ erDiagram
     string type_enum
     string status_enum
     decimal amount_total
-    decimal deposit_amount
+    decimal soft_reserve_amount
+    decimal inspection_deposit_amount
     timestamptz deposit_expires_at
     timestamptz created_at
   }
@@ -126,6 +130,16 @@ erDiagram
     decimal amount
     string proof_url
     timestamptz confirmed_at
+  }
+
+  ListingPriceHistory {
+    uuid id PK
+    uuid listing_id FK
+    decimal old_price
+    decimal new_price
+    uuid actor_id FK
+    string reason
+    timestamptz changed_at
   }
 
   OrderStatusHistory {
@@ -142,6 +156,7 @@ erDiagram
     uuid id PK
     uuid listing_id FK
     uuid inspector_id FK
+    string mode_enum
     string status_enum
     string outcome_enum
     timestamptz scheduled_at
@@ -212,7 +227,9 @@ erDiagram
 
 - `condition_enum`, `listing.status`, `order.type`, `order.status` nên là enum DB hoặc bảng lookup để đồng bộ với SRS.
 - `WishlistItem` khóa chính tổ hợp `(user_id, listing_id)`.
-- **V1.2 nghiệp vụ:** `Listing` thêm `frame_serial` (bắt buộc trước duyệt), cờ `groupset_photo_ok`, `city_code` (HN/SG/DN); PII Seller không trả qua API public cho đến khi Order cọc `confirmed` — xử lý tại tầng API.
+- **V1.2 nghiệp vụ:** `Listing` thêm `frame_serial` (bắt buộc trước duyệt), cờ `groupset_photo_ok`, `city_code` (HN/SG/DN); PII Seller không trả qua API public cho đến khi Soft Reserve `confirmed` — xử lý tại tầng API.
+- `Order.status` cần có `soft_reserved`, `inspection_deposit_pending`, `delivered`, `pending_confirmation` để chuẩn hóa state machine tiền và giao nhận.
+- `Inspection.mode_enum` mở sẵn cho hậu MVP; **MVP chỉ dùng `on_demand`**.
 - **SellerWallet** (khuyến nghị): `user_id`, `balance`, `ledger` (nạp/trừ phạt, phí kiểm định Seller trả) — chi tiết bảng ledger tách riêng khi triển khai.
 
 ---
@@ -249,7 +266,8 @@ erDiagram
 
 | Phương thức | Đường dẫn | RBAC |
 |-------------|-----------|------|
-| POST | `/api/v1/orders` | buyer (body: listingId, type, optional deposit %) |
+| POST | `/api/v1/orders` | buyer (body: listingId, type, softReservePackage) |
+| POST | `/api/v1/orders/{id}/request-inspection` | buyer (khởi tạo Inspection Deposit) |
 | GET | `/api/v1/orders/{id}` | buyer (owner) hoặc seller của listing |
 | POST | `/api/v1/orders/{id}/payments` | buyer — upload offline proof |
 | POST | `/api/v1/orders/{id}/confirm-receipt` | buyer |
@@ -273,6 +291,7 @@ erDiagram
 | POST | `/api/v1/admin/listings/{id}/moderate` | admin |
 | GET/PATCH | `/api/v1/admin/users/...` | admin |
 | GET | `/api/v1/admin/stats/overview` | admin |
+| GET | `/api/v1/admin/stats/trust` | admin (gồm `cancel_rate`, `dispute_rate`) |
 | CRUD | `/api/v1/admin/categories`, `/brands`, `/fee-rules` | admin |
 
 ### 2.7 Báo cáo & tranh chấp
@@ -283,11 +302,18 @@ erDiagram
 | POST | `/api/v1/orders/{id}/disputes` | buyer hoặc seller — **ưu tiên** luồng từ nút **Khiếu nại** trên đơn (auto context theo [03-platform-policy.md](./03-platform-policy.md)). |
 | PATCH | `/api/v1/admin/disputes/{id}` | admin — SLA 8h/48h làm việc (03-F). |
 
+### 2.8 Listing pricing history
+
+| Phương thức | Đường dẫn | RBAC |
+|-------------|-----------|------|
+| GET | `/api/v1/listings/{id}/price-history` | public/authenticated theo policy |
+| GET | `/api/v1/admin/listings/{id}/price-history` | admin |
+
 ---
 
 ## 3. Sự kiện nội bộ (tùy chọn kiến trúc)
 
-Các chuyển trạng thái `Order` nên phát sinh **domain event** (async) cho: email thông báo, cập nhật `Listing.status`, ghi `OrderStatusHistory`.
+Các chuyển trạng thái `Order` nên phát sinh **domain event** (async) cho: email thông báo, cập nhật `Listing.status`, ghi `OrderStatusHistory`, và nhắc việc ở `pending_confirmation`.
 
 ---
 
