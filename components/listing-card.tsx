@@ -101,7 +101,7 @@ export function ListingCard({ listing, index = 0 }: ListingCardProps) {
           <CardContent className="p-4">
             {/* Price */}
             <div className="mb-2">
-              <span className="text-xl font-bold text-primary">
+              <span className="text-xl font-bold text-[#407F3E]">
                 {formatVND(listing.price)}
               </span>
             </div>

@@ -155,8 +155,8 @@ export default function MarketplacePage() {
             backgroundImage: "url('/hero-bike-art.png')",
           }}
         />
-        <div className="absolute left-0 top-0 h-full w-[22%] bg-[#034C5F]/95 [clip-path:polygon(0_0,100%_0,56%_100%,0_100%)]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A]/65 via-[#0B1F3A]/45 to-[#0B1F3A]/65" />
+        <div className="absolute left-0 top-0 h-full w-[22%] bg-[#aee86c]/95 [clip-path:polygon(0_0,100%_0,56%_100%,0_100%)]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#1d2a14]/70 via-[#1d2a14]/45 to-[#1d2a14]/65" />
         <div className="absolute inset-0 opacity-25 [background:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_42%),radial-gradient(circle_at_80%_15%,rgba(255,255,255,0.25),transparent_38%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 lg:py-24 lg:px-6">
           <motion.div
@@ -166,13 +166,13 @@ export default function MarketplacePage() {
             className="text-center"
           >
             <Badge variant="secondary" className="mb-5 gap-1.5 px-4 py-1.5 text-sm font-medium bg-white/20 text-white border-white/30">
-              <Sparkles className="h-3.5 w-3.5 text-cyan-100" />
+              <Sparkles className="h-3.5 w-3.5 text-lime-100" />
               Marketplace Xe Đạp Uy Tín #1 Việt Nam
             </Badge>
             <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl text-balance" style={{ fontFamily: 'var(--font-archivo)' }}>
               Tìm Xe Đạp Thể Thao
               <br />
-              <span className="text-cyan-200">Đã Qua Sử Dụng</span> Chất Lượng
+              <span className="text-lime-200">Đã Qua Sử Dụng</span> Chất Lượng
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-100/95 text-pretty">
               Mua bán xe đạp thể thao đã qua sử dụng tại Hà Nội, TP.HCM và Đà Nẵng. 
@@ -197,9 +197,9 @@ export default function MarketplacePage() {
                 </div>
 
                 <Select value={selectedCity} onValueChange={(value) => setSelectedCity(value as typeof selectedCity)}>
-                  <SelectTrigger className="h-12 rounded-xl border-[#034C5F]/15 bg-slate-50 text-[#0B1F3A] font-semibold">
+                  <SelectTrigger className="h-12 rounded-xl border-primary/25 bg-slate-50 text-[#253218] font-semibold">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-[#034C5F]" />
+                      <MapPin className="h-4 w-4 text-primary" />
                       <SelectValue />
                     </div>
                   </SelectTrigger>
@@ -213,9 +213,9 @@ export default function MarketplacePage() {
                 </Select>
 
                 <Select value={selectedBikeType} onValueChange={(value) => setSelectedBikeType(value as typeof selectedBikeType)}>
-                  <SelectTrigger className="h-12 rounded-xl border-[#034C5F]/15 bg-slate-50 text-[#0B1F3A] font-semibold">
+                  <SelectTrigger className="h-12 rounded-xl border-primary/25 bg-slate-50 text-[#253218] font-semibold">
                     <div className="flex items-center gap-2">
-                      <Bike className="h-4 w-4 text-[#034C5F]" />
+                      <Bike className="h-4 w-4 text-primary" />
                       <SelectValue />
                     </div>
                   </SelectTrigger>
@@ -230,7 +230,7 @@ export default function MarketplacePage() {
 
                 <Button
                   onClick={applyHeroSearch}
-                  className="h-12 rounded-xl bg-[#034C5F] px-7 text-sm font-semibold text-white hover:bg-[#0B1F3A]"
+                  className="h-12 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground hover:bg-[#90cb4f]"
                 >
                   Tìm xe
                 </Button>
@@ -245,10 +245,9 @@ export default function MarketplacePage() {
         <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Danh mục sản phẩm</p>
-              <h2 className="mt-2 text-2xl font-bold text-foreground uppercase tracking-wide" style={{ fontFamily: 'var(--font-archivo)' }}>
+              <p className="mt-2 text-2xl font-bold text-foreground uppercase tracking-wide" style={{ fontFamily: 'var(--font-archivo)' }}>
                 Danh mục sản phẩm
-              </h2>
+              </p>
             </div>
             <Button variant="outline" size="sm" className="hidden md:inline-flex">
               Xem tất cả danh mục
@@ -381,7 +380,7 @@ export default function MarketplacePage() {
         </div>
       </main>
 
-      <footer className="mt-6 border-t border-border/70 bg-[#0B1F3A] text-slate-200">
+      <footer className="mt-6 border-t border-border/70 bg-[#253218] text-slate-200">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-3 lg:px-6">
           <div>
             <h3 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-archivo)' }}>
@@ -390,7 +389,7 @@ export default function MarketplacePage() {
             <p className="mt-3 text-sm leading-6 text-slate-300">
               Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định VeloSafe.
             </p>
-            <div className="mt-4 flex items-center gap-2 text-sm text-cyan-200">
+            <div className="mt-4 flex items-center gap-2 text-sm text-lime-200">
               <ShieldCheck className="h-4 w-4" />
               Cam kết xe rõ nguồn gốc - giao dịch an toàn
             </div>
@@ -399,7 +398,7 @@ export default function MarketplacePage() {
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Thông tin chính sách</h4>
             <ul className="mt-4 space-y-2 text-sm text-slate-300">
-              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-cyan-200" /> Chính sách giao hàng toàn quốc</li>
+              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-lime-200" /> Chính sách giao hàng toàn quốc</li>
               <li>Chính sách kiểm định VeloSafe</li>
               <li>Chính sách đổi trả và hoàn tiền</li>
               <li>Chính sách bảo mật dữ liệu</li>
@@ -411,15 +410,15 @@ export default function MarketplacePage() {
             <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Liên hệ</h4>
             <ul className="mt-4 space-y-3 text-sm text-slate-300">
               <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-cyan-200" />
+                <Phone className="h-4 w-4 text-lime-200" />
                 Hotline: 028.9996.5775
               </li>
               <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-cyan-200" />
+                <Mail className="h-4 w-4 text-lime-200" />
                 Email: support@velotrust.vn
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-cyan-200" />
+                <MapPin className="h-4 w-4 text-lime-200" />
                 330 Hùng Vương, Châu Đức, BR-VT
               </li>
             </ul>

@@ -76,7 +76,7 @@ export function Header() {
         <div className="hidden md:flex flex-1 max-w-2xl">
           <div className="header-marquee w-full">
             <span className="header-marquee-item">
-              <CircleCheckBig className="h-4 w-4 shrink-0 text-[#034C5F]" />
+              <CircleCheckBig className="h-4 w-4 shrink-0 text-primary" />
               Xe đạp được kiểm định khắt khe bởi các chuyên gia
             </span>
           </div>
