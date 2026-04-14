@@ -85,11 +85,11 @@ export function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-1 md:flex">
           <Button 
-            variant={pathname === '/' ? 'secondary' : 'ghost'} 
+            variant={pathname.startsWith('/marketplace') ? 'secondary' : 'ghost'} 
             size="sm" 
             asChild
           >
-            <Link href="/">{t('nav.marketplace')}</Link>
+            <Link href="/marketplace">{t('nav.marketplace')}</Link>
           </Button>
           
           {isAuthenticated && (
@@ -264,7 +264,7 @@ export function Header() {
 
               <nav className="flex flex-col gap-2">
                 <Button variant="ghost" className="justify-start" asChild>
-                  <Link href="/">{t('nav.marketplace')}</Link>
+                  <Link href="/marketplace">{t('nav.marketplace')}</Link>
                 </Button>
                 
                 {isAuthenticated && (

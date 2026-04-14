@@ -68,13 +68,22 @@ export default function ListingDetailPage({ params }: PageProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isWishlisted, setIsWishlisted] = useState(false)
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
+  const [depositFlowType, setDepositFlowType] = useState<'soft_reserve' | 'inspection_deposit'>('soft_reserve')
+  const [isSoftReserved, setIsSoftReserved] = useState(false)
+  const [isInspectionDepositPaid, setIsInspectionDepositPaid] = useState(false)
 
   if (!listing) {
     notFound()
   }
 
   const depositAmount = calculateDeposit(listing.price)
+  const softReserveAmount = Math.min(Math.round(listing.price * 0.02), 500000)
   const conditionLabel = CONDITIONS.find(c => c.value === listing.condition)?.label || listing.condition
+  const transactionState = isInspectionDepositPaid
+    ? 'inspection_scheduled'
+    : isSoftReserved
+      ? 'soft_reserved'
+      : 'pending_deposit'
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => 
@@ -254,21 +263,67 @@ export default function ListingDetailPage({ params }: PageProps) {
                     <p className="text-3xl font-extrabold text-primary" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(listing.price)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground mb-1">Đặt cọc</p>
+                    <p className="text-sm text-muted-foreground mb-1">Cọc kiểm định</p>
                     <p className="text-xl font-bold text-foreground">{formatVND(depositAmount)}</p>
                   </div>
                 </div>
-                <Button 
-                  className="w-full mb-3" 
+                <Button
+                  className="w-full mb-2"
                   size="lg"
-                  onClick={() => setIsDepositModalOpen(true)}
+                  variant={isSoftReserved ? 'secondary' : 'default'}
+                  onClick={() => {
+                    setDepositFlowType('soft_reserve')
+                    setIsDepositModalOpen(true)
+                  }}
                 >
                   <ShieldCheck className="mr-2 h-5 w-5" />
-                  Đặt Cọc & Kiểm Định
+                  {isSoftReserved ? 'Đã Soft Reserve' : `Soft Reserve (${formatVND(softReserveAmount)})`}
+                </Button>
+                <Button
+                  className="w-full mb-3"
+                  size="lg"
+                  disabled={!isSoftReserved}
+                  onClick={() => {
+                    setDepositFlowType('inspection_deposit')
+                    setIsDepositModalOpen(true)
+                  }}
+                >
+                  <ShieldCheck className="mr-2 h-5 w-5" />
+                  Đặt cọc kiểm định (5-10%)
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
-                  Cọc 10% (tối đa 2.000.000đ) để kích hoạt dịch vụ kiểm định VeloSafe
+                  Bước 1: Soft Reserve để mở khóa liên hệ. Bước 2: Cọc kiểm định để kích hoạt Inspector.
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Trạng thái giao dịch & Escrow</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+                  <span className="text-muted-foreground">Trạng thái hiện tại</span>
+                  <Badge variant="outline">
+                    {transactionState === 'pending_deposit' && 'Chờ Soft Reserve'}
+                    {transactionState === 'soft_reserved' && 'Đã Soft Reserve'}
+                    {transactionState === 'inspection_scheduled' && 'Đang chờ kiểm định'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-3">
+                  <span className="text-muted-foreground">Đang chờ hành động từ</span>
+                  <span className="font-medium text-foreground">
+                    {transactionState === 'pending_deposit' && 'Buyer'}
+                    {transactionState === 'soft_reserved' && 'Buyer (đặt cọc kiểm định)'}
+                    {transactionState === 'inspection_scheduled' && 'Inspector'}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="font-medium text-foreground mb-1">Escrow policy</p>
+                  <p className="text-muted-foreground">
+                    Khoản thanh toán cuối sẽ được giữ trong escrow cho đến khi giao hàng + xác nhận hoàn tất hoặc timeout tự động.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -301,7 +356,9 @@ export default function ListingDetailPage({ params }: PageProps) {
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-not-allowed">
                           <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="flex-1 text-sm text-muted-foreground">0*** *** ***</span>
+                          <span className="flex-1 text-sm text-muted-foreground">
+                            {isSoftReserved ? (listing.seller.phone || 'Đã mở khóa - liên hệ qua chat') : '0*** *** ***'}
+                          </span>
                           <Lock className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </TooltipTrigger>
@@ -319,7 +376,11 @@ export default function ListingDetailPage({ params }: PageProps) {
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-not-allowed">
                           <Home className="h-4 w-4 text-muted-foreground" />
-                          <span className="flex-1 text-sm text-muted-foreground">*** ***, *** ***, {listing.city === 'hanoi' ? 'Hà Nội' : listing.city === 'hcm' ? 'TP.HCM' : 'Đà Nẵng'}</span>
+                          <span className="flex-1 text-sm text-muted-foreground">
+                            {isSoftReserved
+                              ? (listing.seller.address || `Đã mở khóa địa chỉ tại ${listing.city === 'hanoi' ? 'Hà Nội' : listing.city === 'hcm' ? 'TP.HCM' : 'Đà Nẵng'}`)
+                              : `*** ***, *** ***, ${listing.city === 'hanoi' ? 'Hà Nội' : listing.city === 'hcm' ? 'TP.HCM' : 'Đà Nẵng'}`}
+                          </span>
                           <Lock className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </TooltipTrigger>
@@ -481,6 +542,15 @@ export default function ListingDetailPage({ params }: PageProps) {
         listing={listing}
         isOpen={isDepositModalOpen}
         onClose={() => setIsDepositModalOpen(false)}
+        flowType={depositFlowType}
+        onSuccess={(flowType) => {
+          if (flowType === 'soft_reserve') {
+            setIsSoftReserved(true)
+          }
+          if (flowType === 'inspection_deposit') {
+            setIsInspectionDepositPaid(true)
+          }
+        }}
       />
     </div>
   )

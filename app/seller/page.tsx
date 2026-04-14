@@ -31,10 +31,12 @@ import { cn } from '@/lib/utils'
 
 const statusColors: Record<string, string> = {
   pending_deposit: 'bg-muted text-muted-foreground',
-  deposit_received: 'bg-[#407F3E]/15 text-[#407F3E]',
+  soft_reserved: 'bg-[#407F3E]/15 text-[#407F3E]',
   inspection_scheduled: 'bg-accent/20 text-accent-foreground',
   inspection_completed: 'bg-[#407F3E]/15 text-[#407F3E]',
   pending_payment: 'bg-[#407F3E]/15 text-[#407F3E]',
+  delivered: 'bg-[#407F3E]/15 text-[#407F3E]',
+  pending_confirmation: 'bg-[#407F3E]/15 text-[#407F3E]',
   completed: 'bg-[#407F3E]/15 text-[#407F3E]',
   cancelled: 'bg-destructive/20 text-destructive',
   disputed: 'bg-destructive/20 text-destructive',

@@ -46,12 +46,48 @@ const statusLabels: Record<string, { vi: string; en: string }> = {
   closed: { vi: 'Đã đóng', en: 'Closed' },
 }
 
+function getSla(createdAt: string) {
+  const createdMs = new Date(createdAt).getTime()
+  const ackDue = createdMs + 8 * 60 * 60 * 1000
+  const resolveDue = createdMs + 48 * 60 * 60 * 1000
+  const now = Date.now()
+  return {
+    ackOverdue: now > ackDue,
+    resolveOverdue: now > resolveDue,
+    ackDue,
+    resolveDue,
+  }
+}
+
+function getEvidenceScore(description: string) {
+  const descScore = Math.min(40, Math.floor(description.trim().length / 4))
+  const base = 35
+  const randomLikeWeight = 15
+  return Math.min(100, base + descScore + randomLikeWeight)
+}
+
 export default function DisputesPage() {
   const { language } = useLanguage()
-  const [disputes, setDisputes] = useState(MOCK_DISPUTES)
-  const [selectedDispute, setSelectedDispute] = useState<typeof MOCK_DISPUTES[0] | null>(null)
+  type LocalDispute = (typeof MOCK_DISPUTES)[number] & {
+    resolutionMeta?: {
+      resolvedBy: string
+      resolvedAt: string
+      notes: string
+    }
+  }
+  const [disputes, setDisputes] = useState<LocalDispute[]>(MOCK_DISPUTES)
+  const [selectedDispute, setSelectedDispute] = useState<LocalDispute | null>(null)
   const [resolution, setResolution] = useState<'buyer' | 'seller'>('buyer')
   const [resolutionNotes, setResolutionNotes] = useState('')
+  const [activeFilter, setActiveFilter] = useState<'all' | 'sla_overdue' | 'high_value'>('all')
+  const [logSearch, setLogSearch] = useState('')
+  const [logStatusFilter, setLogStatusFilter] = useState<'all' | 'resolved_buyer_favor' | 'resolved_seller_favor' | 'closed'>('all')
+  const [logResolverFilter, setLogResolverFilter] = useState<'all' | string>('all')
+  const [logFromDate, setLogFromDate] = useState('')
+  const [logToDate, setLogToDate] = useState('')
+  const [logPage, setLogPage] = useState(1)
+  const [logPageSize, setLogPageSize] = useState<5 | 10 | 20>(5)
+  const [logSort, setLogSort] = useState<'resolved_at_desc' | 'resolved_at_asc' | 'sla_breach_desc' | 'resolver_asc'>('resolved_at_desc')
 
   const handleResolve = () => {
     if (selectedDispute) {
@@ -60,7 +96,12 @@ export default function DisputesPage() {
           ? { 
               ...d, 
               status: resolution === 'buyer' ? 'resolved_buyer_favor' : 'resolved_seller_favor',
-              resolution: resolutionNotes 
+              resolution: resolutionNotes,
+              resolutionMeta: {
+                resolvedBy: 'Admin Duty',
+                resolvedAt: new Date().toISOString(),
+                notes: resolutionNotes,
+              },
             } 
           : d
       ))
@@ -69,8 +110,120 @@ export default function DisputesPage() {
     }
   }
 
-  const activeDisputes = disputes.filter(d => ['open', 'investigating'].includes(d.status))
+  const activeDisputes = disputes
+    .filter(d => ['open', 'investigating'].includes(d.status))
+    .filter((d) => {
+      if (activeFilter === 'all') return true
+      if (activeFilter === 'high_value') return d.listing.price >= 30000000
+      const sla = getSla(d.createdAt)
+      return sla.ackOverdue || sla.resolveOverdue
+    })
   const resolvedDisputes = disputes.filter(d => !['open', 'investigating'].includes(d.status))
+  const repeatSellerCounts = disputes.reduce<Record<string, number>>((acc, d) => {
+    acc[d.seller.id] = (acc[d.seller.id] || 0) + 1
+    return acc
+  }, {})
+  const repeatBuyerCounts = disputes.reduce<Record<string, number>>((acc, d) => {
+    acc[d.buyer.id] = (acc[d.buyer.id] || 0) + 1
+    return acc
+  }, {})
+  const decisionLogs = resolvedDisputes
+    .filter((d) => d.resolutionMeta)
+    .filter((d) => {
+      const query = logSearch.trim().toLowerCase()
+      if (!query) return true
+      return (
+        d.listing.title.toLowerCase().includes(query) ||
+        d.buyer.name.toLowerCase().includes(query) ||
+        d.seller.name.toLowerCase().includes(query) ||
+        (d.resolutionMeta?.notes.toLowerCase().includes(query) ?? false)
+      )
+    })
+    .filter((d) => (logStatusFilter === 'all' ? true : d.status === logStatusFilter))
+    .filter((d) => (logResolverFilter === 'all' ? true : d.resolutionMeta?.resolvedBy === logResolverFilter))
+    .filter((d) => {
+      if (!logFromDate && !logToDate) return true
+      const resolvedTime = d.resolutionMeta ? new Date(d.resolutionMeta.resolvedAt).getTime() : 0
+      if (logFromDate) {
+        const from = new Date(`${logFromDate}T00:00:00`).getTime()
+        if (resolvedTime < from) return false
+      }
+      if (logToDate) {
+        const to = new Date(`${logToDate}T23:59:59`).getTime()
+        if (resolvedTime > to) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const aTime = a.resolutionMeta ? new Date(a.resolutionMeta.resolvedAt).getTime() : 0
+      const bTime = b.resolutionMeta ? new Date(b.resolutionMeta.resolvedAt).getTime() : 0
+      if (logSort === 'resolved_at_asc') return aTime - bTime
+      if (logSort === 'resolver_asc') {
+        const aResolver = a.resolutionMeta?.resolvedBy || ''
+        const bResolver = b.resolutionMeta?.resolvedBy || ''
+        return aResolver.localeCompare(bResolver)
+      }
+      if (logSort === 'sla_breach_desc') {
+        const weight = (type: string) => {
+          if (type === 'ack_8h_and_resolve_48h') return 3
+          if (type === 'resolve_48h') return 2
+          if (type === 'ack_8h') return 1
+          return 0
+        }
+        return weight(getSlaBreachType(b.createdAt)) - weight(getSlaBreachType(a.createdAt))
+      }
+      return bTime - aTime
+    })
+
+  const totalLogPages = Math.max(1, Math.ceil(decisionLogs.length / logPageSize))
+  const paginatedDecisionLogs = decisionLogs.slice((logPage - 1) * logPageSize, logPage * logPageSize)
+
+  const getSlaBreachType = (createdAt: string) => {
+    const sla = getSla(createdAt)
+    if (sla.ackOverdue && sla.resolveOverdue) return 'ack_8h_and_resolve_48h'
+    if (sla.ackOverdue) return 'ack_8h'
+    if (sla.resolveOverdue) return 'resolve_48h'
+    return 'none'
+  }
+
+  const getResolutionLatencyHours = (createdAt: string, resolvedAt?: string) => {
+    if (!resolvedAt) return 0
+    const created = new Date(createdAt).getTime()
+    const resolved = new Date(resolvedAt).getTime()
+    return Math.max(0, Math.round(((resolved - created) / (1000 * 60 * 60)) * 10) / 10)
+  }
+
+  const resolverOptions = Array.from(
+    new Set(resolvedDisputes.map((d) => d.resolutionMeta?.resolvedBy).filter(Boolean))
+  ) as string[]
+
+  const exportDecisionLogsCsv = () => {
+    if (decisionLogs.length === 0) return
+    const headers = ['dispute_id', 'listing_title', 'status', 'buyer', 'seller', 'resolved_by', 'resolved_at', 'sla_breach_type', 'resolution_latency_hours', 'resolution_notes']
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const rows = decisionLogs.map((d) => [
+      d.id,
+      d.listing.title,
+      statusLabels[d.status][language],
+      d.buyer.name,
+      d.seller.name,
+      d.resolutionMeta?.resolvedBy ?? '',
+      d.resolutionMeta?.resolvedAt ?? '',
+      getSlaBreachType(d.createdAt),
+      getResolutionLatencyHours(d.createdAt, d.resolutionMeta?.resolvedAt),
+      d.resolutionMeta?.notes ?? '',
+    ])
+    const csv = [headers, ...rows]
+      .map((row) => row.map((item) => escapeCsv(String(item))).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `decision-log-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-6">
@@ -132,6 +285,17 @@ export default function DisputesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button variant={activeFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setActiveFilter('all')}>
+              {language === 'vi' ? 'Tất cả' : 'All'}
+            </Button>
+            <Button variant={activeFilter === 'sla_overdue' ? 'default' : 'outline'} size="sm" onClick={() => setActiveFilter('sla_overdue')}>
+              {language === 'vi' ? 'SLA quá hạn' : 'SLA overdue'}
+            </Button>
+            <Button variant={activeFilter === 'high_value' ? 'default' : 'outline'} size="sm" onClick={() => setActiveFilter('high_value')}>
+              {language === 'vi' ? 'High value' : 'High value'}
+            </Button>
+          </div>
           {activeDisputes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-success" />
@@ -140,6 +304,13 @@ export default function DisputesPage() {
           ) : (
             <div className="space-y-4">
               {activeDisputes.map((dispute) => (
+                (() => {
+                  const sla = getSla(dispute.createdAt)
+                  const evidenceScore = getEvidenceScore(dispute.description)
+                  const isHighValue = dispute.listing.price >= 30000000
+                  const hasRepeatSeller = (repeatSellerCounts[dispute.seller.id] || 0) > 1
+                  const hasRepeatBuyer = (repeatBuyerCounts[dispute.buyer.id] || 0) > 1
+                  return (
                 <motion.div
                   key={dispute.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -169,6 +340,39 @@ export default function DisputesPage() {
                           <Clock className="h-3 w-3" />
                           {new Date(dispute.createdAt).toLocaleDateString('vi-VN')}
                         </span>
+                        <Badge variant="outline" className={cn('text-xs', sla.ackOverdue ? 'text-destructive border-destructive/40' : 'text-emerald-600 border-emerald-400/40')}>
+                          {sla.ackOverdue
+                            ? (language === 'vi' ? 'Quá SLA 8h acknowledge' : '8h acknowledge overdue')
+                            : (language === 'vi' ? 'Trong SLA 8h acknowledge' : 'Within 8h acknowledge SLA')}
+                        </Badge>
+                        <Badge variant="outline" className={cn('text-xs', sla.resolveOverdue ? 'text-destructive border-destructive/40' : 'text-emerald-600 border-emerald-400/40')}>
+                          {sla.resolveOverdue
+                            ? (language === 'vi' ? 'Quá SLA 48h resolve' : '48h resolution overdue')
+                            : (language === 'vi' ? 'Trong SLA 48h resolve' : 'Within 48h resolution SLA')}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {language === 'vi' ? 'Ack due:' : 'Ack due:'} {new Date(sla.ackDue).toLocaleString('vi-VN')}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {language === 'vi' ? 'Resolve due:' : 'Resolve due:'} {new Date(sla.resolveDue).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {isHighValue && (
+                          <Badge variant="outline" className="text-xs border-destructive/40 text-destructive">
+                            {language === 'vi' ? 'High value case' : 'High value case'}
+                          </Badge>
+                        )}
+                        {hasRepeatSeller && (
+                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600">
+                            {language === 'vi' ? 'Repeat seller dispute' : 'Repeat seller dispute'}
+                          </Badge>
+                        )}
+                        {hasRepeatBuyer && (
+                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600">
+                            {language === 'vi' ? 'Repeat buyer dispute' : 'Repeat buyer dispute'}
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Parties */}
@@ -200,6 +404,15 @@ export default function DisputesPage() {
                           <p className="text-sm">{dispute.description}</p>
                         </div>
                       </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{language === 'vi' ? 'Độ đầy đủ bằng chứng' : 'Evidence completeness'}</span>
+                          <span className="font-medium text-foreground">{evidenceScore}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div className={cn('h-full rounded-full', evidenceScore >= 70 ? 'bg-emerald-500' : 'bg-amber-500')} style={{ width: `${evidenceScore}%` }} />
+                        </div>
+                      </div>
                     </div>
 
                     {/* Actions */}
@@ -229,6 +442,8 @@ export default function DisputesPage() {
                     </div>
                   </div>
                 </motion.div>
+                  )
+                })()
               ))}
             </div>
           )}
@@ -259,6 +474,11 @@ export default function DisputesPage() {
                       <p className="text-xs text-muted-foreground">
                         {dispute.buyer.name} vs {dispute.seller.name}
                       </p>
+                      {dispute.resolutionMeta && (
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          {language === 'vi' ? 'Resolved bởi' : 'Resolved by'} {dispute.resolutionMeta.resolvedBy} - {new Date(dispute.resolutionMeta.resolvedAt).toLocaleString('vi-VN')}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Badge variant="outline" className={cn('text-xs', statusColors[dispute.status])}>
@@ -266,6 +486,162 @@ export default function DisputesPage() {
                   </Badge>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {resolvedDisputes.some((d) => d.resolutionMeta) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{language === 'vi' ? 'Decision Log' : 'Decision Log'}</CardTitle>
+            <CardDescription>
+              {language === 'vi'
+                ? 'Lịch sử quyết định để phục vụ audit và đối soát'
+                : 'Resolution history for audit and reconciliation'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-5">
+              <input
+                value={logSearch}
+                onChange={(e) => {
+                  setLogSearch(e.target.value)
+                  setLogPage(1)
+                }}
+                placeholder={language === 'vi' ? 'Tìm theo tên xe/người...' : 'Search listing/user...'}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <select
+                value={logStatusFilter}
+                onChange={(e) => {
+                  setLogStatusFilter(e.target.value as typeof logStatusFilter)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="all">{language === 'vi' ? 'Tất cả trạng thái' : 'All statuses'}</option>
+                <option value="resolved_buyer_favor">{statusLabels.resolved_buyer_favor[language]}</option>
+                <option value="resolved_seller_favor">{statusLabels.resolved_seller_favor[language]}</option>
+                <option value="closed">{statusLabels.closed[language]}</option>
+              </select>
+              <select
+                value={logResolverFilter}
+                onChange={(e) => {
+                  setLogResolverFilter(e.target.value)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="all">{language === 'vi' ? 'Tất cả người xử lý' : 'All resolvers'}</option>
+                {resolverOptions.map((resolver) => (
+                  <option key={resolver} value={resolver}>{resolver}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={logFromDate}
+                onChange={(e) => {
+                  setLogFromDate(e.target.value)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <input
+                type="date"
+                value={logToDate}
+                onChange={(e) => {
+                  setLogToDate(e.target.value)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              />
+            </div>
+            <div className="mb-3 grid gap-2 sm:grid-cols-2">
+              <select
+                value={String(logPageSize)}
+                onChange={(e) => {
+                  setLogPageSize(Number(e.target.value) as 5 | 10 | 20)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="5">5 rows / page</option>
+                <option value="10">10 rows / page</option>
+                <option value="20">20 rows / page</option>
+              </select>
+              <select
+                value={logSort}
+                onChange={(e) => {
+                  setLogSort(e.target.value as typeof logSort)
+                  setLogPage(1)
+                }}
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="resolved_at_desc">{language === 'vi' ? 'Mới nhất trước' : 'Newest first'}</option>
+                <option value="resolved_at_asc">{language === 'vi' ? 'Cũ nhất trước' : 'Oldest first'}</option>
+                <option value="sla_breach_desc">{language === 'vi' ? 'Ưu tiên SLA breach cao' : 'Highest SLA breach first'}</option>
+                <option value="resolver_asc">{language === 'vi' ? 'Resolver A-Z' : 'Resolver A-Z'}</option>
+              </select>
+            </div>
+            <div className="mb-3 flex justify-end">
+              <Button size="sm" variant="outline" onClick={exportDecisionLogsCsv} disabled={decisionLogs.length === 0}>
+                {language === 'vi' ? 'Export CSV' : 'Export CSV'}
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {paginatedDecisionLogs.map((dispute) => (
+                  <div key={`${dispute.id}-log`} className="rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium">{dispute.listing.title}</p>
+                      <Badge variant="outline" className={cn('text-xs', statusColors[dispute.status])}>
+                        {statusLabels[dispute.status][language]}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {language === 'vi' ? 'Resolved bởi' : 'Resolved by'} {dispute.resolutionMeta?.resolvedBy} -{' '}
+                      {dispute.resolutionMeta ? new Date(dispute.resolutionMeta.resolvedAt).toLocaleString('vi-VN') : ''}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      SLA breach: {getSlaBreachType(dispute.createdAt)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {language === 'vi' ? 'Resolution latency:' : 'Resolution latency:'}{' '}
+                      {getResolutionLatencyHours(dispute.createdAt, dispute.resolutionMeta?.resolvedAt)}h
+                    </p>
+                    <p className="mt-2 text-sm text-foreground">{dispute.resolutionMeta?.notes}</p>
+                  </div>
+                ))}
+              {decisionLogs.length === 0 && (
+                <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  {language === 'vi' ? 'Không có log phù hợp bộ lọc hiện tại.' : 'No decision logs match current filters.'}
+                </div>
+              )}
+              {decisionLogs.length > 0 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'vi' ? 'Trang' : 'Page'} {logPage}/{totalLogPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={logPage <= 1}
+                      onClick={() => setLogPage((p) => Math.max(1, p - 1))}
+                    >
+                      {language === 'vi' ? 'Trước' : 'Prev'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={logPage >= totalLogPages}
+                      onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
+                    >
+                      {language === 'vi' ? 'Sau' : 'Next'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -291,6 +667,23 @@ export default function DisputesPage() {
               <p className="text-sm text-muted-foreground">
                 {DISPUTE_TYPE_LABELS[selectedDispute?.type || 'other'][language]}
               </p>
+              {selectedDispute && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{language === 'vi' ? 'Độ đầy đủ bằng chứng' : 'Evidence completeness'}</span>
+                    <span className="font-medium">{getEvidenceScore(selectedDispute.description)}%</span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-background/80 overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full',
+                        getEvidenceScore(selectedDispute.description) >= 70 ? 'bg-emerald-500' : 'bg-amber-500'
+                      )}
+                      style={{ width: `${getEvidenceScore(selectedDispute.description)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Resolution Choice */}
