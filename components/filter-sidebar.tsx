@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronDown, Filter, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, Filter, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
 import { formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
@@ -143,9 +142,9 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex w-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+      <div className="flex shrink-0 items-center justify-between border-b border-border pb-4 mb-4">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-foreground">Bộ Lọc</h3>
@@ -167,8 +166,7 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
         )}
       </div>
 
-      <ScrollArea className="flex-1 -mx-1 px-1">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 -mx-1 px-1">
           {/* VeloSafe Verified Toggle */}
           <div className="border-b border-border pb-4">
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-success/30 bg-success/5 p-3 hover:bg-success/10 transition-colors">
@@ -228,8 +226,7 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
               defaultOpen={index < 2}
             />
           ))}
-        </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
@@ -242,7 +239,9 @@ export function FilterSidebar({ filters, onFilterChange, className }: FilterSide
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        "hidden lg:flex lg:flex-col w-72 shrink-0 sticky top-20 h-[calc(100vh-6rem)] bg-card/95 backdrop-blur-lg rounded-lg border border-border/60 p-4 shadow-athletic",
+        // Một thanh cuộn trên toàn bộ sidebar: luôn xem được mọi mục khi zoom (svh/dvh bám viewport thật)
+        "hidden max-h-[calc(min(100svh,100dvh,100vh)-5.25rem)] w-72 shrink-0 self-start flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain [scrollbar-gutter:stable]",
+        "bg-card/95 backdrop-blur-lg rounded-lg border border-border/60 p-4 shadow-athletic lg:flex lg:sticky lg:top-20",
         className
       )}
     >
@@ -275,7 +274,7 @@ export function MobileFilterSheet({ filters, onFilterChange }: FilterSidebarProp
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-80 p-4">
+      <SheetContent side="left" className="flex min-h-0 w-80 flex-col gap-0 overflow-y-auto overscroll-y-contain p-4 pt-12 [scrollbar-gutter:stable]">
         <FilterContent filters={filters} onFilterChange={onFilterChange} />
       </SheetContent>
     </Sheet>
