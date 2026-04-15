@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Archivo, Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { ChatWidget } from '@/components/ChatWidget'
 import { Providers } from '@/components/providers'
 import './globals.css'
 
@@ -60,6 +61,7 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <ChatWidget />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
