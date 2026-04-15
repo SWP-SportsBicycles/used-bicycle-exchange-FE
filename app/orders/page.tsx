@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -29,10 +29,12 @@ import { cn } from '@/lib/utils'
 
 const statusIcons = {
   pending_deposit: Clock,
-  deposit_received: CheckCircle2,
+  soft_reserved: CheckCircle2,
   inspection_scheduled: Calendar,
   inspection_completed: CheckCircle2,
   pending_payment: Clock,
+  delivered: Package,
+  pending_confirmation: Clock,
   completed: CheckCircle2,
   cancelled: XCircle,
   disputed: AlertTriangle,
@@ -40,16 +42,48 @@ const statusIcons = {
 
 const statusColors = {
   pending_deposit: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30',
-  deposit_received: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
+  soft_reserved: 'bg-blue-500/20 text-blue-500 border-blue-500/30',
   inspection_scheduled: 'bg-purple-500/20 text-purple-500 border-purple-500/30',
   inspection_completed: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30',
   pending_payment: 'bg-amber-500/20 text-amber-500 border-amber-500/30',
+  delivered: 'bg-cyan-500/20 text-cyan-600 border-cyan-500/30',
+  pending_confirmation: 'bg-indigo-500/20 text-indigo-600 border-indigo-500/30',
   completed: 'bg-success/20 text-success border-success/30',
   cancelled: 'bg-muted text-muted-foreground border-border',
   disputed: 'bg-destructive/20 text-destructive border-destructive/30',
 }
 
 export default function OrdersPage() {
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const getWaitingOwner = (status: string) => {
+    switch (status) {
+      case 'pending_deposit':
+        return language === 'vi' ? 'Chờ Buyer đặt Soft Reserve' : 'Waiting Buyer to soft reserve'
+      case 'soft_reserved':
+        return language === 'vi' ? 'Chờ Buyer đặt cọc kiểm định' : 'Waiting Buyer inspection deposit'
+      case 'inspection_scheduled':
+        return language === 'vi' ? 'Chờ Inspector kiểm định' : 'Waiting Inspector'
+      case 'inspection_completed':
+        return language === 'vi' ? 'Chờ Buyer quyết định thanh toán' : 'Waiting Buyer payment decision'
+      case 'pending_payment':
+        return language === 'vi' ? 'Chờ Buyer thanh toán escrow' : 'Waiting Buyer escrow payment'
+      case 'delivered':
+        return language === 'vi' ? 'Chờ Buyer xác nhận đã nhận' : 'Waiting Buyer confirmation'
+      case 'pending_confirmation':
+        return language === 'vi' ? 'System chờ timeout xác nhận' : 'System waiting confirmation timeout'
+      case 'disputed':
+        return language === 'vi' ? 'Chờ Admin xử lý tranh chấp' : 'Waiting Admin resolution'
+      default:
+        return language === 'vi' ? 'Đã hoàn tất' : 'Completed'
+    }
+  }
+
   const { user, isAuthenticated } = useAuth()
   const { language, t } = useLanguage()
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all')
@@ -70,6 +104,25 @@ export default function OrdersPage() {
     }
     return true
   })
+
+  const getEffectiveStatus = (order: typeof buyerOrders[number]) => {
+    if (order.status !== 'pending_confirmation') return order.status
+    const start = new Date(order.createdAt).getTime()
+    const due = start + 24 * 60 * 60 * 1000
+    return now >= due ? 'completed' : 'pending_confirmation'
+  }
+
+  const getPendingConfirmationCountdown = (createdAt: string) => {
+    const start = new Date(createdAt).getTime()
+    const due = start + 24 * 60 * 60 * 1000
+    const remainingMs = due - now
+    if (remainingMs <= 0) return null
+    const totalSeconds = Math.floor(remainingMs / 1000)
+    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
+    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
+    const seconds = String(totalSeconds % 60).padStart(2, '0')
+    return `${hours}:${minutes}:${seconds}`
+  }
 
   if (!isAuthenticated) {
     return (
@@ -136,7 +189,8 @@ export default function OrdersPage() {
           <TabsContent value={activeTab} className="space-y-4">
             {filteredOrders.length > 0 ? (
               filteredOrders.map((order, index) => {
-                const StatusIcon = statusIcons[order.status]
+                const effectiveStatus = getEffectiveStatus(order)
+                const StatusIcon = statusIcons[effectiveStatus]
                 return (
                   <motion.div
                     key={order.id}
@@ -156,11 +210,16 @@ export default function OrdersPage() {
                         </div>
                         <Badge 
                           variant="outline" 
-                          className={cn('gap-1.5', statusColors[order.status])}
+                          className={cn('gap-1.5', statusColors[effectiveStatus])}
                         >
                           <StatusIcon className="h-3 w-3" />
-                          {ORDER_STATUS_LABELS[order.status][language]}
+                          {ORDER_STATUS_LABELS[effectiveStatus][language]}
                         </Badge>
+                        {order.status === 'pending_confirmation' && effectiveStatus === 'completed' && (
+                          <Badge variant="outline" className="ml-2 text-xs border-emerald-500/40 text-emerald-600">
+                            {language === 'vi' ? 'Auto-completed' : 'Auto-completed'}
+                          </Badge>
+                        )}
                       </CardHeader>
                       <CardContent className="p-4">
                         <div className="flex gap-4">
@@ -215,6 +274,20 @@ export default function OrdersPage() {
                                 </span>
                               </div>
                             )}
+                            <p className="mt-2 text-xs font-medium text-primary">
+                              {getWaitingOwner(effectiveStatus)}
+                            </p>
+                            {order.status === 'pending_confirmation' && effectiveStatus === 'pending_confirmation' && (
+                              <p className="mt-1 text-xs text-amber-600">
+                                {language === 'vi' ? 'Tự động hoàn tất sau:' : 'Auto-complete in:'}{' '}
+                                {getPendingConfirmationCountdown(order.createdAt) ?? (language === 'vi' ? 'Đã hết thời gian, chờ đồng bộ trạng thái' : 'Expired, waiting status sync')}
+                              </p>
+                            )}
+                            {order.status === 'pending_confirmation' && effectiveStatus === 'completed' && (
+                              <p className="mt-1 text-xs text-emerald-600">
+                                {language === 'vi' ? 'Đã tự động hoàn tất sau timeout xác nhận.' : 'Auto-completed after confirmation timeout.'}
+                              </p>
+                            )}
                           </div>
 
                           {/* Price & Actions */}
@@ -240,20 +313,22 @@ export default function OrdersPage() {
                         </div>
 
                         {/* Progress Steps */}
-                        {!['cancelled', 'disputed'].includes(order.status) && (
+                        {!['cancelled', 'disputed'].includes(effectiveStatus) && (
                           <div className="mt-4 pt-4 border-t border-border">
                             <div className="flex items-center justify-between text-xs">
                               {[
-                                { key: 'deposit_received', label: language === 'vi' ? 'Đặt cọc' : 'Deposit' },
-                                { key: 'inspection_scheduled', label: language === 'vi' ? 'Lên lịch' : 'Scheduled' },
-                                { key: 'inspection_completed', label: language === 'vi' ? 'Kiểm định' : 'Inspected' },
+                                { key: 'soft_reserved', label: language === 'vi' ? 'Reserve' : 'Reserve' },
+                                { key: 'inspection_scheduled', label: language === 'vi' ? 'Kiểm định' : 'Inspect' },
+                                { key: 'pending_payment', label: language === 'vi' ? 'Thanh toán' : 'Pay' },
+                                { key: 'delivered', label: language === 'vi' ? 'Đã giao' : 'Delivered' },
+                                { key: 'pending_confirmation', label: language === 'vi' ? 'Xác nhận' : 'Confirm' },
                                 { key: 'completed', label: language === 'vi' ? 'Hoàn thành' : 'Completed' },
                               ].map((step, i, arr) => {
-                                const stepOrder = ['pending_deposit', 'deposit_received', 'inspection_scheduled', 'inspection_completed', 'pending_payment', 'completed']
-                                const currentIndex = stepOrder.indexOf(order.status)
+                                const stepOrder = ['pending_deposit', 'soft_reserved', 'inspection_scheduled', 'inspection_completed', 'pending_payment', 'delivered', 'pending_confirmation', 'completed']
+                                const currentIndex = stepOrder.indexOf(effectiveStatus)
                                 const stepIndex = stepOrder.indexOf(step.key)
                                 const isCompleted = stepIndex <= currentIndex
-                                const isCurrent = step.key === order.status
+                                const isCurrent = step.key === effectiveStatus
 
                                 return (
                                   <div key={step.key} className="flex items-center">

@@ -100,6 +100,14 @@ export default function InspectionPage() {
   )
   const [overallNotes, setOverallNotes] = useState('')
 
+  const checkedCount = checklistItems.filter(item => checklist[item.id].status !== '').length
+  const notesCount = checklistItems.filter(item => checklist[item.id].notes.trim().length > 0).length
+  const photoCount = checklistItems.filter(item => checklist[item.id].photos.length > 0).length
+  const evidenceCompleteness = Math.min(
+    100,
+    Math.round(((checkedCount / checklistItems.length) * 50) + ((notesCount / checklistItems.length) * 25) + ((photoCount / checklistItems.length) * 25))
+  )
+
   const updateChecklist = (id: string, field: keyof ChecklistItemState, value: ChecklistItemState[keyof ChecklistItemState]) => {
     setChecklist(prev => ({
       ...prev,
@@ -228,6 +236,18 @@ export default function InspectionPage() {
             {currentStep === 1 && (language === 'vi' ? 'Kiểm tra từng bộ phận của xe' : 'Inspect each component of the bike')}
             {currentStep === 2 && (language === 'vi' ? 'Xem lại và gửi báo cáo' : 'Review and submit report')}
           </CardDescription>
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{language === 'vi' ? 'Độ đầy đủ bằng chứng' : 'Evidence completeness'}</span>
+              <span className="font-medium text-foreground">{evidenceCompleteness}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={cn('h-full rounded-full', evidenceCompleteness >= 70 ? 'bg-emerald-500' : 'bg-amber-500')}
+                style={{ width: `${evidenceCompleteness}%` }}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <motion.div
@@ -516,7 +536,7 @@ export default function InspectionPage() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} className="gap-2">
+              <Button onClick={handleSubmit} className="gap-2" disabled={evidenceCompleteness < 70}>
                 <Check className="h-4 w-4" />
                 {language === 'vi' ? 'Gửi Báo Cáo' : 'Submit Report'}
               </Button>

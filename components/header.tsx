@@ -76,7 +76,7 @@ export function Header() {
         <div className="hidden md:flex flex-1 max-w-2xl">
           <div className="header-marquee w-full">
             <span className="header-marquee-item">
-              <CircleCheckBig className="h-4 w-4 shrink-0 text-[#034C5F]" />
+              <CircleCheckBig className="h-4 w-4 shrink-0 text-primary" />
               Xe đạp được kiểm định khắt khe bởi các chuyên gia
             </span>
           </div>
@@ -85,11 +85,11 @@ export function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-1 md:flex">
           <Button 
-            variant={pathname === '/' ? 'secondary' : 'ghost'} 
+            variant={pathname.startsWith('/marketplace') ? 'secondary' : 'ghost'} 
             size="sm" 
             asChild
           >
-            <Link href="/">{t('nav.marketplace')}</Link>
+            <Link href="/marketplace">{t('nav.marketplace')}</Link>
           </Button>
           
           {isAuthenticated && (
@@ -264,7 +264,7 @@ export function Header() {
 
               <nav className="flex flex-col gap-2">
                 <Button variant="ghost" className="justify-start" asChild>
-                  <Link href="/">{t('nav.marketplace')}</Link>
+                  <Link href="/marketplace">{t('nav.marketplace')}</Link>
                 </Button>
                 
                 {isAuthenticated && (

@@ -31,11 +31,13 @@ import { cn } from '@/lib/utils'
 
 const statusColors: Record<string, string> = {
   pending_deposit: 'bg-muted text-muted-foreground',
-  deposit_received: 'bg-primary/20 text-primary',
+  soft_reserved: 'bg-[#407F3E]/15 text-[#407F3E]',
   inspection_scheduled: 'bg-accent/20 text-accent-foreground',
-  inspection_completed: 'bg-success/20 text-success',
-  pending_payment: 'bg-primary/20 text-primary',
-  completed: 'bg-success/20 text-success',
+  inspection_completed: 'bg-[#407F3E]/15 text-[#407F3E]',
+  pending_payment: 'bg-[#407F3E]/15 text-[#407F3E]',
+  delivered: 'bg-[#407F3E]/15 text-[#407F3E]',
+  pending_confirmation: 'bg-[#407F3E]/15 text-[#407F3E]',
+  completed: 'bg-[#407F3E]/15 text-[#407F3E]',
   cancelled: 'bg-destructive/20 text-destructive',
   disputed: 'bg-destructive/20 text-destructive',
 }
@@ -91,8 +93,8 @@ export default function SellerDashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {language === 'vi' ? 'Tin Đăng' : 'Listings'}
               </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-primary" />
+              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                <Package className="h-4 w-4 text-[#407F3E]" />
               </div>
             </CardHeader>
             <CardContent>
@@ -114,8 +116,8 @@ export default function SellerDashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {language === 'vi' ? 'Đơn Hàng' : 'Orders'}
               </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ShoppingCart className="h-4 w-4 text-primary" />
+              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                <ShoppingCart className="h-4 w-4 text-[#407F3E]" />
               </div>
             </CardHeader>
             <CardContent>
@@ -132,18 +134,18 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="border-success/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
+          <Card className="border-[#407F3E]/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {language === 'vi' ? 'Số Dư Ví' : 'Wallet Balance'}
               </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-success/15 flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-success" />
+              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                <Wallet className="h-4 w-4 text-[#407F3E]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-success" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
-              <p className="text-xs text-success flex items-center gap-1 mt-1">
+              <div className="text-3xl font-extrabold text-[#407F3E]" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
+              <p className="text-xs text-[#407F3E] flex items-center gap-1 mt-1">
                 <TrendingUp className="h-3 w-3" />
                 +12% {language === 'vi' ? 'tháng này' : 'this month'}
               </p>
@@ -161,8 +163,8 @@ export default function SellerDashboardPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {language === 'vi' ? 'Lượt Xem' : 'Views'}
               </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Eye className="h-4 w-4 text-primary" />
+              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                <Eye className="h-4 w-4 text-[#407F3E]" />
               </div>
             </CardHeader>
             <CardContent>
@@ -270,14 +272,14 @@ export default function SellerDashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {listing.isVeloSafeVerified && (
-                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />
                       )}
                       <Badge 
                         variant="outline" 
                         className={cn(
                           'text-xs',
                           listing.status === 'published' 
-                            ? 'bg-success/20 text-success' 
+                            ? 'bg-[#407F3E]/15 text-[#407F3E]' 
                             : 'bg-muted text-muted-foreground'
                         )}
                       >
@@ -327,10 +329,10 @@ export default function SellerDashboardPage() {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'h-8 w-8 rounded-full flex items-center justify-center',
-                      tx.amount > 0 ? 'bg-success/20' : 'bg-destructive/20'
+                      tx.amount > 0 ? 'bg-[#407F3E]/15' : 'bg-destructive/20'
                     )}>
                       {tx.amount > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-success" />
+                        <TrendingUp className="h-4 w-4 text-[#407F3E]" />
                       ) : (
                         <Wallet className="h-4 w-4 text-destructive" />
                       )}
@@ -345,7 +347,7 @@ export default function SellerDashboardPage() {
                   <div className="text-right">
                     <p className={cn(
                       'text-sm font-semibold',
-                      tx.amount > 0 ? 'text-success' : 'text-destructive'
+                      tx.amount > 0 ? 'text-[#407F3E]' : 'text-destructive'
                     )}>
                       {tx.amount > 0 ? '+' : ''}{formatVND(tx.amount)}
                     </p>
@@ -354,7 +356,7 @@ export default function SellerDashboardPage() {
                       className={cn(
                         'text-xs',
                         tx.status === 'completed' 
-                          ? 'bg-success/20 text-success' 
+                          ? 'bg-[#407F3E]/15 text-[#407F3E]' 
                           : 'bg-muted text-muted-foreground'
                       )}
                     >

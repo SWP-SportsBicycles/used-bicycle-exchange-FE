@@ -33,6 +33,8 @@ interface DepositModalProps {
   listing: Listing
   isOpen: boolean
   onClose: () => void
+  flowType?: 'soft_reserve' | 'inspection_deposit'
+  onSuccess?: (flowType: 'soft_reserve' | 'inspection_deposit') => void
 }
 
 type Step = 'review' | 'payment' | 'confirmation'
@@ -43,13 +45,22 @@ const paymentMethods = [
   { id: 'wallet', label: 'Ví điện tử', icon: Wallet, description: 'Momo, ZaloPay, VNPay' },
 ]
 
-export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
+export function DepositModal({
+  listing,
+  isOpen,
+  onClose,
+  flowType = 'inspection_deposit',
+  onSuccess,
+}: DepositModalProps) {
   const [step, setStep] = useState<Step>('review')
   const [paymentMethod, setPaymentMethod] = useState('bank')
   const [isProcessing, setIsProcessing] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
-  const depositAmount = calculateDeposit(listing.price)
+  const inspectionDepositAmount = calculateDeposit(listing.price)
+  const softReserveAmount = Math.min(Math.round(listing.price * 0.02), 500000)
+  const isSoftReserve = flowType === 'soft_reserve'
+  const depositAmount = isSoftReserve ? softReserveAmount : inspectionDepositAmount
   const tenPercent = listing.price * 0.1
   const isMaxCapped = tenPercent > 2000000
 
@@ -64,6 +75,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
     await new Promise(resolve => setTimeout(resolve, 2000))
     setIsProcessing(false)
     setStep('confirmation')
+    onSuccess?.(flowType)
   }
 
   const handleClose = () => {
@@ -88,10 +100,12 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-primary" />
-                  Đặt Cọc & Kiểm Định
+                  {isSoftReserve ? 'Soft Reserve' : 'Đặt Cọc Kiểm Định'}
                 </DialogTitle>
                 <DialogDescription>
-                  Xác nhận đặt cọc để kích hoạt dịch vụ kiểm định VeloSafe
+                  {isSoftReserve
+                    ? 'Thanh toán Soft Reserve để giữ xe và mở khóa thông tin người bán'
+                    : 'Xác nhận đặt cọc để kích hoạt dịch vụ kiểm định VeloSafe'}
                 </DialogDescription>
               </DialogHeader>
 
@@ -116,7 +130,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
                 <div className="space-y-3">
                   <h4 className="font-medium text-foreground flex items-center gap-2">
                     <Info className="h-4 w-4 text-muted-foreground" />
-                    Chi tiết cọc
+                    {isSoftReserve ? 'Chi tiết Soft Reserve' : 'Chi tiết cọc kiểm định'}
                   </h4>
                   <div className="rounded-lg border border-border p-4 space-y-2">
                     <div className="flex justify-between text-sm">
@@ -124,14 +138,22 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
                       <span className="text-foreground">{formatVND(listing.price)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Cọc 10%</span>
-                      <span className="text-foreground">{formatVND(tenPercent)}</span>
+                      <span className="text-muted-foreground">{isSoftReserve ? 'Soft Reserve 2%' : 'Cọc 10%'}</span>
+                      <span className="text-foreground">{formatVND(isSoftReserve ? listing.price * 0.02 : tenPercent)}</span>
                     </div>
-                    {isMaxCapped && (
+                    {!isSoftReserve && isMaxCapped && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Giới hạn tối đa</span>
                         <Badge variant="secondary" className="font-normal">
                           Max 2.000.000đ
+                        </Badge>
+                      </div>
+                    )}
+                    {isSoftReserve && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Giới hạn Soft Reserve</span>
+                        <Badge variant="secondary" className="font-normal">
+                          Max 500.000đ
                         </Badge>
                       </div>
                     )}
@@ -145,14 +167,21 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
 
                 {/* What happens next */}
                 <div className="space-y-3">
-                  <h4 className="font-medium text-foreground">Sau khi đặt cọc</h4>
+                  <h4 className="font-medium text-foreground">{isSoftReserve ? 'Sau khi Soft Reserve' : 'Sau khi đặt cọc'}</h4>
                   <div className="space-y-2">
-                    {[
-                      'Inspector VeloSafe sẽ liên hệ Seller để hẹn lịch kiểm tra xe',
-                      'Báo cáo kiểm định chi tiết sẽ được gửi cho bạn trong 48h',
-                      'Bạn có quyền hủy và hoàn 100% cọc nếu xe có lỗi nghiêm trọng',
-                      'Thông tin liên hệ của Seller sẽ được hiển thị sau khi cọc thành công',
-                    ].map((item, index) => (
+                    {(isSoftReserve
+                      ? [
+                          'Tin đăng được giữ chỗ trong hàng đợi giao dịch',
+                          'SĐT và địa chỉ chi tiết của Seller được mở khóa',
+                          'Bạn có thể chuyển sang bước đặt cọc kiểm định',
+                          'Soft Reserve giúp giảm rủi ro bị bán cho người khác',
+                        ]
+                      : [
+                          'Inspector VeloSafe sẽ liên hệ Seller để hẹn lịch kiểm tra xe',
+                          'Báo cáo kiểm định chi tiết sẽ được gửi cho bạn trong 48h',
+                          'Bạn có quyền hủy và hoàn 100% cọc nếu xe có lỗi nghiêm trọng',
+                          'Thông tin liên hệ của Seller đã được mở khóa từ bước Soft Reserve',
+                        ]).map((item, index) => (
                       <div key={index} className="flex items-start gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                         <span className="text-muted-foreground">{item}</span>
@@ -171,7 +200,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
                   />
                   <span className="text-sm text-muted-foreground">
                     Tôi đồng ý với{' '}
-                    <a href="#" className="text-primary hover:underline">Điều khoản đặt cọc</a>
+                    <a href="#" className="text-primary hover:underline">{isSoftReserve ? 'Điều khoản Soft Reserve' : 'Điều khoản đặt cọc'}</a>
                     {' '}và{' '}
                     <a href="#" className="text-primary hover:underline">Chính sách hủy/hoàn tiền</a>
                     {' '}của VeloTrust
@@ -185,7 +214,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
                   disabled={!agreedToTerms}
                   onClick={handleProceedToPayment}
                 >
-                  Tiếp tục thanh toán
+                  {isSoftReserve ? 'Tiếp tục Soft Reserve' : 'Tiếp tục thanh toán'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -203,7 +232,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
               <DialogHeader>
                 <DialogTitle>Chọn phương thức thanh toán</DialogTitle>
                 <DialogDescription>
-                  Thanh toán {formatVND(depositAmount)} để hoàn tất đặt cọc
+                  Thanh toán {formatVND(depositAmount)} để hoàn tất {isSoftReserve ? 'Soft Reserve' : 'đặt cọc kiểm định'}
                 </DialogDescription>
               </DialogHeader>
 
@@ -296,9 +325,7 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
                 <CheckCircle2 className="h-8 w-8 text-success" />
               </motion.div>
 
-              <h3 className="text-xl font-bold text-foreground mb-2">
-                Đặt cọc thành công!
-              </h3>
+              <h3 className="text-xl font-bold text-foreground mb-2">{isSoftReserve ? 'Soft Reserve thành công!' : 'Đặt cọc thành công!'}</h3>
               <p className="text-muted-foreground mb-6">
                 Mã đơn hàng: <span className="font-mono text-foreground">VT-{Date.now().toString(36).toUpperCase()}</span>
               </p>
@@ -306,11 +333,20 @@ export function DepositModal({ listing, isOpen, onClose }: DepositModalProps) {
               <div className="rounded-lg bg-success/10 border border-success/30 p-4 mb-6 text-left">
                 <h4 className="font-medium text-success mb-2 flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
-                  Dịch vụ kiểm định đã được kích hoạt
+                  {isSoftReserve ? 'Tin đăng đã được giữ chỗ và mở khóa liên hệ' : 'Dịch vụ kiểm định đã được kích hoạt'}
                 </h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>Inspector sẽ liên hệ Seller trong 24h làm việc</li>
-                  <li>Báo cáo kiểm định sẽ có trong 48h sau buổi kiểm</li>
+                  {isSoftReserve ? (
+                    <>
+                      <li>Bạn đã có thể xem thông tin liên hệ chi tiết của Seller</li>
+                      <li>Bước tiếp theo: Đặt cọc kiểm định để kích hoạt Inspector</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Inspector sẽ liên hệ Seller trong 24h làm việc</li>
+                      <li>Báo cáo kiểm định sẽ có trong 48h sau buổi kiểm</li>
+                    </>
+                  )}
                 </ul>
               </div>
 

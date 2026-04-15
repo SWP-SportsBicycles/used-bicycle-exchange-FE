@@ -412,7 +412,17 @@ export interface SellerOrder {
   }
   depositAmount: number
   totalAmount: number
-  status: 'pending_deposit' | 'deposit_received' | 'inspection_scheduled' | 'inspection_completed' | 'pending_payment' | 'completed' | 'cancelled' | 'disputed'
+  status:
+    | 'pending_deposit'
+    | 'soft_reserved'
+    | 'inspection_scheduled'
+    | 'inspection_completed'
+    | 'pending_payment'
+    | 'delivered'
+    | 'pending_confirmation'
+    | 'completed'
+    | 'cancelled'
+    | 'disputed'
   createdAt: string
   inspectionDate?: string
 }
@@ -487,7 +497,7 @@ export const MOCK_SELLER_ORDERS: SellerOrder[] = [
     buyer: { id: 'buyer-2', name: 'Lê Thị Mai', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=buyer2' },
     depositAmount: 2000000,
     totalAmount: 38000000,
-    status: 'deposit_received',
+    status: 'pending_confirmation',
     createdAt: '2024-01-11',
   },
   {
@@ -665,10 +675,12 @@ export const MOCK_ANALYTICS = {
 // Order status labels
 export const ORDER_STATUS_LABELS = {
   pending_deposit: { vi: 'Chờ Đặt Cọc', en: 'Pending Deposit' },
-  deposit_received: { vi: 'Đã Nhận Cọc', en: 'Deposit Received' },
+  soft_reserved: { vi: 'Đã Soft Reserve', en: 'Soft Reserved' },
   inspection_scheduled: { vi: 'Đã Lên Lịch Kiểm Định', en: 'Inspection Scheduled' },
   inspection_completed: { vi: 'Kiểm Định Hoàn Tất', en: 'Inspection Completed' },
   pending_payment: { vi: 'Chờ Thanh Toán', en: 'Pending Payment' },
+  delivered: { vi: 'Đã Giao Hàng', en: 'Delivered' },
+  pending_confirmation: { vi: 'Chờ Xác Nhận', en: 'Pending Confirmation' },
   completed: { vi: 'Hoàn Thành', en: 'Completed' },
   cancelled: { vi: 'Đã Hủy', en: 'Cancelled' },
   disputed: { vi: 'Đang Tranh Chấp', en: 'In Dispute' },

@@ -1,7 +1,11 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
+<<<<<<< HEAD
 This project is indexed by GitNexus as **used-bicycle-exchange-FE** (517 symbols, 1345 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+=======
+This project is indexed by GitNexus as **used-bicycle-exchange-FE** (523 symbols, 1358 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+>>>>>>> 7c45eb299dfaea5d1554db9051a163a5a890c880
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
