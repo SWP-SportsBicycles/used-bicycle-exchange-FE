@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { Suspense, useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Grid3X3, List, Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike } from 'lucide-react'
 import Image from 'next/image'
@@ -66,7 +66,7 @@ const bikeTypeOptions = [
   { value: 'urban', label: 'Xe đạp touring' },
 ] as const
 
-export default function MarketplacePage() {
+function MarketplacePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<FilterState>(initialFilters)
@@ -469,5 +469,22 @@ export default function MarketplacePage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background" aria-hidden>
+          <div className="mx-auto h-16 max-w-7xl animate-pulse border-b bg-muted/30" />
+          <div className="mx-auto mt-8 max-w-7xl px-4">
+            <div className="h-48 rounded-xl bg-muted/40" />
+          </div>
+        </div>
+      }
+    >
+      <MarketplacePageContent />
+    </Suspense>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { User, Heart, Menu, Globe, ChevronDown, LayoutDashboard, ClipboardCheck, Shield, LogOut, CircleCheckBig } from 'lucide-react'
@@ -15,6 +16,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { AuthModal } from '@/components/auth-modal'
 import { useAuth, type UserRole } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
@@ -36,9 +38,14 @@ const roleColors: Record<UserRole, string> = {
 }
 
 export function Header() {
+  const [authOpen, setAuthOpen] = useState(false)
   const { user, isAuthenticated, switchRole, logout } = useAuth()
   const { language, setLanguage, t } = useLanguage()
   const pathname = usePathname()
+  const isHome = pathname === '/'
+  const showPostListingCta =
+    (user.role === 'seller' || user.role === 'guest' || user.role === 'buyer') &&
+    (!isHome || isAuthenticated)
 
   const getDashboardLink = () => {
     switch (user.role) {
@@ -229,12 +236,19 @@ export function Header() {
             </DropdownMenu>
           )}
 
-          {(user.role === 'seller' || user.role === 'guest' || user.role === 'buyer') && (
-            <Button size="sm" className="ml-2" asChild>
-              <Link href="/seller/create">{t('nav.postListing')}</Link>
-            </Button>
-          )}
+          {(user.role === 'seller' || user.role === 'guest' || user.role === 'buyer') &&
+            (showPostListingCta ? (
+              <Button size="sm" className="ml-2" asChild>
+                <Link href="/seller/create">{t('nav.postListing')}</Link>
+              </Button>
+            ) : (
+              <Button size="sm" className="ml-2" onClick={() => setAuthOpen(true)}>
+                {language === 'vi' ? 'Đăng nhập' : 'Sign In'}
+              </Button>
+            ))}
         </nav>
+
+        <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
 
         {/* Mobile Menu */}
         <Sheet>
@@ -332,9 +346,15 @@ export function Header() {
               </div>
 
               <div className="border-t border-border pt-4">
-                <Button className="w-full mb-3" asChild>
-                  <Link href="/seller/create">{t('nav.postListing')}</Link>
-                </Button>
+                {showPostListingCta ? (
+                  <Button className="w-full mb-3" asChild>
+                    <Link href="/seller/create">{t('nav.postListing')}</Link>
+                  </Button>
+                ) : (
+                  <Button className="w-full mb-3" onClick={() => setAuthOpen(true)}>
+                    {language === 'vi' ? 'Đăng nhập' : 'Sign In'}
+                  </Button>
+                )}
                 {!isAuthenticated && (
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => switchRole('buyer')}>
