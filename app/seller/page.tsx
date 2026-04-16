@@ -88,22 +88,24 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Tin Đăng' : 'Listings'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                <Package className="h-4 w-4 text-[#407F3E]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.totalListings}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.activeListings} {language === 'vi' ? 'đang hoạt động' : 'active'}
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/seller/listings" className="block">
+            <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'vi' ? 'Tin Đăng' : 'Listings'}
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                  <Package className="h-4 w-4 text-[#407F3E]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.totalListings}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.activeListings} {language === 'vi' ? 'đang hoạt động' : 'active'}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
 
         <motion.div
@@ -111,22 +113,24 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Đơn Hàng' : 'Orders'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                <ShoppingCart className="h-4 w-4 text-[#407F3E]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.pendingOrders}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'vi' ? 'đang xử lý' : 'pending'}
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/seller/orders" className="block">
+            <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'vi' ? 'Đơn Hàng' : 'Orders'}
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4 text-[#407F3E]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.pendingOrders}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {language === 'vi' ? 'đang xử lý' : 'pending'}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
 
         <motion.div
@@ -134,23 +138,25 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="border-[#407F3E]/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Số Dư Ví' : 'Wallet Balance'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-[#407F3E]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold text-[#407F3E]" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
-              <p className="text-xs text-[#407F3E] flex items-center gap-1 mt-1">
-                <TrendingUp className="h-3 w-3" />
-                +12% {language === 'vi' ? 'tháng này' : 'this month'}
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/seller/wallet" className="block">
+            <Card className="border-[#407F3E]/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300 cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'vi' ? 'Số Dư Ví' : 'Wallet Balance'}
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
+                  <Wallet className="h-4 w-4 text-[#407F3E]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-extrabold text-[#407F3E]" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
+                <p className="text-xs text-[#407F3E] flex items-center gap-1 mt-1">
+                  <TrendingUp className="h-3 w-3" />
+                  +12% {language === 'vi' ? 'tháng này' : 'this month'}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
 
         <motion.div
@@ -259,7 +265,7 @@ export default function SellerDashboardPage() {
                     href={`/listing/${listing.id}`}
                     className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
-                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
                       <img 
                         src={listing.images[0]} 
                         alt={listing.title}
