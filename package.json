@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "guard:merge-conflicts": "node scripts/check-conflict-markers.mjs",
+    "guard:agent-sync": "node scripts/check-agent-guidance-sync.mjs",
+    "guard": "npm run guard:merge-conflicts && npm run guard:agent-sync",
+    "prepare": "node scripts/setup-git-hooks.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

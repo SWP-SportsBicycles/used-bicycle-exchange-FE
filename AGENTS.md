@@ -1,11 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-<<<<<<< HEAD
-This project is indexed by GitNexus as **used-bicycle-exchange-FE** (517 symbols, 1345 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
-=======
-This project is indexed by GitNexus as **used-bicycle-exchange-FE** (523 symbols, 1358 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
->>>>>>> 7c45eb299dfaea5d1554db9051a163a5a890c880
+This project is indexed by GitNexus as **xB6jYf9JZEC** (574 symbols, 1497 relationships, 5 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -21,7 +17,7 @@ This project is indexed by GitNexus as **used-bicycle-exchange-FE** (523 symbols
 
 1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/used-bicycle-exchange-FE/process/{processName}` — trace the full execution flow step by step
+3. `READ gitnexus://repo/xB6jYf9JZEC/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -60,10 +56,10 @@ This project is indexed by GitNexus as **used-bicycle-exchange-FE** (523 symbols
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/used-bicycle-exchange-FE/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/used-bicycle-exchange-FE/clusters` | All functional areas |
-| `gitnexus://repo/used-bicycle-exchange-FE/processes` | All execution flows |
-| `gitnexus://repo/used-bicycle-exchange-FE/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/xB6jYf9JZEC/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/xB6jYf9JZEC/clusters` | All functional areas |
+| `gitnexus://repo/xB6jYf9JZEC/processes` | All execution flows |
+| `gitnexus://repo/xB6jYf9JZEC/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 
@@ -91,6 +87,18 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 
 > Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
 
+## Troubleshooting (Cross-IDE / Cross-Agent)
+
+If GitNexus MCP resources are not visible or tool calls fail, use this recovery sequence:
+
+1. Check status: `npx gitnexus status`
+2. If repo is not indexed: `npx gitnexus analyze`
+3. If analyze fails with `@ladybugdb/core` / `lbugjs.node` errors (common on some Windows setups):
+	- Run: `node node_modules/@ladybugdb/core/install.js`
+	- Re-run: `npx gitnexus analyze`
+4. If still failing, reinstall dependencies with the project package manager, then retry analyze.
+5. Until GitNexus recovers, continue with the fallback workflow in “Cross-IDE Compatibility (Important)” so work is never blocked.
+
 ## CLI
 
 | Task | Read this skill file |
@@ -103,3 +111,36 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Local Agent Addendum (Persistent)
+
+This section is intentionally outside the GitNexus managed block so it is not overwritten by `gitnexus analyze`.
+
+### Cross-IDE Compatibility
+
+- GitNexus MCP is optional. If MCP tools/resources are unavailable in your IDE/agent, continue with code-first fallback and do not block work.
+- Fallback exploration order:
+	1. Use workspace search (`rg`, symbol search, or semantic search) to find entrypoints and UI flow.
+	2. Read route files first (`app/**/page.tsx`, `app/**/layout.tsx`), then shared components (`components/**`), then state/context (`lib/**`, `hooks/**`).
+	3. Build a caller/callee map manually from imports and function usage before editing.
+- Fallback impact check before edits:
+	- Find all references for target symbol (IDE references, `rg "symbolName"`).
+	- List direct callers and files likely affected.
+	- Mark risk as HIGH if symbol is shared across many routes/components.
+- Fallback pre-commit check:
+	- Review `git diff --name-only` to confirm only expected files changed.
+	- Run project validation commands (`npm run lint`, and build/test if configured).
+
+### Multi-Repo GitNexus CLI Note
+
+- If CLI returns `Multiple repositories indexed`, specify repo explicitly:
+	- `npx gitnexus query --repo xB6jYf9JZEC "<your query>"`
+	- `npx gitnexus context --repo xB6jYf9JZEC <symbolName>`
+	- `npx gitnexus impact --repo xB6jYf9JZEC <symbolName>`
+
+### Native Binary Recovery (Windows)
+
+- If analyze fails with `@ladybugdb/core` / `lbugjs.node` errors:
+	1. Run `node node_modules/@ladybugdb/core/install.js`
+	2. Re-run `npx gitnexus analyze`
+
