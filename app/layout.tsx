@@ -26,20 +26,7 @@ export const metadata: Metadata = {
   description: 'Nền tảng mua bán xe đạp thể thao đã qua sử dụng uy tín với dịch vụ kiểm định VeloSafe tại Hà Nội, TP.HCM và Đà Nẵng.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: '/icon.svg',
     apple: '/apple-icon.png',
   },
 }
