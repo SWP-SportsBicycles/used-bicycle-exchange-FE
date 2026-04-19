@@ -1,0 +1,462 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* VeloTrust - Professional Sporty Light Theme
+   Design Vision: "Strava meets Specialized"
+   High contrast, Electric Blue accent, glassmorphism, dynamic shadows */
+:root {
+  /* Pure white base for maximum contrast */
+  --background: oklch(0.985 0.004 95);
+  --foreground: oklch(0.15 0.02 250);
+  
+  /* Glass-like card surfaces with subtle translucency */
+  --card: oklch(0.995 0.004 95);
+  --card-foreground: oklch(0.12 0.02 250);
+  
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.12 0.02 250);
+  
+  /* Bright green primary */
+  --primary: #aee86c;
+  --primary-foreground: #1f2c12;
+  
+  /* Cool gray for secondary elements */
+  --secondary: oklch(0.955 0.006 95);
+  --secondary-foreground: oklch(0.24 0.02 250);
+  
+  /* Subtle muted tones */
+  --muted: oklch(0.958 0.004 95);
+  --muted-foreground: oklch(0.46 0.01 250);
+  
+  /* Light blue accent for hover states - glass feel */
+  --accent: #eef8df;
+  --accent-foreground: #223018;
+  
+  /* Neon Lime for verified badges & success states */
+  --success: oklch(0.72 0.22 140);
+  --success-foreground: oklch(0.15 0.02 140);
+  
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  
+  /* Refined borders for glass effect */
+  --border: oklch(0.89 0.01 95);
+  --input: oklch(0.978 0.004 95);
+  --ring: #aee86c;
+  
+  /* Chart colors - athletic palette */
+  --chart-1: #aee86c;
+  --chart-2: oklch(0.72 0.22 140);
+  --chart-3: oklch(0.60 0.15 280);
+  --chart-4: oklch(0.68 0.18 45);
+  --chart-5: oklch(0.58 0.22 25);
+  
+  /* 8px border radius as specified */
+  --radius: 0.5rem;
+
+  /* Carbon accent — subtle dark personality */
+  --carbon: #1a1a1a;
+  --carbon-light: #2a2a2a;
+  --carbon-muted: #3a3a3a;
+  --carbon-surface: #f5f5f5;
+  
+  /* Glass sidebar */
+  --sidebar: oklch(0.982 0.004 95);
+  --sidebar-foreground: oklch(0.12 0.02 250);
+  --sidebar-primary: #aee86c;
+  --sidebar-primary-foreground: #1f2c12;
+  --sidebar-accent: oklch(0.95 0.02 255);
+  --sidebar-accent-foreground: oklch(0.20 0.02 250);
+  --sidebar-border: oklch(0.92 0.005 250);
+  --sidebar-ring: #aee86c;
+}
+
+.dark {
+  /* Dark mode - Deep athletic dark with Electric Blue accents */
+  --background: oklch(0.10 0.015 250);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.14 0.015 250);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.12 0.015 250);
+  --popover-foreground: oklch(0.96 0 0);
+  --primary: #aee86c;
+  --primary-foreground: #1f2c12;
+  --secondary: oklch(0.20 0.01 250);
+  --secondary-foreground: oklch(0.90 0 0);
+  --muted: oklch(0.18 0.008 250);
+  --muted-foreground: oklch(0.60 0 0);
+  --accent: oklch(0.22 0.03 238);
+  --accent-foreground: oklch(0.96 0 0);
+  --success: oklch(0.72 0.22 140);
+  --success-foreground: oklch(0.10 0 0);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.96 0 0);
+  --border: oklch(0.24 0.01 250);
+  --input: oklch(0.18 0.008 250);
+  --ring: #aee86c;
+  --chart-1: #aee86c;
+  --chart-2: oklch(0.72 0.22 140);
+  --chart-3: oklch(0.60 0.15 280);
+  --chart-4: oklch(0.70 0.18 45);
+  --chart-5: oklch(0.58 0.22 25);
+  --sidebar: oklch(0.08 0.015 250);
+  --sidebar-foreground: oklch(0.96 0 0);
+  --sidebar-primary: #aee86c;
+  --sidebar-primary-foreground: #1f2c12;
+  --sidebar-accent: oklch(0.16 0.03 255);
+  --sidebar-accent-foreground: oklch(0.96 0 0);
+  --sidebar-border: oklch(0.22 0.01 250);
+  --sidebar-ring: #aee86c;
+}
+
+@theme inline {
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+  --font-display: 'Archivo', 'Archivo Fallback', system-ui, sans-serif;
+  --font-mono: 'Space Grotesk', 'Space Grotesk Fallback', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at top left, rgba(174, 232, 108, 0.16), transparent 26%),
+      radial-gradient(circle at top right, rgba(64, 127, 62, 0.08), transparent 22%),
+      linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0));
+    background-attachment: fixed;
+  }
+}
+
+/* Professional Sporty Glass Utilities */
+@layer utilities {
+  .glass-card {
+    @apply bg-card/85 backdrop-blur-md border border-border/60 shadow-sm;
+  }
+  
+  .glass-surface {
+    @apply bg-card/70 backdrop-blur-lg border border-border/50;
+  }
+  
+  .glass-elevated {
+    @apply bg-card/90 backdrop-blur-xl shadow-xl shadow-primary/10 border-border/40;
+  }
+  
+  /* Dynamic shadow utilities for athletic feel */
+  .shadow-athletic {
+    box-shadow: 
+      0 4px 6px -1px rgb(174 232 108 / 0.22),
+      0 2px 4px -2px rgb(174 232 108 / 0.2);
+  }
+  
+  .shadow-athletic-lg {
+    box-shadow: 
+      0 10px 15px -3px rgb(174 232 108 / 0.24),
+      0 4px 6px -4px rgb(174 232 108 / 0.22);
+  }
+
+  .shadow-premium {
+    box-shadow:
+      0 24px 48px -26px rgba(23, 35, 12, 0.28),
+      0 10px 24px -18px rgba(174, 232, 108, 0.24);
+  }
+  
+  /* High contrast text for sporty headers */
+  .text-sporty {
+    @apply font-bold tracking-tight text-foreground;
+  }
+
+  .header-marquee {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 1.5rem;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .header-marquee-item {
+    position: absolute;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    color: #253218;
+    font-size: 0.82rem;
+    font-weight: 600;
+    animation: header-marquee-single 13s linear infinite;
+    will-change: transform, opacity;
+  }
+
+  /* ── Homepage Redesign Utilities ── */
+
+  .section-label {
+    @apply text-xs font-bold uppercase tracking-[0.2em] text-primary;
+  }
+
+  .section-heading {
+    @apply text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl;
+    font-family: var(--font-archivo);
+  }
+
+  .section-subtext {
+    @apply mx-auto mt-4 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg;
+  }
+
+  /* Category card with lift + glow */
+  .category-card {
+    @apply flex h-full flex-col items-center gap-3 rounded-[1.75rem] border border-[#dfe8d2] bg-white/88 p-6
+           cursor-pointer transition-all duration-300 backdrop-blur-sm;
+    box-shadow:
+      0 20px 40px -30px rgba(37, 50, 24, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  .category-card:hover {
+    @apply border-primary/50 -translate-y-1.5;
+    box-shadow:
+      0 18px 36px -16px rgba(174, 232, 108, 0.26),
+      0 10px 20px -18px rgba(37, 50, 24, 0.28);
+  }
+
+  /* Trust / Why VeloTrust card */
+  .trust-card {
+    @apply rounded-2xl border border-border/50 bg-card/85 p-6
+           backdrop-blur-md transition-all duration-300;
+  }
+  .trust-card:hover {
+    @apply border-primary/40 -translate-y-0.5;
+    box-shadow: 0 8px 30px -8px rgba(174, 232, 108, 0.15);
+  }
+
+  .page-shell {
+    @apply relative overflow-hidden;
+  }
+
+  .page-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(174, 232, 108, 0.08), transparent 22%),
+      radial-gradient(circle at 100% 0%, rgba(37, 50, 24, 0.05), transparent 18%);
+    opacity: 0.9;
+  }
+
+  .premium-panel {
+    @apply rounded-[1.75rem] border border-border/70 bg-card/92 backdrop-blur-xl;
+    box-shadow:
+      0 28px 60px -36px rgba(18, 24, 10, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  .premium-subpanel {
+    @apply rounded-2xl border border-border/70 bg-white/80 backdrop-blur-md;
+  }
+
+  .eyebrow-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5a8739];
+  }
+
+  .metric-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+  }
+
+  .metric-value {
+    @apply text-3xl font-extrabold tracking-tight text-foreground;
+    font-family: var(--font-archivo);
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold;
+  }
+
+  .mesh-card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,250,242,0.88)),
+      radial-gradient(circle at top right, rgba(174, 232, 108, 0.18), transparent 38%);
+  }
+
+  /* Seller CTA gradient background */
+  .seller-cta-gradient {
+    background: linear-gradient(135deg, #253218 0%, #1a2410 50%, #2a3d1a 100%);
+  }
+
+  /* Step connector line */
+  .step-connector {
+    @apply hidden lg:block;
+    position: absolute;
+    top: 2rem;
+    left: calc(50% + 2rem);
+    width: calc(100% - 4rem);
+    height: 2px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--primary) 0px,
+      var(--primary) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+    opacity: 0.4;
+  }
+
+  /* Testimonial card */
+  .testimonial-card {
+    @apply rounded-2xl border border-border/50 bg-card p-6 transition-all duration-300;
+  }
+  .testimonial-card:hover {
+    @apply border-primary/30 -translate-y-0.5;
+    box-shadow: 0 4px 20px -6px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Stats counter  */
+  .stat-number {
+    @apply text-3xl font-extrabold text-foreground sm:text-4xl;
+    font-family: var(--font-archivo);
+  }
+
+  /* Trust badge row in hero */
+  .trust-badge-item {
+    @apply flex items-center gap-2 rounded-full border border-white/20 bg-white/10
+           px-4 py-2 text-sm font-medium text-white backdrop-blur-sm;
+  }
+
+  /* ── Carbon Accent Utilities ── */
+
+  /* Carbon section — subtle dark band for visual rhythm */
+  .carbon-section {
+    background: linear-gradient(180deg, var(--carbon) 0%, #222 100%);
+    color: #f0f0f0;
+  }
+
+  /* Carbon badge for premium tags */
+  .carbon-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1
+           text-[11px] font-bold tracking-wide uppercase;
+    background: var(--carbon);
+    color: #e0e0e0;
+    border: 1px solid rgba(174, 232, 108, 0.2);
+  }
+
+  /* Live activity pulse dot */
+  .live-dot {
+    @apply h-2 w-2 rounded-full bg-emerald-400;
+    box-shadow: 0 0 6px 2px rgba(52, 211, 153, 0.4);
+    animation: live-pulse 2s ease-in-out infinite;
+  }
+
+  /* Viewer count shimmer */
+  .viewer-signal {
+    @apply inline-flex items-center gap-1.5 rounded-full
+           bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700
+           dark:bg-amber-950/30 dark:text-amber-300;
+  }
+
+  /* Time-ago subtle label */
+  .time-ago {
+    @apply text-[11px] text-muted-foreground;
+  }
+
+  .ambient-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(37, 50, 24, 0.12), transparent);
+  }
+
+  .demo-kicker {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300;
+  }
+}
+
+@keyframes header-marquee-single {
+  0% {
+    transform: translateX(102%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(-100% - 1.5rem));
+    opacity: 0;
+  }
+}
+
+/* Subtle float for trust section icons */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Pulse glow for CTA buttons */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(174, 232, 108, 0.4); }
+  50%      { box-shadow: 0 0 20px 4px rgba(174, 232, 108, 0.2); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* Live pulse for activity indicators */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.3); }
+}
+
+/* Subtle shimmer for loading states */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(174, 232, 108, 0.08) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
