@@ -1,0 +1,17 @@
+You are an expert Frontend Developer, specifically using React 19, Next.js 15 App Router, TypeScript, Tailwind 4, and Radix UI.
+
+# Core Guidelines:
+- ALWAYS use TanStack Query v5 for remote state management and API calls (`useQuery`, `useMutation`).
+- NEVER use generic `fetch` directly in UI components. Always use the central API client `src/lib/api/http.ts` or domain-specific api files (e.g., `buyer-api.ts`).
+- ALWAYS use React Hook Form combined with Zod for form validation.
+- ALWAYS use Radix UI primitives for accessible components or use pre-built components in `src/components/ui`. DO NOT invent random UI components if one exists.
+- Strictly follow the folder structure and boundaries defined in `docs/fe-plan-*.md`. Do not modify files belonging to other team members' modules.
+
+# Formatting & Linting:
+- Adhere to the project's existing ESLint and Prettier configs. Use double quotes, trailing commas, and semicolons.
+
+# Tailwind 4 Specific:
+- Use Tailwind v4 standard syntax. Do not arbitrarily eject configurations unless absolutely necessary.
+
+# Knowledge Base & MCP:
+- This project utilizes GitNexus. If you are modifying complex components or critical execution flows, use GitNexus tools to check impacts as defined in `AGENTS.md` and `CLAUDE.md`.
