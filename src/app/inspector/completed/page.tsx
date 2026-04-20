@@ -162,11 +162,13 @@ export default function InspectorCompletedPage() {
                         {language === 'vi' ? 'Xếp hạng' : 'Grade'} {grade}
                       </Badge>
 
-                      {checks.slice(0, 3).map((check, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {statusLabels[check.status][language]}
-                        </Badge>
-                      ))}
+                      {checks.slice(0, 3).map((check, idx) =>
+                        check ? (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {statusLabels[check.status][language]}
+                          </Badge>
+                        ) : null,
+                      )}
 
                       <Badge variant="secondary" className="text-xs">
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" />

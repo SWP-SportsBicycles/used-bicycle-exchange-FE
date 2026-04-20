@@ -12,6 +12,7 @@ import {
   ChevronRight 
 } from 'lucide-react'
 import { Header } from '@/components/header'
+import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
@@ -48,8 +49,9 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
   const { language } = useLanguage()
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <RoleGuard allow={['inspector']}>
+      <div className="min-h-screen bg-background">
+        <Header />
       
       <div className="flex">
         {/* Sidebar */}
@@ -160,6 +162,7 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
           </motion.div>
         </main>
       </div>
-    </div>
+      </div>
+    </RoleGuard>
   )
 }

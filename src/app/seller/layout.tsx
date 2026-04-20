@@ -13,6 +13,7 @@ import {
   ChevronRight 
 } from 'lucide-react'
 import { Header } from '@/components/header'
+import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
@@ -48,8 +49,9 @@ export default function SellerLayout({ children }: { children: ReactNode }) {
   const { language } = useLanguage()
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <RoleGuard allow={['seller']}>
+      <div className="min-h-screen bg-background">
+        <Header />
       
       <div className="flex">
         {/* Sidebar */}
@@ -136,6 +138,7 @@ export default function SellerLayout({ children }: { children: ReactNode }) {
           </motion.div>
         </main>
       </div>
-    </div>
+      </div>
+    </RoleGuard>
   )
 }

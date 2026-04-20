@@ -1,0 +1,13 @@
+# Global fallback
+* @thanh
+
+# Core FE architecture and governance
+/src/lib/** @thanh
+/src/modules/** @thanh
+/src/app/api/** @thanh
+/.github/** @thanh
+/docs/** @thanh
+
+# UI primitives and shared components
+/src/components/ui/** @thanh
+/src/components/** @thanh

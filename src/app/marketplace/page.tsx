@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MOCK_LISTINGS } from '@/lib/mock-data'
+import { useMarketplaceListings } from '@/modules/marketplace/hooks/useMarketplaceListings'
 import { cn } from '@/lib/utils'
 
 const initialFilters: FilterState = {
@@ -76,6 +76,11 @@ function MarketplacePageContent() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('hcm')
   const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
+  const { data: listings = [] } = useMarketplaceListings({
+    search: appliedSearch || undefined,
+    city: selectedCity !== 'all' ? selectedCity : undefined,
+    category: selectedBikeType !== 'all' ? selectedBikeType : undefined,
+  })
 
   useEffect(() => {
     const term = (searchParams.get('q') || '').trim()
@@ -120,7 +125,7 @@ function MarketplacePageContent() {
 
   // Filter and sort listings
   const filteredListings = useMemo(() => {
-    let result = MOCK_LISTINGS.filter(listing => {
+    const result = listings.filter(listing => {
       // VeloSafe filter
       if (filters.veloSafeOnly && !listing.isVeloSafeVerified) return false
 
@@ -175,9 +180,7 @@ function MarketplacePageContent() {
     }
 
     return result
-  }, [filters, sortBy, appliedSearch])
-
-  const veloSafeCount = MOCK_LISTINGS.filter(l => l.isVeloSafeVerified).length
+  }, [listings, filters, sortBy, appliedSearch])
 
   return (
     <div className="min-h-screen bg-background">

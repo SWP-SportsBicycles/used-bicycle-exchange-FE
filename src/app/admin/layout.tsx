@@ -14,6 +14,7 @@ import {
   Settings
 } from 'lucide-react'
 import { Header } from '@/components/header'
+import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
@@ -56,8 +57,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { language } = useLanguage()
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <RoleGuard allow={['admin']}>
+      <div className="min-h-screen bg-background">
+        <Header />
       
       <div className="flex">
         {/* Sidebar - Command Center */}
@@ -157,6 +159,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </motion.div>
         </main>
       </div>
-    </div>
+      </div>
+    </RoleGuard>
   )
 }

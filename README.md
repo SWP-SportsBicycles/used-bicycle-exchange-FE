@@ -21,8 +21,12 @@ Open `http://localhost:3000`.
 
 - `npm run dev` — start local dev
 - `npm run lint` — run ESLint
+- `npm run lint:ci` — lint critical architecture paths with zero warnings
+- `npm run test` — run unit tests
+- `npm run test:ci` — run unit tests for CI
 - `npm run build` — production build + typecheck
 - `npm run start` — run production server
+- `npm run guard` — run repository guardrails
 
 ## Architecture Overview
 
@@ -137,3 +141,4 @@ This allows FE work without waiting for backend.
 
 - Data is mocked for MVP FE acceleration.
 - Swap to real backend by replacing adapters in `src/lib/api/*` and `src/mocks/mockApi.ts`.
+- See `docs/fe-standard-baseline.md` for merge quality baseline and Go/No-Go rules.

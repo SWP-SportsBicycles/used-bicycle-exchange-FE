@@ -1,4 +1,4 @@
-import type { MoneyVnd } from "@/types/domain";
+type MoneyVnd = number;
 
 export const MAX_DEPOSIT_VND: MoneyVnd = 2_000_000;
 
@@ -11,3 +11,7 @@ export function calcDepositAmountVnd(listingPrice: MoneyVnd, roundTo = 1_000) {
   return Math.round(raw / roundTo) * roundTo;
 }
 
+// Backward-compatible alias used by new baseline tests.
+export function calculateDepositVnd(priceVnd: number): number {
+  return calcDepositAmountVnd(priceVnd, 1);
+}
