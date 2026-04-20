@@ -1,14 +1,15 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { 
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
   Wallet, 
+  MapPin,
   Plus,
   ChevronRight 
 } from 'lucide-react'
@@ -17,6 +18,7 @@ import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
+import { sellerShippingApi } from '@/lib/api/sellerShippingApi'
 import { cn } from '@/lib/utils'
 
 const sidebarItems = [
@@ -41,15 +43,59 @@ const sidebarItems = [
     icon: Wallet, 
     label: { vi: 'Ví Tiền', en: 'Wallet' }
   },
+  {
+    href: '/seller/shipping-profile',
+    icon: MapPin,
+    label: { vi: 'Địa Chỉ Lấy Hàng', en: 'Pickup Address' },
+  },
 ]
 
+function isShippingProfileMissingError(error: unknown) {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message.includes('not found') || message.includes('404')
+}
+
 export default function SellerLayout({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const pathname = usePathname()
   const { user } = useAuth()
   const { language } = useLanguage()
+  const [isCheckingShippingProfile, setIsCheckingShippingProfile] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    const checkShippingProfile = async () => {
+      if (!pathname.startsWith('/seller') || pathname.startsWith('/seller/shipping-profile')) {
+        if (active) setIsCheckingShippingProfile(false)
+        return
+      }
+
+      try {
+        await sellerShippingApi.getMyProfile()
+      } catch (error) {
+        if (!active) return
+
+        if (isShippingProfileMissingError(error)) {
+          router.replace(`/seller/shipping-profile?redirect=${encodeURIComponent(pathname)}`)
+          return
+        }
+      } finally {
+        if (active) setIsCheckingShippingProfile(false)
+      }
+    }
+
+    void checkShippingProfile()
+
+    return () => {
+      active = false
+    }
+  }, [pathname, router, user.role])
 
   return (
     <RoleGuard allow={['seller']}>
+      {isCheckingShippingProfile ? null : (
       <div className="min-h-screen bg-background">
         <Header />
       
@@ -139,6 +185,7 @@ export default function SellerLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
       </div>
+      )}
     </RoleGuard>
   )
 }

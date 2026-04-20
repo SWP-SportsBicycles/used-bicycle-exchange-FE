@@ -10,8 +10,10 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { authApi } from '@/lib/api/auth-api'
+import type { AuthSession } from '@/lib/api/auth-api'
 import { useAuth } from '@/lib/auth-context'
 import type { AuthRole } from '@/lib/api/auth-api'
+import { sellerShippingApi } from '@/lib/api/sellerShippingApi'
 import {
   loginSchema,
   registerSchema,
@@ -34,6 +36,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { cn } from '@/lib/utils'
 
 type AuthMode = 'login' | 'register'
+type GoogleIntent = 'login' | 'register'
 
 const AUTH_DECOR_IMAGE =
   'https://www.theproscloset.com/cdn/shop/t/866/assets/login-modal-img.webp?v=130212517508398775691771966687'
@@ -59,6 +62,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null)
   const [registerErrorMessage, setRegisterErrorMessage] = useState<string | null>(null)
   const [isHandlingGoogleCallback, setIsHandlingGoogleCallback] = useState(false)
+  const [pendingGoogleIdToken, setPendingGoogleIdToken] = useState<string | null>(null)
+  const [pendingGoogleIntent, setPendingGoogleIntent] = useState<GoogleIntent | null>(null)
+  const [pendingGoogleRole, setPendingGoogleRole] = useState<'1' | '2'>('1')
   const hasGoogleClientId = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
 
   const defaultEmail = useMemo(() => searchParams.get('email') ?? '', [searchParams])
@@ -95,6 +101,51 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     [registerPassword],
   )
 
+  const mapAuthRoleToContextRole = (role: unknown): 'buyer' | 'seller' | 'inspector' | 'admin' | null => {
+    const normalized = typeof role === 'string' ? role.trim().toLowerCase() : role
+    if (normalized === 1 || normalized === '1' || normalized === 'buyer') return 'buyer'
+    if (normalized === 2 || normalized === '2' || normalized === 'seller') return 'seller'
+    if (normalized === 3 || normalized === '3' || normalized === 'inspector') return 'inspector'
+    if (normalized === 4 || normalized === '4' || normalized === 'admin') return 'admin'
+    return null
+  }
+
+  const isShippingProfileMissingError = (error: unknown) => {
+    if (!(error instanceof Error)) return false
+    const message = error.message.toLowerCase()
+    return message.includes('not found') || message.includes('404')
+  }
+
+  const resolvePostLoginDestination = async (session?: AuthSession, roleHint?: AuthRole) => {
+    const resolvedRole =
+      mapAuthRoleToContextRole(session?.user?.role) ??
+      mapAuthRoleToContextRole(roleHint)
+
+    if (resolvedRole !== 'seller') {
+      return redirectTarget
+    }
+
+    try {
+      await sellerShippingApi.getMyProfile()
+      return redirectTarget
+    } catch (error) {
+      if (isShippingProfileMissingError(error)) {
+        return `/seller/shipping-profile?redirect=${encodeURIComponent(redirectTarget)}`
+      }
+      return redirectTarget
+    }
+  }
+
+  const resetPendingGoogle = () => {
+    setPendingGoogleIdToken(null)
+    setPendingGoogleIntent(null)
+  }
+
+  const onModeChange = (nextMode: AuthMode) => {
+    setMode(nextMode)
+    resetPendingGoogle()
+  }
+
   useEffect(() => {
     const callbackFlag = searchParams.get('googleCallback')
     const accessToken = searchParams.get('accessToken') ?? searchParams.get('token')
@@ -129,7 +180,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
           },
         })
 
-        router.replace(redirectTarget)
+        const destination = await resolvePostLoginDestination(undefined, normalizedRole)
+        router.replace(destination)
       } catch {
         const message = language === 'vi' ? 'Dang nhap Google that bai' : 'Google sign-in failed'
         setLoginErrorMessage(message)
@@ -140,7 +192,15 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
 
     void run()
-  }, [isHandlingGoogleCallback, language, loginWithSession, redirectTarget, router, searchParams])
+  }, [
+    isHandlingGoogleCallback,
+    language,
+    loginWithSession,
+    redirectTarget,
+    resolvePostLoginDestination,
+    router,
+    searchParams,
+  ])
 
   const onLoginSubmit = async (values: LoginFormValues) => {
     setIsLoginSubmitting(true)
@@ -149,7 +209,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     try {
       const session = await authApi.signin(values)
       await loginWithSession(session)
-      router.push(searchParams.get('redirect') ?? '/')
+      const destination = await resolvePostLoginDestination(session)
+      router.push(destination)
     } catch (error) {
       setLoginErrorMessage(error instanceof Error ? error.message : 'Đăng nhập thất bại')
     } finally {
@@ -181,19 +242,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
   }
 
-  const onGoogleSubmit = async (response: CredentialResponse, target: 'login' | 'register') => {
-    const idToken = response.credential
-    if (!idToken) {
-      const message = language === 'vi' ? 'Khong nhan duoc token Google' : 'Unable to read Google token'
-      if (target === 'login') {
-        setLoginErrorMessage(message)
-      } else {
-        setRegisterErrorMessage(message)
-      }
-      return
-    }
-
-    const role = target === 'login' ? 1 : Number(registerRole) === 1 ? 1 : 2
+  const submitGoogleSession = async (idToken: string, role: AuthRole, target: GoogleIntent) => {
     setLoginErrorMessage(null)
     setRegisterErrorMessage(null)
     setIsGoogleSubmitting(true)
@@ -201,7 +250,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     try {
       const session = await authApi.googleLogin(idToken, role)
       await loginWithSession(session)
-      router.push(redirectTarget)
+      const destination = await resolvePostLoginDestination(session, role)
+      router.push(destination)
+      return true
     } catch (error) {
       const message =
         error instanceof Error
@@ -215,8 +266,42 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       } else {
         setRegisterErrorMessage(message)
       }
+      return false
     } finally {
       setIsGoogleSubmitting(false)
+    }
+  }
+
+  const onGoogleSubmit = async (response: CredentialResponse, target: GoogleIntent) => {
+    const idToken = response.credential
+    if (!idToken) {
+      const message = language === 'vi' ? 'Khong nhan duoc token Google' : 'Unable to read Google token'
+      if (target === 'login') {
+        setLoginErrorMessage(message)
+      } else {
+        setRegisterErrorMessage(message)
+      }
+      return
+    }
+
+    setPendingGoogleIdToken(idToken)
+    setPendingGoogleIntent(target)
+    setPendingGoogleRole(target === 'register' && registerRole === '2' ? '2' : '1')
+
+    if (target === 'login') {
+      setLoginErrorMessage(null)
+    } else {
+      setRegisterErrorMessage(null)
+    }
+  }
+
+  const onConfirmGoogleLoginRole = async () => {
+    if (!pendingGoogleIdToken || !pendingGoogleIntent) return
+    const role = pendingGoogleRole === '2' ? 2 : 1
+    const success = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
+
+    if (success) {
+      resetPendingGoogle()
     }
   }
 
@@ -268,7 +353,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                   />
                   <button
                     type="button"
-                    onClick={() => setMode('login')}
+                    onClick={() => onModeChange('login')}
                     className={cn(
                       'z-10 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                       mode === 'login' ? 'text-foreground' : 'text-foreground/70',
@@ -278,7 +363,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode('register')}
+                    onClick={() => onModeChange('register')}
                     className={cn(
                       'z-10 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                       mode === 'register' ? 'text-foreground' : 'text-foreground/70',
@@ -379,6 +464,37 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                               )}
                             </div>
                           </Button>
+
+                          {pendingGoogleIdToken && pendingGoogleIntent === 'login' && (
+                            <div className="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                              <p className="text-sm font-medium text-foreground">
+                                {language === 'vi' ? 'Chọn vai trò để hoàn tất đăng nhập Google' : 'Choose role to finish Google sign-in'}
+                              </p>
+                              <Select value={pendingGoogleRole} onValueChange={(value) => setPendingGoogleRole(value as '1' | '2')}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={language === 'vi' ? 'Chọn vai trò' : 'Select role'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">{language === 'vi' ? 'Người mua' : 'Buyer'}</SelectItem>
+                                  <SelectItem value="2">{language === 'vi' ? 'Người bán' : 'Seller'}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex gap-2">
+                                <Button type="button" className="flex-1" onClick={() => void onConfirmGoogleLoginRole()} disabled={isGoogleSubmitting}>
+                                  {isGoogleSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {language === 'vi' ? 'Xác nhận vai trò' : 'Confirm role'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={resetPendingGoogle}
+                                  disabled={isGoogleSubmitting}
+                                >
+                                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="text-right text-sm">
                             <Link href="/auth/forgot-password" className="text-foreground/70 hover:text-foreground hover:underline">
@@ -536,6 +652,32 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                               )}
                             </div>
                           </Button>
+
+                          {pendingGoogleIdToken && pendingGoogleIntent === 'register' && (
+                            <div className="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                              <p className="text-sm font-medium text-foreground">
+                                {language === 'vi' ? 'Chọn vai trò để hoàn tất đăng ký Google' : 'Choose role to finish Google sign-up'}
+                              </p>
+                              <Select value={pendingGoogleRole} onValueChange={(value) => setPendingGoogleRole(value as '1' | '2')}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={language === 'vi' ? 'Chọn vai trò' : 'Select role'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">{language === 'vi' ? 'Người mua' : 'Buyer'}</SelectItem>
+                                  <SelectItem value="2">{language === 'vi' ? 'Người bán' : 'Seller'}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="flex gap-2">
+                                <Button type="button" className="flex-1" onClick={() => void onConfirmGoogleLoginRole()} disabled={isGoogleSubmitting}>
+                                  {isGoogleSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {language === 'vi' ? 'Xác nhận vai trò' : 'Confirm role'}
+                                </Button>
+                                <Button type="button" variant="ghost" onClick={resetPendingGoogle} disabled={isGoogleSubmitting}>
+                                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </form>
                       </Form>
                     </div>
