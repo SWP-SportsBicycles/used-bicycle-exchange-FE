@@ -6,7 +6,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { 
   Package, 
-  ChevronRight, 
   Clock, 
   CheckCircle2, 
   XCircle, 
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -54,7 +53,7 @@ const statusColors = {
 }
 
 export default function OrdersPage() {
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -85,7 +84,7 @@ export default function OrdersPage() {
   }
 
   const { user, isAuthenticated } = useAuth()
-  const { language, t } = useLanguage()
+  const { language } = useLanguage()
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all')
 
   // Mock buyer orders (using seller orders but as if user is the buyer)
@@ -138,6 +137,28 @@ export default function OrdersPage() {
               ? 'Đăng nhập để xem đơn hàng của bạn' 
               : 'Login to view your orders'}
           </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (user.role !== 'buyer') {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <Package className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">
+            {language === 'vi' ? 'Trang này dành cho Người Mua' : 'This page is for Buyers only'}
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            {language === 'vi'
+              ? 'Bạn có thể quản lý công việc tại bảng điều khiển theo vai trò hiện tại.'
+              : 'Use your role dashboard to manage your current workspace.'}
+          </p>
+          <Button asChild>
+            <Link href="/">{language === 'vi' ? 'Về Trang Chủ' : 'Back to Home'}</Link>
+          </Button>
         </div>
       </div>
     )

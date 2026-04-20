@@ -6,6 +6,7 @@ import { Grid3X3, List, Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Searc
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 import { Header } from '@/components/header'
 import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/components/filter-sidebar'
 import { ListingCard } from '@/components/listing-card'
@@ -68,6 +69,7 @@ const bikeTypeOptions = [
 
 function MarketplacePageContent() {
   const router = useRouter()
+  const { user } = useAuth()
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [sortBy, setSortBy] = useState('newest')
@@ -76,6 +78,8 @@ function MarketplacePageContent() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('hcm')
   const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
+  const sellerCtaHref =
+    user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'
   const { data: listings = [] } = useMarketplaceListings({
     search: appliedSearch || undefined,
     city: selectedCity !== 'all' ? selectedCity : undefined,
@@ -275,7 +279,7 @@ function MarketplacePageContent() {
                 </Button>
 
                 <Button asChild className="h-14 rounded-xl bg-[#407F3E] px-8 text-base font-semibold text-white hover:bg-[#346734]">
-                  <Link href="/seller/create">Bán ngay</Link>
+                  <Link href={sellerCtaHref}>Bán ngay</Link>
                 </Button>
               </div>
             </div>

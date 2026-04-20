@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { 
   User, 
@@ -43,7 +44,7 @@ const roleLabels: Record<string, { vi: string; en: string }> = {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const { language } = useLanguage()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
@@ -76,6 +77,32 @@ export default function ProfilePage() {
 
   // Mock transaction history
   const transactions = MOCK_SELLER_ORDERS.slice(0, 3)
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <h3 className="text-lg font-semibold mb-2">
+                {language === 'vi' ? 'Vui lòng đăng nhập' : 'Please login'}
+              </h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                {language === 'vi'
+                  ? 'Đăng nhập để quản lý hồ sơ cá nhân của bạn.'
+                  : 'Sign in to manage your profile.'}
+              </p>
+              <Button asChild>
+                <Link href="/auth/login?redirect=/profile">{language === 'vi' ? 'Đăng nhập' : 'Sign in'}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">

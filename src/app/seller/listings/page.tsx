@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
@@ -255,7 +256,13 @@ export default function SellerListingsPage() {
               className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted"
             >
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                <img src={listing.images[0] ?? '/placeholder.svg'} alt={listing.title} className="h-full w-full object-cover" />
+                <Image
+                  src={listing.images[0] ?? '/placeholder.svg'}
+                  alt={listing.title}
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-cover"
+                />
               </div>
 
               <div className="min-w-0 flex-1">
