@@ -87,19 +87,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function setRoleCookie(role: UserRole) {
+  if (typeof document === 'undefined') return
+  document.cookie = `role=${role}; path=/; max-age=86400; samesite=lax`
+}
+
+function clearAuthCookies() {
+  if (typeof document === 'undefined') return
+  document.cookie = 'role=; path=/; max-age=0; samesite=lax'
+  document.cookie = 'accessToken=; path=/; max-age=0; samesite=lax'
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User>(MOCK_USERS.guest)
 
   const switchRole = useCallback((role: UserRole) => {
     setUser(MOCK_USERS[role])
+    setRoleCookie(role)
   }, [])
 
   const login = useCallback((role: UserRole) => {
     setUser(MOCK_USERS[role])
+    setRoleCookie(role)
   }, [])
 
   const logout = useCallback(() => {
     setUser(MOCK_USERS.guest)
+    clearAuthCookies()
   }, [])
 
   const isAuthenticated = user.role !== 'guest'

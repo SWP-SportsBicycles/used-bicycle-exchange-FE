@@ -12,12 +12,15 @@ import {
   Check,
   AlertCircle
 } from 'lucide-react'
+import { useCreateListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import { listingSchema } from '@/modules/seller/schemas/listing-schema'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
@@ -45,7 +48,10 @@ const steps = [
 
 export default function CreateListingPage() {
   const { language } = useLanguage()
+  const createListingMutation = useCreateListing()
   const [currentStep, setCurrentStep] = useState(0)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -101,6 +107,81 @@ export default function CreateListingPage() {
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
     }))
+  }
+
+  const handleSubmitForReview = async () => {
+    setSubmitError(null)
+    setSubmitSuccess(null)
+
+    const medias = [
+      ...formData.images.map((image) => ({ image, type: 0 as const })),
+      ...(formData.serialPhoto ? [{ image: formData.serialPhoto, type: 0 as const }] : []),
+      ...(formData.groupsetPhoto ? [{ image: formData.groupsetPhoto, type: 0 as const }] : []),
+    ]
+
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      serialNumber: formData.serial,
+      category: formData.category,
+      brand: formData.brand,
+      frameSize: formData.frameSize,
+      frameMaterial: formData.frameMaterial || undefined,
+      condition: formData.condition,
+      paint: undefined,
+      groupset: formData.groupset,
+      operating: formData.usageHistory || undefined,
+      tireRim: formData.wheelSize || undefined,
+      brakeType: undefined,
+      overall: undefined,
+      price: Number(String(formData.price).replace(/,/g, '')),
+      city: formData.city,
+      medias,
+    }
+
+    const validationResult = listingSchema.safeParse(payload)
+    if (!validationResult.success) {
+      const firstIssue = validationResult.error.issues[0]
+      setSubmitError(firstIssue?.message ?? (language === 'vi' ? 'Du lieu khong hop le' : 'Invalid listing data'))
+      return
+    }
+
+    try {
+      await createListingMutation.mutateAsync(validationResult.data)
+      setSubmitSuccess(
+        language === 'vi'
+          ? 'Da gui tin dang len he thong, vui long cho admin duyet.'
+          : 'Listing submitted successfully and is awaiting admin review.',
+      )
+      setCurrentStep(0)
+      setFormData({
+        title: '',
+        category: '',
+        brand: '',
+        model: '',
+        condition: '',
+        description: '',
+        frameSize: '',
+        frameMaterial: '',
+        groupset: '',
+        wheelSize: '',
+        usageHistory: '',
+        serial: '',
+        city: '',
+        price: '',
+        images: [],
+        serialPhoto: '',
+        groupsetPhoto: '',
+      })
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : language === 'vi'
+            ? 'Khong the gui tin luc nay. Vui long thu lai.'
+            : 'Unable to submit listing right now. Please try again.',
+      )
+    }
   }
 
   return (
@@ -167,6 +248,20 @@ export default function CreateListingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {submitError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
+          )}
+
+          {submitSuccess && (
+            <Alert className="mb-6 border-success/30 bg-success/10 text-success">
+              <Check className="h-4 w-4" />
+              <AlertDescription>{submitSuccess}</AlertDescription>
+            </Alert>
+          )}
+
           <motion.div
             key={currentStep}
             initial={{ opacity: 0, x: 20 }}
@@ -342,9 +437,9 @@ export default function CreateListingPage() {
                       <SelectContent>
                         <SelectItem value="700c">700c</SelectItem>
                         <SelectItem value="650b">650b</SelectItem>
-                        <SelectItem value="29">29"</SelectItem>
-                        <SelectItem value="27.5">27.5"</SelectItem>
-                        <SelectItem value="26">26"</SelectItem>
+                        <SelectItem value="29">29&quot;</SelectItem>
+                        <SelectItem value="27.5">27.5&quot;</SelectItem>
+                        <SelectItem value="26">26&quot;</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -647,8 +742,16 @@ export default function CreateListingPage() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2">
-                <Check className="h-4 w-4" />
+              <Button
+                className="gap-2"
+                onClick={handleSubmitForReview}
+                disabled={createListingMutation.isPending}
+              >
+                {createListingMutation.isPending ? (
+                  <Upload className="h-4 w-4 animate-pulse" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
                 {language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review'}
               </Button>
             )}
