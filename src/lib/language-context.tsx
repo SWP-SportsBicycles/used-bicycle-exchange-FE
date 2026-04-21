@@ -7,7 +7,7 @@ export type Language = 'vi' | 'en'
 // Translation dictionary
 export const translations = {
   // Common
-  'nav.marketplace': { vi: 'Marketplace', en: 'Marketplace' },
+  'nav.marketplace': { vi: 'Sàn xe đạp', en: 'Marketplace' },
   'nav.howItWorks': { vi: 'Cách Hoạt Động', en: 'How It Works' },
   'nav.wishlist': { vi: 'Yêu Thích', en: 'Wishlist' },
   'nav.login': { vi: 'Đăng Nhập', en: 'Login' },

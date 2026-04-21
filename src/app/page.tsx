@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useAuth } from '@/lib/auth-context'
 import { MOCK_LISTINGS } from '@/lib/mock-data'
 
 /* ────────────────────────────────────────────
@@ -153,10 +154,13 @@ const staggerItem = {
    Page Component
    ──────────────────────────────────────────── */
 export default function HomePage() {
+  const { user } = useAuth()
   const router = useRouter()
   const [searchInput, setSearchInput] = useState('')
   const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('all')
   const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
+  const sellerCtaHref =
+    user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'
 
   const featuredListings = useMemo(() => {
     const conditionScore = {
@@ -345,7 +349,7 @@ export default function HomePage() {
                 variant="outline"
                 className="rounded-xl border-white/30 bg-white/10 px-8 text-base font-bold text-white backdrop-blur-sm hover:bg-white/20 hover:border-white/50 transition-all duration-300"
               >
-                <Link href="/seller/create">
+                <Link href={sellerCtaHref}>
                   Bán xe của bạn
                 </Link>
               </Button>
@@ -594,7 +598,7 @@ export default function HomePage() {
                   size="lg"
                   className="rounded-xl bg-primary px-10 text-base font-bold text-primary-foreground hover:bg-[#90cb4f] animate-pulse-glow"
                 >
-                  <Link href="/seller/create">
+                  <Link href={sellerCtaHref}>
                     Đăng Bán Ngay
                     <ChevronRight className="ml-1 h-5 w-5" />
                   </Link>
@@ -823,7 +827,7 @@ export default function HomePage() {
                 { href: '/marketplace', label: 'Marketplace' },
                 { href: '#how-it-works', label: 'Cách hoạt động' },
                 { href: '#why-velotrust', label: 'Tại sao VeloTrust' },
-                { href: '/seller/create', label: 'Đăng bán xe' },
+                { href: sellerCtaHref, label: 'Đăng bán xe' },
               ].map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className="transition-colors hover:text-lime-200">{link.label}</Link>

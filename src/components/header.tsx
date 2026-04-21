@@ -1,9 +1,17 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { User, Heart, Menu, Globe, ChevronDown, LayoutDashboard, ClipboardCheck, Shield, LogOut, CircleCheckBig } from 'lucide-react'
+import {
+  CircleCheckBig,
+  ClipboardCheck,
+  Globe,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Shield,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -16,7 +24,6 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { AuthModal } from '@/components/auth-modal'
 import { useAuth, type UserRole } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
@@ -38,21 +45,28 @@ const roleColors: Record<UserRole, string> = {
 }
 
 export function Header() {
-  const [authOpen, setAuthOpen] = useState(false)
-  const { user, isAuthenticated, switchRole, logout } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
   const { language, setLanguage, t } = useLanguage()
   const pathname = usePathname()
   const isHome = pathname === '/'
-  const showPostListingCta =
-    (user.role === 'seller' || user.role === 'guest' || user.role === 'buyer') &&
-    (!isHome || isAuthenticated)
+  const authRedirect = encodeURIComponent(pathname || '/')
+  const isBuyer = user.role === 'buyer'
+  const showPostListingCta = (user.role === 'seller' || user.role === 'guest') && (!isHome || isAuthenticated)
+  const postListingHref =
+    user.role === 'seller'
+      ? '/seller/create'
+      : `/auth/login?redirect=${encodeURIComponent('/auth/register?role=2&redirect=/seller/create')}`
 
   const getDashboardLink = () => {
     switch (user.role) {
-      case 'seller': return '/seller'
-      case 'inspector': return '/inspector'
-      case 'admin': return '/admin'
-      default: return '/profile'
+      case 'seller':
+        return '/seller'
+      case 'inspector':
+        return '/inspector'
+      case 'admin':
+        return '/admin'
+      default:
+        return '/profile'
     }
   }
 
@@ -75,7 +89,7 @@ export function Header() {
             </svg>
           </div>
           <span className="hidden text-xl font-extrabold tracking-tight text-foreground sm:inline-block" style={{ fontFamily: 'var(--font-archivo)' }}>
-            VeloTrust
+            SBE
           </span>
         </Link>
 
@@ -91,21 +105,12 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-1 md:flex">
-          <Button 
-            variant={pathname.startsWith('/marketplace') ? 'secondary' : 'ghost'} 
-            size="sm" 
-            asChild
-          >
+          <Button variant={pathname.startsWith('/marketplace') ? 'secondary' : 'ghost'} size="sm" asChild>
             <Link href="/marketplace">{t('nav.marketplace')}</Link>
           </Button>
-          
-          {isAuthenticated && (
-            <Button 
-              variant={pathname.startsWith('/wishlist') ? 'secondary' : 'ghost'} 
-              size="sm" 
-              className="relative" 
-              asChild
-            >
+
+          {isBuyer && (
+            <Button variant={pathname.startsWith('/wishlist') ? 'secondary' : 'ghost'} size="sm" className="relative" asChild>
               <Link href="/wishlist">
                 <Heart className="h-4 w-4" />
                 <span className="sr-only">{t('nav.wishlist')}</span>
@@ -122,15 +127,21 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setLanguage('vi')} className={cn(language === 'vi' && 'bg-accent')}>
+              <DropdownMenuItem
+                onClick={() => setLanguage('vi')}
+                className={cn(language === 'vi' && 'bg-accent')}
+              >
                 Tiếng Việt
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLanguage('en')} className={cn(language === 'en' && 'bg-accent')}>
+              <DropdownMenuItem
+                onClick={() => setLanguage('en')}
+                className={cn(language === 'en' && 'bg-accent')}
+              >
                 English
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
           {/* User Menu */}
           {isAuthenticated ? (
             <DropdownMenu>
@@ -142,11 +153,13 @@ export function Header() {
                   </Avatar>
                   <div className="hidden lg:flex flex-col items-start">
                     <span className="text-sm font-medium leading-none">{user.name}</span>
-                    <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 mt-0.5', roleColors[user.role])}>
+                      <Badge
+                        variant="outline"
+                        className={cn('text-[10px] px-1.5 py-0 mt-0.5', roleColors[user.role])}
+                      >
                       {roleLabels[user.role][language]}
                     </Badge>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -157,7 +170,7 @@ export function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                
+
                 {user.role === 'seller' && (
                   <DropdownMenuItem asChild>
                     <Link href="/seller" className="flex items-center gap-2">
@@ -166,6 +179,7 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                 )}
+
                 {user.role === 'inspector' && (
                   <DropdownMenuItem asChild>
                     <Link href="/inspector" className="flex items-center gap-2">
@@ -174,6 +188,7 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                 )}
+
                 {user.role === 'admin' && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin" className="flex items-center gap-2">
@@ -182,30 +197,16 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                 )}
-                
+
                 <DropdownMenuItem asChild>
                   <Link href="/profile">{t('nav.profile')}</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/orders">{t('nav.myOrders')}</Link>
-                </DropdownMenuItem>
-                
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Demo: Switch Role
-                </DropdownMenuLabel>
-                {(['buyer', 'seller', 'inspector', 'admin'] as UserRole[]).map(role => (
-                  <DropdownMenuItem 
-                    key={role} 
-                    onClick={() => switchRole(role)}
-                    className={cn(user.role === role && 'bg-accent')}
-                  >
-                    <Badge variant="outline" className={cn('mr-2 text-xs', roleColors[role])}>
-                      {roleLabels[role][language]}
-                    </Badge>
+                {isBuyer && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/orders">{t('nav.myOrders')}</Link>
                   </DropdownMenuItem>
-                ))}
-                
+                )}
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />
@@ -214,41 +215,17 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <User className="h-4 w-4" />
-                  <span className="sr-only">Account</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Demo: Login As
-                </DropdownMenuLabel>
-                {(['buyer', 'seller', 'inspector', 'admin'] as UserRole[]).map(role => (
-                  <DropdownMenuItem key={role} onClick={() => switchRole(role)}>
-                    <Badge variant="outline" className={cn('mr-2 text-xs', roleColors[role])}>
-                      {roleLabels[role][language]}
-                    </Badge>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/auth/login?redirect=${authRedirect}`}>{t('nav.login')}</Link>
+            </Button>
           )}
 
-          {(user.role === 'seller' || user.role === 'guest' || user.role === 'buyer') &&
-            (showPostListingCta ? (
-              <Button size="sm" className="ml-2" asChild>
-                <Link href="/seller/create">{t('nav.postListing')}</Link>
-              </Button>
-            ) : (
-              <Button size="sm" className="ml-2" onClick={() => setAuthOpen(true)}>
-                {language === 'vi' ? 'Đăng nhập' : 'Sign In'}
-              </Button>
-            ))}
+          {showPostListingCta && (
+            <Button size="sm" className="ml-2" asChild>
+              <Link href={postListingHref}>{t('nav.postListing')}</Link>
+            </Button>
+          )}
         </nav>
-
-        <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
 
         {/* Mobile Menu */}
         <Sheet>
@@ -276,30 +253,44 @@ export function Header() {
                 </div>
               )}
 
+              {!isAuthenticated && (
+                <Button variant="outline" asChild>
+                  <Link href={`/auth/login?redirect=${authRedirect}`}>{t('nav.login')}</Link>
+                </Button>
+              )}
+
               <nav className="flex flex-col gap-2">
                 <Button variant="ghost" className="justify-start" asChild>
                   <Link href="/marketplace">{t('nav.marketplace')}</Link>
                 </Button>
-                
+
                 {isAuthenticated && (
                   <>
-                    <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/wishlist">
-                        <Heart className="mr-2 h-4 w-4" />
-                        {t('nav.wishlist')}
-                      </Link>
-                    </Button>
+                    {isBuyer && (
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link href="/wishlist">
+                          <Heart className="mr-2 h-4 w-4" />
+                          {t('nav.wishlist')}
+                        </Link>
+                      </Button>
+                    )}
                     <Button variant="ghost" className="justify-start" asChild>
                       <Link href={getDashboardLink()}>
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         {t('nav.dashboard')}
                       </Link>
                     </Button>
-                    <Button variant="ghost" className="justify-start" asChild>
-                      <Link href="/orders">{t('nav.myOrders')}</Link>
-                    </Button>
+                    {isBuyer && (
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link href="/orders">{t('nav.myOrders')}</Link>
+                      </Button>
+                    )}
                     <Button variant="ghost" className="justify-start" asChild>
                       <Link href="/profile">{t('nav.profile')}</Link>
+                    </Button>
+                    <Button variant="ghost" className="justify-start text-destructive" onClick={logout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t('nav.logout')}
                     </Button>
                   </>
                 )}
@@ -308,67 +299,18 @@ export function Header() {
               {/* Language Toggle */}
               <div className="flex items-center gap-2 py-2 border-t border-border">
                 <Globe className="h-4 w-4 text-muted-foreground" />
-                <Button 
-                  variant={language === 'vi' ? 'secondary' : 'ghost'} 
-                  size="sm"
-                  onClick={() => setLanguage('vi')}
-                >
+                <Button variant={language === 'vi' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('vi')}>
                   VN
                 </Button>
-                <Button 
-                  variant={language === 'en' ? 'secondary' : 'ghost'} 
-                  size="sm"
-                  onClick={() => setLanguage('en')}
-                >
+                <Button variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')}>
                   EN
                 </Button>
               </div>
 
-              {/* Role Switcher (Demo) */}
               <div className="border-t border-border pt-4">
-                <p className="text-xs text-muted-foreground mb-2">Demo: Switch Role</p>
-                <div className="flex flex-wrap gap-2">
-                  {(['guest', 'buyer', 'seller', 'inspector', 'admin'] as UserRole[]).map(role => (
-                    <Badge 
-                      key={role}
-                      variant="outline" 
-                      className={cn(
-                        'cursor-pointer text-xs transition-colors',
-                        roleColors[role],
-                        user.role === role && 'ring-2 ring-primary'
-                      )}
-                      onClick={() => switchRole(role)}
-                    >
-                      {roleLabels[role][language]}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4">
-                {showPostListingCta ? (
+                {showPostListingCta && (
                   <Button className="w-full mb-3" asChild>
-                    <Link href="/seller/create">{t('nav.postListing')}</Link>
-                  </Button>
-                ) : (
-                  <Button className="w-full mb-3" onClick={() => setAuthOpen(true)}>
-                    {language === 'vi' ? 'Đăng nhập' : 'Sign In'}
-                  </Button>
-                )}
-                {!isAuthenticated && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={() => switchRole('buyer')}>
-                      {t('nav.login')}
-                    </Button>
-                    <Button variant="secondary" className="flex-1">
-                      {t('nav.register')}
-                    </Button>
-                  </div>
-                )}
-                {isAuthenticated && (
-                  <Button variant="outline" className="w-full" onClick={logout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {t('nav.logout')}
+                    <Link href={postListingHref}>{t('nav.postListing')}</Link>
                   </Button>
                 )}
               </div>
