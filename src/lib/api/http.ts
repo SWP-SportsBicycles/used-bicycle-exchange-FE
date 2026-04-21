@@ -1,23 +1,27 @@
 "use client";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const API_BASE = "/api/proxy";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 async function fetchJson<T>(path: string, method: HttpMethod, body?: unknown): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    credentials: "include",
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${normalizedPath}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("Unable to connect to API. Please check backend service and network.");
+  }
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => null);

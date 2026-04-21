@@ -8,8 +8,6 @@ import {
   LayoutDashboard, 
   ClipboardList, 
   AlertOctagon,
-  Users,
-  BarChart3,
   ChevronRight,
   Settings
 } from 'lucide-react'
@@ -38,16 +36,6 @@ const sidebarItems = [
     icon: AlertOctagon, 
     label: { vi: 'Tranh Chấp', en: 'Disputes' },
     badge: 2
-  },
-  { 
-    href: '/admin/users', 
-    icon: Users, 
-    label: { vi: 'Người Dùng', en: 'Users' }
-  },
-  { 
-    href: '/admin/analytics', 
-    icon: BarChart3, 
-    label: { vi: 'Thống Kê', en: 'Analytics' }
   },
 ]
 

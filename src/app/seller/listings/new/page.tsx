@@ -1,5 +1,5 @@
 import SellerCreateListingScreen from '@/modules/seller/screens/SellerCreateListingScreen'
 
-export default function CreateListingPage() {
+export default function NewSellerListingPage() {
   return <SellerCreateListingScreen />
 }

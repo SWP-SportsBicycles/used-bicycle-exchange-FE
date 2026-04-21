@@ -14,11 +14,13 @@ import { Header } from '@/components/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { MOCK_LISTINGS, formatVND, getConditionColor, CITIES } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 export default function WishlistPage() {
+  const { user, isAuthenticated } = useAuth()
   const { language } = useLanguage()
   // Mock wishlist with first 3 listings
   const [wishlistIds, setWishlistIds] = useState(['1', '3', '5'])
@@ -27,6 +29,60 @@ export default function WishlistPage() {
 
   const removeFromWishlist = (id: string) => {
     setWishlistIds(prev => prev.filter(i => i !== id))
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto max-w-5xl px-4 py-8 lg:px-6">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <h3 className="text-lg font-semibold mb-2">
+                {language === 'vi' ? 'Vui lòng đăng nhập' : 'Please login'}
+              </h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                {language === 'vi'
+                  ? 'Đăng nhập để xem danh sách xe yêu thích của bạn.'
+                  : 'Sign in to view your wishlist.'}
+              </p>
+              <Button asChild>
+                <Link href="/auth/login?redirect=/wishlist">
+                  {language === 'vi' ? 'Đăng nhập' : 'Sign in'}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
+  if (user.role !== 'buyer') {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto max-w-5xl px-4 py-8 lg:px-6">
+          <Card>
+            <CardContent className="py-16 text-center">
+              <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
+              <h3 className="text-lg font-semibold mb-2">
+                {language === 'vi' ? 'Trang này dành cho Người Mua' : 'This page is for Buyers only'}
+              </h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                {language === 'vi'
+                  ? 'Vai trò hiện tại không sử dụng danh sách yêu thích.'
+                  : 'Your current role does not use wishlist.'}
+              </p>
+              <Button asChild>
+                <Link href="/">{language === 'vi' ? 'Về Trang Chủ' : 'Back to Home'}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
   }
 
   return (

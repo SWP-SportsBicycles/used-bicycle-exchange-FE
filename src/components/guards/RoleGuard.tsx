@@ -11,13 +11,21 @@ interface RoleGuardProps {
 
 export function RoleGuard({ allow, children }: RoleGuardProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
 
   useEffect(() => {
+    if (isInitializing) {
+      return;
+    }
+
     if (!allow.includes(user.role)) {
       router.replace("/");
     }
-  }, [allow, router, user.role]);
+  }, [allow, isInitializing, router, user.role]);
+
+  if (isInitializing) {
+    return null;
+  }
 
   if (!allow.includes(user.role)) {
     return null;
