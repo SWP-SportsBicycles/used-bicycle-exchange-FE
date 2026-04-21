@@ -1,7 +1,7 @@
 ## FE Team Working Agreement (3 người) — SportsBicyclesExchange
 
 **Mục tiêu**: team FE làm nhanh, ít lệch BE, tránh “demo logic” lọt vào production.  
-**Nguồn chuẩn**: Swagger BE + các plan trong `docs/`.
+**Nguồn chuẩn**: Swagger BE + các plan trong `docs/` + Git workflow chuẩn tại `docs/git-workflow.md`.
 
 ---
 
@@ -88,6 +88,8 @@ BE dùng kiểu lỗi dạng **ProblemDetails** (RFC7807). Quy ước FE:
 ---
 
 ## Git workflow (đủ chặt để tránh merge demo)
+
+Quy chuẩn đầy đủ cho toàn bộ nhánh/commit/PR/merge nằm tại `docs/git-workflow.md`. Mục dưới đây là bản rút gọn theo ngữ cảnh FE team.
 
 ### Branch naming
 
