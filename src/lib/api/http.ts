@@ -1,11 +1,9 @@
 "use client";
 
-import { QueryClient } from "@tanstack/react-query";
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ?? "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
 
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
+async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== "undefined"
     ? localStorage.getItem("accessToken")
     : null;
@@ -46,17 +44,17 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     throw new Error(error.message || "API Error");
   }
 
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
-export const api = {
-  get: (url: string) => fetchWithAuth(url),
-  post: (url: string, body?: unknown) =>
-    fetchWithAuth(url, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-  put: (url: string, body: unknown) =>
-    fetchWithAuth(url, { method: "PUT", body: JSON.stringify(body) }),
-  delete: (url: string) => fetchWithAuth(url, { method: "DELETE" }),
-  upload: async (url: string, file: File) => {
+export const http = {
+  get: <T>(url: string) => fetchWithAuth<T>(url),
+  post: <T>(url: string, body?: unknown) =>
+    fetchWithAuth<T>(url, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(url: string, body: unknown) =>
+    fetchWithAuth<T>(url, { method: "PUT", body: JSON.stringify(body) }),
+  delete: <T>(url: string) => fetchWithAuth<T>(url, { method: "DELETE" }),
+  upload: async <T>(url: string, file: File): Promise<T> => {
     const formData = new FormData();
     formData.append("file", file);
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -66,12 +64,9 @@ export const api = {
       body: formData,
     });
     if (!res.ok) throw new Error("Upload failed");
-    return res.json();
+    return res.json() as Promise<T>;
   },
 };
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1 },
-  },
-});
+// Backward-compatible alias while callers migrate to the canonical `http` symbol.
+export const api = http;

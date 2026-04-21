@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signInWithPopup } from 'firebase/auth'
-import { auth, googleProvider } from '@/lib/firebase'
+import { auth, canUseFirebaseAuth, googleProvider } from '@/lib/firebase'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
@@ -278,6 +278,19 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       setLoginErrorMessage(null)
     } else {
       setRegisterErrorMessage(null)
+    }
+
+    if (!canUseFirebaseAuth || !auth || !googleProvider) {
+      const message = language === 'vi'
+        ? 'Google chưa được cấu hình. Vui lòng kiểm tra biến môi trường Firebase.'
+        : 'Google sign-in is not configured. Please check Firebase environment variables.'
+
+      if (target === 'login') {
+        setLoginErrorMessage(message)
+      } else {
+        setRegisterErrorMessage(message)
+      }
+      return
     }
 
     try {
