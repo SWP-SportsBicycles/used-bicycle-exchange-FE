@@ -1,7 +1,14 @@
 import { http } from '@/lib/api/http'
 
-// FE uses this as request DTO only; backend entity fields (id/userId/...) remain BE-owned.
 export interface SellerShippingProfileRequest {
+  senderName: string
+  senderPhone: string
+  senderAddress: string
+  fromDistrictId: number
+  fromWardCode: string
+}
+
+export interface SellerShippingProfileResponse {
   senderName: string
   senderPhone: string
   senderAddress: string
@@ -13,7 +20,7 @@ export interface SellerShippingProfileRequest {
   isDefault?: boolean
 }
 
-export type SellerShippingProfileDraft = Partial<SellerShippingProfileRequest>
+export type SellerShippingProfileDraft = Partial<SellerShippingProfileResponse>
 
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== 'object') {
@@ -50,6 +57,6 @@ export const sellerShippingApi = {
   },
 
   async upsertProfile(payload: SellerShippingProfileRequest) {
-    return http.put<unknown>('/api/SellerShippingProfile', payload)
+    return http.post<unknown>('/api/SellerShippingProfile', payload)
   },
 }

@@ -1,26 +1,33 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { sellerApi, type SellerListingPayload } from "@/lib/api/seller-api";
+import { sellerApi, type SellerListingFormData } from "@/lib/api/seller-api";
 
 export function useCreateListing() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: SellerListingPayload) => sellerApi.createListing(payload),
+    mutationFn: (data: SellerListingFormData) => sellerApi.createListing(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
     },
   });
 }
 
-export function useUpdateListing(listingId: string) {
-  const queryClient = useQueryClient();
-
+export function useUploadMedia() {
   return useMutation({
-    mutationFn: (payload: SellerListingPayload) => sellerApi.updateListing(listingId, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
-      queryClient.invalidateQueries({ queryKey: ["seller-listing-detail", listingId] });
-    },
+    mutationFn: ({ listingId, files }: { listingId: string; files: File[] }) =>
+      sellerApi.uploadMedia(listingId, files),
+  });
+}
+
+export function useUploadImage() {
+  return useMutation({
+    mutationFn: (file: File) => sellerApi.uploadImage(file),
+  });
+}
+
+export function useUploadVideo() {
+  return useMutation({
+    mutationFn: (file: File) => sellerApi.uploadVideo(file),
   });
 }
 

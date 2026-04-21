@@ -14,7 +14,9 @@ import {
   X,
   Star,
   Package,
-  Clock
+  Clock,
+  Building,
+  CreditCard
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,6 +57,14 @@ export default function ProfilePage() {
     address: user.address || '',
   })
 
+  // Thêm Bank Info form
+  const [bankFormData, setBankFormData] = useState({
+    bankAccountName: '',
+    bankAccountNumber: '',
+    bankName: '',
+  })
+  const [isEditingBank, setIsEditingBank] = useState(false)
+
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -62,6 +72,11 @@ export default function ProfilePage() {
   const handleSave = () => {
     // Mock save
     setIsEditing(false)
+  }
+
+  const handleBankSave = () => {
+    // TODO: Connect to backend API when ready
+    setIsEditingBank(false)
   }
 
   const handleCancel = () => {
@@ -317,6 +332,79 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Bank Info Section (Chỉ Seller) */}
+            {user.role === 'seller' && (
+              <Card className="mt-6">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                       <CreditCard className="h-5 w-5" />
+                       {language === 'vi' ? 'Thông Tin Ngân Hàng' : 'Bank Information'}
+                    </CardTitle>
+                    <CardDescription>
+                      {language === 'vi' 
+                        ? 'Cập nhật tài khoản nhận tiền sau khi giao dịch thành công' 
+                        : 'Update bank account to receive payments after successful transactions'}
+                    </CardDescription>
+                  </div>
+                  {!isEditingBank ? (
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingBank(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      {language === 'vi' ? 'Sửa' : 'Edit'}
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditingBank(false)}>
+                        <X className="h-4 w-4 mr-2" />
+                        {language === 'vi' ? 'Hủy' : 'Cancel'}
+                      </Button>
+                      <Button size="sm" onClick={handleBankSave}>
+                        <Save className="h-4 w-4 mr-2" />
+                        {language === 'vi' ? 'Lưu' : 'Save'}
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                     <Label htmlFor="bankName">
+                        <Building className="h-4 w-4 inline mr-2" />
+                        {language === 'vi' ? 'Ngân hàng' : 'Bank Name'}
+                     </Label>
+                     <Input
+                        id="bankName"
+                        value={bankFormData.bankName}
+                        onChange={(e) => setBankFormData(p => ({ ...p, bankName: e.target.value }))}
+                        disabled={!isEditingBank}
+                        placeholder="VD: Vietcombank"
+                     />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankAccountNumber">{language === 'vi' ? 'Số tài khoản' : 'Account Number'}</Label>
+                      <Input
+                        id="bankAccountNumber"
+                        value={bankFormData.bankAccountNumber}
+                        onChange={(e) => setBankFormData(p => ({ ...p, bankAccountNumber: e.target.value }))}
+                        disabled={!isEditingBank}
+                        placeholder="VD: 0123456789"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bankAccountName">{language === 'vi' ? 'Tên chủ tài khoản' : 'Account Holder'}</Label>
+                      <Input
+                        id="bankAccountName"
+                        value={bankFormData.bankAccountName}
+                        onChange={(e) => setBankFormData(p => ({ ...p, bankAccountName: e.target.value }))}
+                        disabled={!isEditingBank}
+                        placeholder="VD: NGUYEN VAN A"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </motion.div>
         </div>
 
