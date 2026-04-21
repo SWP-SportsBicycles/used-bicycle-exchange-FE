@@ -89,7 +89,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
         >
 
           {/* ── IMAGE ──────────────────────────────── */}
-          <div className="relative aspect-[4/3] overflow-hidden bg-secondary/50">
+          <div className="relative aspect-4/3 overflow-hidden bg-secondary/50">
             <Image
               src={listing.images[0]}
               alt={listing.title}
@@ -103,7 +103,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             />
 
             {/* Gradient overlay — richer on hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/10 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80" />
 
             {/* ── VeloSafe badge (top-left) */}
             {listing.isVeloSafeVerified && (
@@ -115,7 +115,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
                       <span className="text-[11px] font-bold text-[#1f2c12]">VeloSafe</span>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[220px]">
+                  <TooltipContent side="bottom" className="max-w-55">
                     <p className="font-semibold">Xe Đã Kiểm Định VeloSafe</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Kiểm tra 50+ điểm bởi inspector chuyên nghiệp của VeloTrust.
