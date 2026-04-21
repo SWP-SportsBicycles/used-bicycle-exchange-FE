@@ -1,6 +1,10 @@
 # 👤 Vũ — Auth + Seller
 
-**Mục tiêu:** Xây dựng toàn bộ hệ thống xác thực (đăng ký, đăng nhập, OTP, quên mật khẩu, Google login) và toàn bộ trải nghiệm Seller — từ đăng tin bán xe, upload ảnh, quản lý tin, đến xem đơn hàng và profile cá nhân.
+**Mục tiêu:** Xây dựng toàn bộ hệ thống xác thực (đăng ký, đăng nhập, OTP, quên mật khẩu, Google login) và toàn bộ trải nghiệm Seller — từ đăng tin bán xe, upload ảnh/video, **cập nhật thông tin ngân hàng**, đến **quản lý đơn hàng đặt mua xe của mình** (xác nhận đóng gói trong 12h, theo dõi tracking GHN).
+
+> **Nghiệp vụ tham chiếu:** [01-order-and-payment-rules.md](../01-order-and-payment-rules.md) | [business-spec.md](../business-spec.md) | [03-platform-policy.md](../03-platform-policy.md)
+
+> **⚠️ LƯU Ý QUAN TRỌNG:** Nghiệp vụ mới **CẤM chỉnh sửa bài đăng** sau khi Published. Seller chỉ có quyền Ẩn (withdraw) hoặc Xóa. **Không còn trang Edit Listing**.
 
 ---
 
@@ -13,11 +17,12 @@
 | 3 | OTP Verification | `/auth/verify-otp` | 🟢 |
 | 4 | Forgot Password | `/auth/forgot-password` | 🟢 |
 | 5 | Reset Password | `/auth/reset-password` | 🟢 |
-| 6 | Create Listing (form + upload ảnh) | `/seller/listings/new` | 🔴 |
-| 7 | Edit Listing | `/seller/listings/[id]/edit` | 🟡 |
-| 8 | My Listings (list + status) | `/seller/listings` | 🟡 |
-| 9 | Seller Orders | `/seller/orders` | 🟡 |
-| 10 | Profile + Change Password | `/profile` | 🟡 |
+| 6 | Create Listing (form + upload ảnh/video) | `/seller/listings/new` | 🔴 |
+| 7 | My Listings (list + status) | `/seller/listings` | 🟡 |
+| 8 | Listing Detail (seller view — preview, KHÔNG CÓ EDIT) | `/seller/listings/[id]` | 🟡 |
+| 9 | **⭐ Seller Orders (Quản lý đơn hàng đặt mua xe)** | `/seller/orders` | 🔴 |
+| 10 | **⭐ Seller Order Detail (Confirm đóng gói + Tracking)** | `/seller/orders/[id]` | 🔴 |
+| 11 | **⭐ Profile + Bank Info** | `/seller/profile` | 🟡 |
 
 ---
 
@@ -31,30 +36,29 @@
 | V2 | Register page | Form fullName + email + phone + password + role (Buyer=1/Seller=2), gọi `POST /api/Auth/signup`, redirect `/auth/verify-otp` | 3h | V1 |
 | V3 | OTP Verification page | Form 6 chữ số, gọi `POST /api/Auth/verify-otp` {email, otp}. Nút "Gửi lại" gọi `POST /api/Auth/resend-otp`. Timer 60s | 3h | V2 |
 | V4 | Google Login button | Trên Login + Register: nút "Đăng nhập bằng Google", gọi `POST /api/Auth/google-login` {idToken, role}. Cần setup Google OAuth client | 3h | V1 |
-| V5 | Seller Create Listing — Form cơ bản | Form với tất cả fields: title, description, serialNumber, category, brand, frameSize, frameMaterial, condition, paint, groupset, operating, tireRim, brakeType, overall, price, city. Validation Zod | 4h | V1 |
-| V6 | Seller Create Listing — Image Upload | Component `ImageUploader.tsx`: multi-image upload gọi `POST /api/Upload/image` lấy URL, quản lý medias array `[{image, videoUrl, type}]`. Submit toàn bộ gọi `POST /api/seller-listing` | 4h | V5 |
+| V5 | Seller Create Listing — Form cơ bản | Form với tất cả fields: title, description, serialNumber, category, brand, frameSize, frameMaterial, condition, paint, groupset, operating, tireRim, brakeType, overall, **price (Đây là "Giá đề nghị" — hệ thống tự động cộng 5% thành Giá niêm yết)**, city. Validation Zod | 4h | V1 |
+| V6 | Seller Create Listing — Media Upload | Component `ImageUploader.tsx` + `VideoUploader.tsx`: multi-image upload + **BẮT BUỘC ≥1 video quay quanh xe**. Gọi `POST /api/Upload/image` và `POST /api/Upload/video` lấy URL, quản lý medias array. Submit toàn bộ gọi `POST /api/seller-listing` | 4h | V5 |
 
-### Sprint 2 — Seller Management (4 ngày)
-
-| # | Công việc | Kết quả đầu ra | Ước tính | Phụ thuộc |
-|---|-----------|----------------|----------|-----------|
-| V7 | My Listings page | Table/card list với status badge (draft/pending/published/reserved/sold/rejected/withdrawn), pagination. `GET /api/seller-listing` | 3h | V5 |
-| V8 | Edit Listing | Load data `GET /api/seller-listing/{id}`, pre-fill form, submit `PUT /api/seller-listing/{id}`. Cùng form component như Create (reuse) | 3h | V5,V7 |
-| V9 | Submit for review | Trên My Listings: nút "Gửi duyệt" cho tin status=draft. `POST /api/seller-listing/{id}/submit`. Confirm dialog trước khi submit | 1h | V7 |
-| V10 | Withdraw listing | Nút "Rút tin" cho tin published. `POST /api/seller-listing/{id}/withdraw`. Dialog confirm + warning nếu có order active | 1h | V7 |
-| V11 | Delete listing | Nút "Xóa" cho tin draft/rejected. `DELETE /api/seller-listing/{id}`. Alert dialog | 1h | V7 |
-| V12 | Seller Orders page | Danh sách order đặt trên listing của mình (GET từ listing detail hoặc API riêng nếu BE có). Hiển thị buyer info, status, amount | 3h | V7 |
-| V13 | Listing Detail — Seller view | `GET /api/seller-listing/{id}`: xem chi tiết tin đã đăng, preview giống Buyer thấy, hiện action buttons theo status | 2h | V7 |
-
-### Sprint 3 — Auth bổ sung + Profile (3 ngày)
+### Sprint 2 — Seller Listing & Order Management (4 ngày) ⭐ LUỒNG MỚI QUAN TRỌNG
 
 | # | Công việc | Kết quả đầu ra | Ước tính | Phụ thuộc |
 |---|-----------|----------------|----------|-----------|
-| V14 | Forgot Password page | Form email, gọi `POST /api/Auth/forgot-password`, hiện thông báo "Đã gửi link reset qua email" | 2h | V1 |
-| V15 | Reset Password page | Form newPassword + confirmPassword, lấy `token` từ query string, gọi `POST /api/Auth/reset-password-by-link?token=xxx` | 2h | V14 |
-| V16 | Profile page | `GET /api/Auth/me` hiển thị thông tin user, avatar upload `POST /api/Auth/upload-avatar`, đổi mật khẩu `POST /api/Auth/change-password` | 3h | V1 |
-| V17 | Auth guard middleware | File `src/middleware.ts`: redirect `/auth/login` nếu chưa login mà vào route `/buyer/*`, `/seller/*`. Check role phù hợp | 2h | Đạt D2 |
-| V18 | Polish + Bug fix | Responsive auth forms, loading states, error toast, session persistence | 3h | All |
+| V7 | My Listings page | Table/card list với status badge (draft / pending_review / published / locked / sold / rejected / withdrawn), pagination. `GET /api/seller-listing`. **KHÔNG CÓ nút Edit** cho tin đã Published. | 3h | V5 |
+| V8 | Listing Detail — Seller view | `GET /api/seller-listing/{id}`: xem chi tiết tin đã đăng, preview giống Buyer thấy. Hiện action buttons: "Gửi duyệt" (draft), "Ẩn tin" (published), "Xóa" (draft/rejected). **KHÔNG CÓ nút Sửa** khi đã Published. | 3h | V7 |
+| V9 | Submit for review + Withdraw + Delete | Nút "Gửi duyệt": `POST /api/seller-listing/{id}/submit`. Nút "Ẩn tin": `POST /api/seller-listing/{id}/withdraw`. Nút "Xóa": `DELETE /api/seller-listing/{id}`. Confirm dialog. | 2h | V7 |
+| V10 | **⭐ Seller Orders — Danh sách đơn đặt mua xe** | Route `/seller/orders`. Table hiển thị: tên buyer, tiêu đề xe, mã vận đơn GHN, trạng thái, ngày đặt, tổng tiền. Gọi `GET /api/seller/orders`. Filter theo trạng thái. | 4h | V5 |
+| V11 | **⭐ Seller Order Detail — Xác nhận đóng gói** | Route `/seller/orders/[id]`. Hiện thông tin buyer + xe + tracking GHN. **NÚT QUAN TRỌNG: "Sẵn sàng giao hàng"** → gọi `POST /api/seller/orders/{id}/confirm-ready`. Hiện cảnh báo **SLA 12 tiếng** ("Bạn cần xác nhận trong vòng 12h, nếu không đơn sẽ bị hủy"). | 4h | V10 |
+| V12 | **⭐ Seller Order — Tracking GHN** | Trong Order Detail: component hiển thị step-by-step trạng thái vận chuyển GHN (picking_up → in_transit → delivered → completed). Waybill code dùng để kiểm tra trên web GHN. | 2h | V11 |
+
+### Sprint 3 — Auth bổ sung + Profile + Bank (3 ngày)
+
+| # | Công việc | Kết quả đầu ra | Ước tính | Phụ thuộc |
+|---|-----------|----------------|----------|-----------|
+| V13 | Forgot Password page | Form email, gọi `POST /api/Auth/forgot-password`, hiện thông báo "Đã gửi link reset qua email" | 2h | V1 |
+| V14 | Reset Password page | Form newPassword + confirmPassword, lấy `token` từ query string, gọi `POST /api/Auth/reset-password-by-link?token=xxx` | 2h | V13 |
+| V15 | **⭐ Profile + Bank Info** | `GET /api/Auth/me` hiển thị thông tin user, avatar upload. **PHẦN MỚI: Form nhập Thông Tin Ngân Hàng** (`bankAccountName`, `bankAccountNumber`, `bankName`) → gọi `POST /api/seller/profile/bank-info`. Hiện **warning nếu chưa điền bank info:** "Bạn cần cập nhật thông tin ngân hàng trước khi đăng bán xe." | 4h | V1 |
+| V16 | Auth guard middleware | File `src/middleware.ts`: redirect `/auth/login` nếu chưa login. Check role phù hợp cho `/buyer/*`, `/seller/*`. | 2h | Đạt D2 |
+| V17 | Polish + Bug fix | Responsive auth forms, loading states, error toast. **Kiểm tra flow SLA 12h hiển thị đúng** | 2h | All |
 
 ---
 
@@ -82,13 +86,13 @@ src/app/(seller)/seller/
 │   ├── new/
 │   │   └── page.tsx               ← Create Listing
 │   └── [id]/
-│       ├── page.tsx               ← Listing Detail (seller view)
-│       └── edit/
-│           └── page.tsx           ← Edit Listing
-├── orders/
-│   └── page.tsx                   ← Seller Orders
+│       └── page.tsx               ← Listing Detail (CẤM EDIT — chỉ view + actions)
+├── orders/                        ← ⭐ MỚI
+│   ├── page.tsx                   ← Seller Orders (đơn đặt mua xe)
+│   └── [id]/
+│       └── page.tsx               ← Order Detail + Confirm Đóng Gói + Tracking
 └── profile/
-    └── page.tsx                   ← Profile
+    └── page.tsx                   ← Profile + Bank Info
 
 src/modules/seller/
 ├── screens/
@@ -99,33 +103,42 @@ src/modules/seller/
 │   ├── ResetPasswordScreen.tsx
 │   ├── SellerListingsScreen.tsx
 │   ├── SellerListingDetailScreen.tsx
-│   ├── SellerListingFormScreen.tsx     ← Dùng chung Create + Edit
-│   ├── SellerOrdersScreen.tsx
-│   └── ProfileScreen.tsx
+│   ├── SellerListingFormScreen.tsx     ← Chỉ dùng cho Create (KHÔNG CÓ Edit)
+│   ├── SellerOrdersScreen.tsx          ← ⭐ MỚI
+│   ├── SellerOrderDetailScreen.tsx     ← ⭐ MỚI
+│   └── ProfileScreen.tsx              ← ⭐ MỚI: Bổ sung Bank Info
 ├── components/
 │   ├── ListingForm.tsx                ← Big form component
 │   ├── ImageUploader.tsx
+│   ├── VideoUploader.tsx              ← ⭐ MỚI: Upload video riêng
 │   ├── ListingStatusBadge.tsx
-│   └── SellerSidebar.tsx
+│   ├── SellerSidebar.tsx
+│   ├── ConfirmShipButton.tsx          ← ⭐ MỚI: Nút "Sẵn sàng giao hàng"
+│   ├── SellerOrderStatusBadge.tsx     ← ⭐ MỚI
+│   ├── BankInfoForm.tsx               ← ⭐ MỚI: Form bank account
+│   └── SellerGhnTracker.tsx           ← ⭐ MỚI: Tracking vận đơn cho Seller
 └── hooks/
     ├── useSellerListings.ts
     ├── useCreateListing.ts
-    └── useSellerOrders.ts
+    ├── useSellerOrders.ts             ← ⭐ MỚI
+    ├── useSellerOrderDetail.ts        ← ⭐ MỚI
+    ├── useConfirmReady.ts             ← ⭐ MỚI: Mutation confirm đóng gói
+    └── useBankInfo.ts                 ← ⭐ MỚI
 ```
 
 ### API Endpoints & Payload
 
 ```typescript
-// src/lib/api/auth-api.ts
+// src/lib/api/auth-api.ts — GIỐNG CŨ, KHÔNG ĐỔI
 import { api } from "./http";
 
 export const authApi = {
   signup: (data: {
     fullName: string;
-    phoneNumber?: string; // regex: ^0\d{9}$
+    phoneNumber?: string;
     email: string;
-    password: string;     // regex: ^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$
-    role: 1 | 2 | 3 | 4; // 1=Buyer, 2=Seller, 3=Inspector, 4=Admin
+    password: string;
+    role: 1 | 2 | 3 | 4;
   }) => api.post("/api/Auth/signup", data),
 
   signin: (data: { email: string; password: string }) =>
@@ -141,9 +154,7 @@ export const authApi = {
     api.post("/api/Auth/google-login", data),
 
   logout: () => api.post("/api/Auth/logout"),
-
   renewToken: () => api.post("/api/Auth/renew-token"),
-
   getMe: () => api.get("/api/Auth/me"),
 
   changePassword: (data: {
@@ -164,16 +175,19 @@ export const authApi = {
     api.upload("/api/Auth/upload-avatar", file),
 };
 
-// src/lib/api/seller-api.ts
+// src/lib/api/seller-api.ts — CẬP NHẬT THEO NGHIỆP VỤ MỚI
 import { api } from "./http";
 
 export const sellerApi = {
+  // ===== LISTINGS =====
   createListing: (data: {
     title: string; description: string; serialNumber: string;
     category: string; brand: string; frameSize: string;
     frameMaterial: string; condition: string; paint: string;
     groupset: string; operating: string; tireRim: string;
-    brakeType: string; overall: string; price: number; city: string;
+    brakeType: string; overall: string;
+    price: number; // ← Đây là "Giá đề nghị" (BE sẽ tự tính giá niêm yết = price + 5%)
+    city: string;
     medias: Array<{ image: string; videoUrl?: string; type: 0 | 1 }>;
   }) => api.post("/api/seller-listing", data),
 
@@ -183,13 +197,7 @@ export const sellerApi = {
   getListingDetail: (id: string) =>
     api.get(`/api/seller-listing/${id}`),
 
-  updateListing: (id: string, data: {
-    title: string; description: string; serialNumber: string;
-    category: string; brand: string; frameSize: string;
-    frameMaterial: string; condition: string; paint: string;
-    groupset: string; operating: string; tireRim: string;
-    brakeType: string; overall: string; price: number; city: string;
-  }) => api.put(`/api/seller-listing/${id}`, data),
+  // ❌ BỎ updateListing — NGHIỆP VỤ MỚI CẤM EDIT SAU KHI PUBLISHED
 
   submitListing: (id: string) =>
     api.post(`/api/seller-listing/${id}/submit`),
@@ -200,11 +208,30 @@ export const sellerApi = {
   deleteListing: (id: string) =>
     api.delete(`/api/seller-listing/${id}`),
 
+  // Upload
   uploadImage: (file: File) =>
     api.upload("/api/Upload/image", file),
 
   uploadVideo: (file: File) =>
     api.upload("/api/Upload/video", file),
+
+  // ===== ⭐ ORDERS (MỚI — Quản lý đơn đặt mua xe) =====
+  getOrders: (page = 1, size = 10) =>
+    api.get(`/api/seller/orders?pageNumber=${page}&pageSize=${size}`),
+
+  getOrderDetail: (orderId: string) =>
+    api.get(`/api/seller/orders/${orderId}`),
+
+  // Xác nhận đã đóng gói, sẵn sàng cho GHN lấy (SLA 12h)
+  confirmReadyToShip: (orderId: string) =>
+    api.post(`/api/seller/orders/${orderId}/confirm-ready`),
+
+  // ===== ⭐ BANK INFO (MỚI — Cần thiết để giải ngân) =====
+  updateBankInfo: (data: {
+    bankAccountName: string;
+    bankAccountNumber: string;
+    bankName: string;
+  }) => api.post("/api/seller/profile/bank-info", data),
 };
 ```
 
@@ -229,7 +256,7 @@ export const listingSchema = z.object({
   tireRim: z.string().optional(),
   brakeType: z.string().optional(),
   overall: z.string().optional(),
-  price: z.number().positive("Giá phải lớn hơn 0"),
+  price: z.number().positive("Giá đề nghị phải lớn hơn 0"),
   city: z.enum(["Hà Nội", "TP.HCM", "Đà Nẵng"], {
     errorMap: () => ({ message: "Chỉ hỗ trợ HN, HCM, ĐN" }),
   }),
@@ -239,20 +266,28 @@ export const listingSchema = z.object({
     type: z.literal(0).or(z.literal(1)),
   })).min(1, "Cần ít nhất 1 ảnh (bao gồm ảnh groupset)"),
 });
+
+// ⭐ Schema Bank Info
+export const bankInfoSchema = z.object({
+  bankAccountName: z.string().min(3, "Tên chủ tài khoản bắt buộc"),
+  bankAccountNumber: z.string().min(6, "Số tài khoản bắt buộc"),
+  bankName: z.string().min(2, "Tên ngân hàng bắt buộc"),
+});
 ```
 
 ### Edge cases phải xử lý
 
 | # | Edge case | Xử lý |
 |---|-----------|-------|
-| 1 | Password validation | Regex `^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$` — hiển thị checklist realtime (chữ hoa, số, ký tự đặc biệt, 6+ ký tự) |
+| 1 | Password validation | Regex `^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$` — hiển thị checklist realtime |
 | 2 | OTP hết hạn | Sau 60s mới cho bấm "Gửi lại". Toast "OTP không đúng hoặc đã hết hạn" |
 | 3 | Email đã tồn tại | Catch error 409 → hiển thị "Email này đã được đăng ký" |
-| 4 | Upload ảnh thất bại | Retry 1 lần, nếu fail → toast error + xóa ảnh lỗi khỏi preview |
-| 5 | Listing — thieu serial/groupset | Validation Zod block submit, highlight field thiếu |
-| 6 | Edit listing khi đã published & sửa giá >10% | Hiện warning "Tin sẽ phải duyệt lại vì giá thay đổi >10%" |
-| 7 | Submit listing khi đang pending | Disable nút Submit, show status badge "Đang chờ duyệt" |
-| 8 | Withdraw listing có order active | Backend sẽ trả 400, FE hiện toast "Không thể rút tin khi có đơn hàng đang xử lý" |
+| 4 | Upload ảnh/video thất bại | Retry 1 lần, nếu fail → toast error + xóa file lỗi khỏi preview |
+| 5 | **KHÔNG CÓ Edit Listing** | Khi listing status = `published` → **chỉ hiện nút Ẩn/Xóa**, không render form edit |
+| 6 | Submit listing khi đang pending | Disable nút Submit, show status badge "Đang chờ duyệt" |
+| 7 | **⭐ SLA 12h — Seller quên confirm** | Hiện **countdown 12h** trên Order Detail. Nếu under 2h → highlight đỏ "SẮP HẾT HẠN". BE sẽ tự hủy đơn nếu quá. |
+| 8 | **⭐ Chưa có Bank Info** | Khi Seller vào Create Listing mà chưa điền Bank Info → Redirect `/seller/profile` + toast "Vui lòng cập nhật thông tin ngân hàng trước" |
+| 9 | Seller có đơn đang xử lý mà muốn Ẩn tin | Backend trả 400, FE hiện toast "Không thể ẩn tin khi có đơn hàng đang xử lý" |
 
 ### Prompt sẵn cho Vũ dùng với AI
 
@@ -260,7 +295,7 @@ export const listingSchema = z.object({
 > Task hiện tại là **[task #VX]: [mô tả]**.
 > API base: `https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net`
 > API cần gọi: `[method] [endpoint]` — payload: `[copy từ auth-api.ts hoặc seller-api.ts]`
-> Pattern: custom `api` client (xem http.ts), TanStack Query cho state management.
-> Validation: Zod schema (xem listing-schema.ts).
+> Nghiệp vụ quan trọng: **CẤM edit listing đã Published**, Seller phải **confirm đóng gói trong 12h** (SLA), **BẮT BUỘC điền Bank Info** trước khi đăng bán.
+> Tham chiếu: `docs/fe-plan-vu.md`, `01-order-and-payment-rules.md`, `business-spec.md`.
 > File đặt tại: `src/modules/seller/screens/[ScreenName].tsx`.
 > Hãy giúp tôi triển khai bước này."

@@ -3,17 +3,18 @@
 > **Tech stack:** Next.js 15 + React 19 + TanStack Query 5 + Radix UI + Tailwind 4 + React Hook Form 7 + Zod 4
 > **API Base:** `https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net`
 > **Auth:** JWT Bearer (cookie-based refresh token)
-> **Ngày tạo:** 2026-04-19
+> **Nghiệp vụ:** Mua Trực Tiếp (Cart Lock 5 phút) — PayOS — GHN — Desk Review Inspector — Escrow 48h
+> **Ngày cập nhật:** 2026-04-21
 
 ---
 
-## Team & Phân công
+## Team & Phân công (v3.2 — Direct Buy)
 
 | Thành viên | Scope | Folders sở hữu | % |
 |-----------|-------|----------------|---|
-| **Đạt** (Lead) | Public + Buyer + Foundation | `(public)/`, `(buyer)/`, `modules/buyer/`, `lib/` | ~37% |
-| **Vũ** | Auth + Seller | `auth/`, `(seller)/`, `modules/seller/` | ~33% |
-| **Trí** | Admin + Inspector + Chatbot | `(admin)/`, `(inspector)/`, `modules/admin/`, `modules/inspector/` | ~30% |
+| **Đạt** (Lead) | Public + **Buyer Checkout (Cart Lock + PayOS + GHN)** + Foundation | `(public)/`, `(buyer)/`, `modules/buyer/`, `lib/` | ~37% |
+| **Vũ** | Auth + **Seller (Orders + Bank Info + Confirm Ship)** | `auth/`, `(seller)/`, `modules/seller/` | ~33% |
+| **Trí** | **Admin (Payout + Dispute + CRUD Category/Brand)** + Inspector (**suggestedPrice**) + Chatbot | `(admin)/`, `(inspector)/`, `modules/admin/`, `modules/inspector/` | ~30% |
 
 ---
 
@@ -43,7 +44,6 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   });
 
   if (res.status === 401) {
-    // Try renew token
     const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
       method: "POST",
       credentials: "include",
@@ -51,10 +51,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     if (renewRes.ok) {
       const data = await renewRes.json();
       localStorage.setItem("accessToken", data.accessToken);
-      // Retry original request
       return fetchWithAuth(url, options);
     }
-    // Redirect to login
     window.location.href = "/auth/login";
     throw new Error("Unauthorized");
   }
@@ -95,24 +93,16 @@ export const queryClient = new QueryClient({
 });
 ```
 
-### `src/lib/auth/auth-context.tsx` — Auth Provider
-
-```typescript
-// Đạt sẽ cung cấp: useAuth() hook trả về:
-// { user, isAuthenticated, isLoading, login(), logout(), refetch() }
-// Vũ, Trí chỉ cần gọi const { user } = useAuth() — không sửa file này
-```
-
 ### Quy tắc file service riêng
 
 ```
 src/lib/api/
 ├── http.ts            ← Đạt (KHÔNG AI SỬA)
-├── buyer-api.ts       ← Đạt sở hữu
-├── seller-api.ts      ← Vũ sở hữu
+├── buyer-api.ts       ← Đạt sở hữu (Checkout, GHN, Dispute, Wishlist)
+├── seller-api.ts      ← Vũ sở hữu (Listings, Orders, Bank Info)
 ├── auth-api.ts        ← Vũ sở hữu
-├── admin-api.ts       ← Trí sở hữu
-└── inspector-api.ts   ← Trí sở hữu
+├── admin-api.ts       ← Trí sở hữu (Payout, Dispute, CRUD Cat/Brand)
+└── inspector-api.ts   ← Trí sở hữu (Report + suggestedPrice)
 ```
 
 ---
@@ -137,59 +127,37 @@ src/modules/buyer/hooks/useOrders.ts           ← TanStack Query hook
 src/lib/api/buyer-api.ts                       ← API calls
 ```
 
-### TanStack Query pattern
-
-```typescript
-// Trong hook file (vd: useOrders.ts)
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { buyerApi } from "@/lib/api/buyer-api";
-
-export function useOrders(page = 1) {
-  return useQuery({
-    queryKey: ["buyer-orders", page],
-    queryFn: () => buyerApi.getOrders(page),
-  });
-}
-
-export function useCreateOrder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: buyerApi.createOrder,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["buyer-orders"] }),
-  });
-}
-```
-
-### React Hook Form + Zod pattern
-
-```typescript
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-
-const schema = z.object({
-  title: z.string().min(5, "Tiêu đề phải từ 5 ký tự"),
-  price: z.number().positive("Giá phải lớn hơn 0"),
-});
-type FormData = z.infer<typeof schema>;
-
-const form = useForm<FormData>({ resolver: zodResolver(schema) });
-```
-
 ---
 
 ## Timeline gợi ý (3 sprints)
 
 | Sprint | Thời gian | Đạt | Vũ | Trí |
 |--------|----------|-----|-----|-----|
-| **1** (4 ngày) | Foundation | API client + Auth context + Homepage + Marketplace | Login + Register + OTP + Seller Create Listing | Admin Pending Listings + Inspector Pending |
-| **2** (4 ngày) | Core flows | PDP + Order Create + Order Detail + Wishlist | Seller Listings List + Edit + Submit + Seller Orders | Admin Approve/Reject + Inspector Submit Report + History |
-| **3** (3 ngày) | Polish | Shipment tracking + Review + Bug fix | Forgot/Reset Password + Profile + Withdraw + Bug fix | Dashboard + User Mgmt + Config + Chatbot + Bug fix |
+| **1** (4 ngày) | Foundation + Core | API client + Auth context + Homepage + Marketplace | Login + Register + OTP + Seller Create Listing (form + media) | Admin Pending Listings + Inspector Pending + Setup API files |
+| **2** (4 ngày) | ⭐ Luồng mới | **PDP + Checkout Cart Lock 5 phút + GHN Address + PayOS QR** + Wishlist | **My Listings (CẤM Edit) + Seller Orders + Confirm Đóng Gói (SLA 12h) + Tracking GHN** | **Inspector Report (suggestedPrice) + CRUD Category/Brand + Admin Layout** |
+| **3** (3 ngày) | Polish + Escrow | My Orders + Order Detail + **Hủy đơn (penalty)** + **Dispute (video unbox)** | Forgot/Reset Password + **Profile + Bank Info** + Auth guard + Bug fix | **Payout Dashboard + Dispute Resolution** + Dashboard Stats + Chatbot + Bug fix |
+
+---
+
+## Thay đổi lớn so với phiên bản cũ
+
+| # | Trước (Cọc 2 lớp) | Sau (Direct Buy v3.2) |
+|---|-------------------|----------------------|
+| 1 | Buyer chọn gói cọc Soft Reserve | **Cart Lock 5 phút** + thanh toán 100% PayOS |
+| 2 | Buyer upload bill chuyển khoản | **QR PayOS tự động** + Webhook xác nhận |
+| 3 | Admin duyệt bill cọc thủ công | **Admin chỉ xử lý Payout + Dispute** |
+| 4 | Seller Edit listing thoải mái | **CẤM Edit sau Published** |
+| 5 | Không có SLA cho Seller | **SLA 12 tiếng** xác nhận đóng gói |
+| 6 | Inspector tùy chọn | **Inspector BẮT BUỘC 100% cho mọi bài** + tham mưu giá |
+| 7 | PII Seller hiện luôn | **PII ẨN đến khi thanh toán xong** |
+| 8 | Không có Payout Dashboard | **Admin Payout** (xem + đánh dấu đã chuyển khoản) |
+| 9 | Không có Dispute rõ ràng | **Dispute 24h upload video unbox** |
+| 10 | Không quản lý Category/Brand | **Admin CRUD Category/Brand** |
 
 ---
 
 ## Chi tiết từng thành viên
 
-- [fe-plan-dat.md](./fe-plan-dat.md) — Đạt (Lead): Public + Buyer + Foundation
-- [fe-plan-vu.md](./fe-plan-vu.md) — Vũ: Auth + Seller
-- [fe-plan-tri.md](./fe-plan-tri.md) — Trí: Admin + Inspector + Chatbot
+- [fe-plan-dat.md](./fe-plan-dat.md) — Đạt (Lead): Public + Buyer + Checkout Flow + Foundation
+- [fe-plan-vu.md](./fe-plan-vu.md) — Vũ: Auth + Seller (Orders + Bank Info)
+- [fe-plan-tri.md](./fe-plan-tri.md) — Trí: Admin (Payout + Dispute + CRUD) + Inspector (suggestedPrice) + Chatbot

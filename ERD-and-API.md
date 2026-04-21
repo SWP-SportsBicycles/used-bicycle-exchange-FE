@@ -1,7 +1,7 @@
 # ERD & API Boundary
 
-**Hệ thống:** Online Exchange System for Used Sports Bicycles  
-**Đi kèm:** [SRS.md](./SRS.md)
+**Hệ thống:** VeloTrust (Online Exchange System for Used Sports Bicycles)  
+**Tương thích Specs:** [business-spec.md](./business-spec.md) | **Version:** 3.2 (Direct Buy - Cart Lock)
 
 ---
 
@@ -9,38 +9,29 @@
 
 ```mermaid
 erDiagram
-  User ||--o| SellerProfile : has
-  User ||--o| BuyerProfile : has
-  User }o--o{ UserRole : has
-  Role ||--o{ UserRole : assigned
+  User ||--o| SellerProfile : "has (Cần Bank Profile)"
+  User ||--o| BuyerProfile : "has"
+  User }o--o{ UserRole : "has"
+  Role ||--o{ UserRole : "assigned"
 
-  User ||--o{ Listing : sells
-  Category ||--o{ Listing : classifies
-  Brand ||--o{ Listing : classifies
-  Listing ||--o{ ListingMedia : contains
-  Listing ||--o{ WishlistItem : bookmarked
-  User ||--o{ WishlistItem : saves
+  User ||--o{ Listing : "sells"
+  Category ||--o{ Listing : "classifies"
+  Brand ||--o{ Listing : "classifies"
+  Listing ||--o{ ListingMedia : "contains"
+  Listing ||--o{ WishlistItem : "bookmarked"
+  User ||--o{ WishlistItem : "saves"
 
-  Listing ||--o{ Order : generates
-  User ||--o{ Order : buys
-  Order ||--o{ Payment : has
-  Order ||--o{ OrderStatusHistory : logs
-  Listing ||--o{ ListingPriceHistory : tracks_price
+  Listing ||--o{ Order : "generates"
+  User ||--o{ Order : "buys"
+  Order ||--o{ OrderStatusHistory : "logs"
 
-  Listing ||--o| Inspection : optional
-  User ||--o{ Inspection : performs
-  Inspection ||--o| InspectionReport : produces
+  Listing ||--o| Inspection : "mandatory desk-review"
+  User ||--o{ Inspection : "performs"
+  Inspection ||--o| InspectionReport : "produces"
 
-  Order ||--o{ Review : after_complete
-  User ||--o{ Review : writes
-
-  Listing ||--o{ Report : receives
-  Order ||--o{ Dispute : may_have
-  Dispute ||--o{ DisputeMessage : contains
-  User ||--o{ DisputeMessage : sends
-
-  AdminAction }o--|| User : by_admin
-  FeeRule }o--|| AdminAction : optional_audit
+  Order ||--o{ Dispute : "may_have"
+  Order ||--o{ PayoutRequest : "triggers_after_48h"
+  PayoutRequest }o--|| User : "paid_to_seller"
 
   User {
     uuid id PK
@@ -55,18 +46,14 @@ erDiagram
     string code UK
   }
 
-  UserRole {
-    uuid user_id FK
-    int role_id FK
-  }
-
   SellerProfile {
     uuid user_id PK_FK
     string phone
     text bio
     decimal reputation_score
-    decimal cancel_rate
-    decimal dispute_rate
+    string bank_account_name
+    string bank_account_number
+    string bank_name
   }
 
   BuyerProfile {
@@ -90,14 +77,11 @@ erDiagram
     uuid seller_id FK
     int category_id FK
     int brand_id FK
-    string frame_size
-    string condition_enum
     string title
-    text description
-    text usage_history
-    decimal price
+    string frame_serial
+    decimal listed_price
+    decimal seller_expected_price
     string status_enum
-    boolean request_inspection
     timestamptz created_at
   }
 
@@ -113,267 +97,96 @@ erDiagram
     uuid id PK
     uuid listing_id FK
     uuid buyer_id FK
-    string type_enum
     string status_enum
-    decimal amount_total
-    decimal soft_reserve_amount
-    decimal inspection_deposit_amount
-    timestamptz deposit_expires_at
+    decimal total_price
+    decimal shipping_fee
+    string payos_transaction_id
+    string ghn_waybill_code
+    timestamptz cart_expires_at
     timestamptz created_at
-  }
-
-  Payment {
-    uuid id PK
-    uuid order_id FK
-    string method_enum
-    string status_enum
-    decimal amount
-    string proof_url
-    timestamptz confirmed_at
-  }
-
-  ListingPriceHistory {
-    uuid id PK
-    uuid listing_id FK
-    decimal old_price
-    decimal new_price
-    uuid actor_id FK
-    string reason
-    timestamptz changed_at
   }
 
   OrderStatusHistory {
     uuid id PK
     uuid order_id FK
-    uuid actor_id FK
-    string from_status
-    string to_status
-    string reason
+    string status
     timestamptz at
+  }
+
+  PayoutRequest {
+    uuid id PK
+    uuid order_id FK
+    uuid seller_id FK
+    decimal amount
+    string status_enum
+    timestamptz created_at
   }
 
   Inspection {
     uuid id PK
     uuid listing_id FK
     uuid inspector_id FK
-    string mode_enum
     string status_enum
-    string outcome_enum
-    timestamptz scheduled_at
-    timestamptz completed_at
+    timestamptz assigned_at
   }
 
   InspectionReport {
     uuid id PK
     uuid inspection_id FK
-    string report_url
     json checklist_json
-  }
-
-  Review {
-    uuid id PK
-    uuid order_id FK
-    uuid author_id FK
-    int rating
-    text comment
-    timestamptz created_at
-  }
-
-  WishlistItem {
-    uuid user_id FK
-    uuid listing_id FK
-  }
-
-  Report {
-    uuid id PK
-    uuid listing_id FK
-    uuid reporter_id FK
-    string reason
-    string status_enum
+    decimal suggested_price
+    string report_url
   }
 
   Dispute {
     uuid id PK
     uuid order_id FK
     string status_enum
+    timestamptz media_upload_deadline
+    boolean has_media_proof
   }
 
-  DisputeMessage {
-    uuid id PK
-    uuid dispute_id FK
-    uuid sender_id FK
-    text body
-    timestamptz at
-  }
-
-  FeeRule {
-    int id PK
-    string code UK
-    json config_json
-  }
-
-  AdminAction {
-    uuid id PK
-    uuid admin_id FK
-    string entity_type
-    uuid entity_id
-    string action_code
-    json payload_json
-    timestamptz at
+  WishlistItem {
+    uuid user_id PK_FK
+    uuid listing_id PK_FK
   }
 ```
 
-**Ghi chú triển khai:**
-
-- `condition_enum`, `listing.status`, `order.type`, `order.status` nên là enum DB hoặc bảng lookup để đồng bộ với SRS.
-- `WishlistItem` khóa chính tổ hợp `(user_id, listing_id)`.
-- **V1.2 nghiệp vụ:** `Listing` thêm `frame_serial` (bắt buộc trước duyệt), cờ `groupset_photo_ok`, `city_code` (HN/SG/DN); PII Seller không trả qua API public cho đến khi Soft Reserve `confirmed` — xử lý tại tầng API.
-- `Order.status` cần có `soft_reserved`, `inspection_deposit_pending`, `delivered`, `pending_confirmation` để chuẩn hóa state machine tiền và giao nhận.
-- `Inspection.mode_enum` mở sẵn cho hậu MVP; **MVP chỉ dùng `on_demand`**.
-- **SellerWallet** (khuyến nghị): `user_id`, `balance`, `ledger` (nạp/trừ phạt, phí kiểm định Seller trả) — chi tiết bảng ledger tách riêng khi triển khai.
+**Ghi chú:**
+- Bảng `Order` không còn các cột tiền cọc lặt vặt. Sinh ra là khóa `cart_expires_at` đếm ngược 5 phút. `status_enum`: `timer_draft` -> `payos_paid` -> `ghn_picking_up` -> `ghn_in_transit` -> `ghn_delivered` -> `pending_escrow` -> `completed_and_payout`.
+- Bảng `SellerProfile` bổ sung bắt buộc `bank_...` để giải ngân.
+- Bảng `PayoutRequest`: Cấu trúc cho phương án "Dễ", Admin vào xem danh sách rồi bấm thanh toán bằng App ngân hàng ở ngoài, chọn `status = Paid`.
 
 ---
 
-## 2. Ranh giới API (theo bounded context)
+## 2. Ranh giới API Mới (Bounded Context V3.2)
 
-### 2.1 Public / Guest + Buyer browse
+### 2.1 Auth & File
+- `/api/v1/auth/register`, `/login`, `/me`
+- `/api/v1/upload/image`, `/video`
 
-| Phương thức | Đường dẫn | Mô tả |
-|-------------|-----------|--------|
-| GET | `/api/v1/listings` | Danh sách + filter query params. |
-| GET | `/api/v1/listings/{id}` | Chi tiết (PII seller theo policy). |
-| GET | `/api/v1/meta/categories` | Cây danh mục. |
-| GET | `/api/v1/meta/brands` | Thương hiệu. |
+### 2.2 Category & Brand & Wishlist
+- `GET /api/v1/categories`, `/brands`
+- `POST /api/v1/wishlist/{listingId}` | `GET /api/v1/wishlist`
 
-### 2.2 Auth
+### 2.3 Người Bán (Seller)
+- `POST /api/v1/seller/profile/bank-info` (Cập nhật Profile lấy tiền)
+- `POST /api/v1/seller/listings` (Đăng xe, trạng thái sẽ là `pending_review_online`)
+- `GET /api/v1/seller/orders` (Xem danh sách đơn đã chốt)
+- `POST /api/v1/seller/orders/{id}/confirm-ready` (Bắt buộc bấm trong 12H để gọi GHN qua lấy)
 
-| Phương thức | Đường dẫn | Mô tả |
-|-------------|-----------|--------|
-| POST | `/api/v1/auth/register` | Đăng ký. |
-| POST | `/api/v1/auth/login` | JWT/session. |
-| POST | `/api/v1/auth/logout` | Thu hồi refresh token nếu có. |
+### 2.4 Người Mua (Buyer) - Luồng Cart & PayOS quan trọng
+- `POST /api/v1/orders/checkout` -> **Mới:** Truyền vào `listingId`, `toWardCode`. Nó sẽ khóa giỏ, call API nội bộ hoặc tự tính phí ship, trả về String `payos_qr_url` và con số đếm ngược `expires_at`.
+- `GET /api/v1/orders/{id}` -> Xem trạng thái (Mã vận chuyển GHN)
+- `POST /api/v1/orders/{id}/dispute` -> Khởi tạo khiếu nại (bắt Upload video 24h).
 
-### 2.3 Seller — Listing
+### 2.5 Webhooks (Tầng Server)
+- `POST /api/v1/webhooks/payos` -> Lắng nghe PayOS ting ting. Kiểm tra `Amount`. Nhả lock giỏ hoặc Confirmed.
+- `POST /api/v1/webhooks/ghn` -> Nhận thông tin bưu tá lấy/giao hàng.
 
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/seller/listings` | seller |
-| PATCH | `/api/v1/seller/listings/{id}` | seller (owner) |
-| POST | `/api/v1/seller/listings/{id}/submit` | seller |
-| POST | `/api/v1/seller/listings/{id}/media` | seller |
-
-### 2.4 Buyer — Order & Wishlist
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/orders` | buyer (body: listingId, type, softReservePackage) |
-| POST | `/api/v1/orders/{id}/request-inspection` | buyer (khởi tạo Inspection Deposit) |
-| GET | `/api/v1/orders/{id}` | buyer (owner) hoặc seller của listing |
-| POST | `/api/v1/orders/{id}/payments` | buyer — upload offline proof |
-| POST | `/api/v1/orders/{id}/confirm-receipt` | buyer |
-| POST | `/api/v1/orders/{id}/seller-confirm-payment` | seller |
-| POST | `/api/v1/wishlist/{listingId}` | buyer |
-| DELETE | `/api/v1/wishlist/{listingId}` | buyer |
-
-### 2.5 Inspector
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| GET | `/api/v1/inspector/assignments` | inspector |
-| PATCH | `/api/v1/inspector/inspections/{id}` | inspector |
-| POST | `/api/v1/inspector/inspections/{id}/report` | inspector |
-
-### 2.6 Admin
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| GET | `/api/v1/admin/listings?status=pending_review` | admin |
-| POST | `/api/v1/admin/listings/{id}/moderate` | admin |
-| GET/PATCH | `/api/v1/admin/users/...` | admin |
-| GET | `/api/v1/admin/stats/overview` | admin |
-| GET | `/api/v1/admin/stats/trust` | admin (gồm `cancel_rate`, `dispute_rate`) |
-| CRUD | `/api/v1/admin/categories`, `/brands`, `/fee-rules` | admin |
-
-### 2.7 Báo cáo & tranh chấp
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/reports/listings` | authenticated |
-| POST | `/api/v1/orders/{id}/disputes` | buyer hoặc seller — **ưu tiên** luồng từ nút **Khiếu nại** trên đơn (auto context theo [03-platform-policy.md](./03-platform-policy.md)). |
-| PATCH | `/api/v1/admin/disputes/{id}` | admin — SLA 8h/48h làm việc (03-F). |
-
-### 2.8 Listing pricing history
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| GET | `/api/v1/listings/{id}/price-history` | public/authenticated theo policy |
-| GET | `/api/v1/admin/listings/{id}/price-history` | admin |
-
----
-
-## 3. Sự kiện nội bộ (tùy chọn kiến trúc)
-
-Các chuyển trạng thái `Order` nên phát sinh **domain event** (async) cho: email thông báo, cập nhật `Listing.status`, ghi `OrderStatusHistory`, và nhắc việc ở `pending_confirmation`.
-
----
-
-## 4. Phiên bản & tương thích
-
-- Tiền tố `/api/v1/`; breaking changes → v2.
-- Client web/mobile chỉ gọi qua API này; không expose DB trực tiếp.
-
----
-
-## 5. Mở rộng (v1.1+): thực thể & API
-
-Tham chiếu yêu cầu nghiệp vụ: [SRS.md — mục 6](./SRS.md). Phần này mô tả **bổ sung** model và ranh giới API; không thay thế bảng MVP ở mục 2.
-
-### 5.1 Thực thể bổ sung (ERD gợi ý)
-
-| Thực thể | Khóa & quan hệ | Mục đích |
-|----------|----------------|----------|
-| `ChatSession` | `id`, `user_id` (nullable), `channel` (web/app), `external_thread_id` | Phiên chatbot / handoff. |
-| `ChatMessage` | `session_id` FK, `role` (user/bot/system), `content`, `metadata_json` | Lịch sử; có thể lưu tối giản nếu dùng SaaS chat. |
-| `SupportTicket` | `id`, `user_id`, `status`, `priority`, `source` (chat/email), `order_id` optional | Escalation từ chatbot. |
-| `Shipment` | `id`, `order_id` FK, `carrier_code`, `service_code`, `tracking_number`, `status`, `pickup_address`, `delivery_address`, `idempotency_key` UK | Đơn vận chuyển. |
-| `ShipmentEvent` | `shipment_id` FK, `status`, `raw_payload_json`, `occurred_at` | Lịch sử từ webhook/job. |
-| `CarrierAccount` | `id`, `carrier_code`, `credentials_ref` (secret store), `is_sandbox` | Cấu hình đối tác. |
-| `Payment` (mở rộng) | Thêm `provider`, `provider_payment_id`, `idempotency_key`, `escrow_state` (`none`, `held`, `released`, `refunded`), `released_at` | Đồng bộ PSP và escrow. |
-
-**Quan hệ:** `Order` 1—0..1 `Shipment` (MVP sau này có thể nhiều chặng — v1.1 giữ 1 shipment chính). `Order` 1—N `Payment` (nhiều lần thử / partial capture theo chính sách PSP).
-
-### 5.2 API bổ sung (đề xuất đặt sau `/api/v1/` hoặc `/api/v1/ext/`)
-
-**Thanh toán & escrow**
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/orders/{id}/payments/intent` | buyer — tạo intent (amount, method). |
-| POST | `/api/v1/webhooks/payments/{provider}` | server-to-server (ký webhook) |
-| POST | `/api/v1/orders/{id}/escrow/release` | hệ thống / admin — sau điều kiện xác nhận. |
-| POST | `/api/v1/orders/{id}/escrow/refund` | admin — hoàn tranh chấp. |
-
-**Logistics**
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/orders/{id}/shipments` | buyer hoặc seller (theo policy ai book) |
-| GET | `/api/v1/shipments/{id}` | các bên liên quan đơn |
-| POST | `/api/v1/webhooks/logistics/{carrier}` | server-to-server |
-
-**Chatbot & hỗ trợ**
-
-| Phương thức | Đường dẫn | RBAC |
-|-------------|-----------|------|
-| POST | `/api/v1/support/chat/sessions` | guest (session) / authenticated |
-| POST | `/api/v1/support/chat/sessions/{id}/messages` | same |
-| POST | `/api/v1/support/tickets` | authenticated — tạo ticket thủ công hoặc từ bot |
-| GET/PATCH | `/api/v1/admin/support/tickets` | admin |
-
-### 5.3 Sự kiện nội bộ (bổ sung)
-
-- `PaymentCaptured`, `EscrowReleased`, `ShipmentDelivered` — kích hoạt thông báo, cập nhật `Order.status`, và (với escrow) job payout.
-
----
-
-*Tài liệu có thể import vào công cụ ERD để tinh chỉnh kiểu dữ liệu cột theo DB cụ thể (PostgreSQL khuyến nghị).*
+### 2.6 Admin & Payout & Inspector
+- `GET /api/v1/inspector/assignments` (Round-Robin Auto Assign).
+- `POST /api/v1/inspector/assignments/{id}/report` (Desk review checklist).
+- `GET /api/v1/admin/payouts/pending` (Lấy file excel xuất tiền).
+- `POST /api/v1/admin/payouts/{id}/mark-paid` (Xác nhận đã bắn tiền tài khoản Seller).
+- `POST /api/v1/admin/disputes/{id}/resolve` (Phán xử tranh chấp bom hàng / sai mô tả).
