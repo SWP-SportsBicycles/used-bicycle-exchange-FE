@@ -9,6 +9,14 @@
 - [ ] Phase 4: Route protection via middleware/server checks
 - [ ] Phase 5: Tests + CI gates
 
+## Git Workflow Compliance
+- [ ] Branch is created from latest `main` and follows naming convention (`feature/*`, `fix/*`, `chore/*`, `docs/*`)
+- [ ] PR scope is focused to one primary objective
+- [ ] Commit messages follow `type(scope): summary`
+- [ ] This PR is not a direct push to `main`
+- [ ] Required review approvals are collected before merge
+- [ ] Workflow reference checked: `docs/git-workflow.md`
+
 ## Go / No-Go Checklist
 - [ ] No direct `fetch` in UI components/pages (except Next route handlers and server utilities)
 - [ ] Remote state is handled via Query hooks

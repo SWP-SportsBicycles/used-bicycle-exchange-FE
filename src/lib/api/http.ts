@@ -1,44 +1,72 @@
 "use client";
 
-const API_BASE = "/api/proxy";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ?? "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== "undefined"
+    ? localStorage.getItem("accessToken")
+    : null;
 
-async function fetchJson<T>(path: string, method: HttpMethod, body?: unknown): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const res = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    credentials: "include", // for refresh token cookie
+  });
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}${normalizedPath}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      cache: "no-store",
+  if (res.status === 401) {
+    const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
+      method: "POST",
+      credentials: "include",
     });
-  } catch {
-    throw new Error("Unable to connect to API. Please check backend service and network.");
+    if (renewRes.ok) {
+      const data = await renewRes.json();
+      localStorage.setItem("accessToken", data.accessToken);
+      
+      return fetchWithAuth(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${data.accessToken}`,
+        }
+      });
+    }
+    window.location.href = "/auth/login";
+    throw new Error("Unauthorized");
   }
 
-  if (!response.ok) {
-    const errorPayload = await response.json().catch(() => null);
-    const message =
-      (errorPayload && typeof errorPayload.message === "string" && errorPayload.message) ||
-      response.statusText ||
-      "API request failed";
-    throw new Error(message);
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(error.message || "API Error");
   }
 
-  return (await response.json()) as T;
+  return res.json() as Promise<T>;
 }
 
 export const http = {
-  get: <T>(path: string) => fetchJson<T>(path, "GET"),
-  post: <T>(path: string, body?: unknown) => fetchJson<T>(path, "POST", body),
-  put: <T>(path: string, body: unknown) => fetchJson<T>(path, "PUT", body),
-  patch: <T>(path: string, body: unknown) => fetchJson<T>(path, "PATCH", body),
-  delete: <T>(path: string) => fetchJson<T>(path, "DELETE"),
+  get: <T>(url: string) => fetchWithAuth<T>(url),
+  post: <T>(url: string, body?: unknown) =>
+    fetchWithAuth<T>(url, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(url: string, body: unknown) =>
+    fetchWithAuth<T>(url, { method: "PUT", body: JSON.stringify(body) }),
+  delete: <T>(url: string) => fetchWithAuth<T>(url, { method: "DELETE" }),
+  upload: async <T>(url: string, file: File): Promise<T> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    const res = await fetch(`${API_BASE}${url}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    return res.json() as Promise<T>;
+  },
 };
+
+// Backward-compatible alias while callers migrate to the canonical `http` symbol.
+export const api = http;
