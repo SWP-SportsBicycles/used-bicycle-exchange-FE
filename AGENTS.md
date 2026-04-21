@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **xB6jYf9JZEC** (574 symbols, 1497 relationships, 5 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **used-bicycle-exchange-FE** (842 symbols, 2172 relationships, 46 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -17,7 +17,7 @@ This project is indexed by GitNexus as **xB6jYf9JZEC** (574 symbols, 1497 relati
 
 1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/xB6jYf9JZEC/process/{processName}` — trace the full execution flow step by step
+3. `READ gitnexus://repo/used-bicycle-exchange-FE/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -56,10 +56,10 @@ This project is indexed by GitNexus as **xB6jYf9JZEC** (574 symbols, 1497 relati
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/xB6jYf9JZEC/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/xB6jYf9JZEC/clusters` | All functional areas |
-| `gitnexus://repo/xB6jYf9JZEC/processes` | All execution flows |
-| `gitnexus://repo/xB6jYf9JZEC/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/used-bicycle-exchange-FE/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/used-bicycle-exchange-FE/clusters` | All functional areas |
+| `gitnexus://repo/used-bicycle-exchange-FE/processes` | All execution flows |
+| `gitnexus://repo/used-bicycle-exchange-FE/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 
@@ -86,18 +86,6 @@ npx gitnexus analyze --embeddings
 To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
 
 > Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
-
-## Troubleshooting (Cross-IDE / Cross-Agent)
-
-If GitNexus MCP resources are not visible or tool calls fail, use this recovery sequence:
-
-1. Check status: `npx gitnexus status`
-2. If repo is not indexed: `npx gitnexus analyze`
-3. If analyze fails with `@ladybugdb/core` / `lbugjs.node` errors (common on some Windows setups):
-	- Run: `node node_modules/@ladybugdb/core/install.js`
-	- Re-run: `npx gitnexus analyze`
-4. If still failing, reinstall dependencies with the project package manager, then retry analyze.
-5. Until GitNexus recovers, continue with the fallback workflow in “Cross-IDE Compatibility (Important)” so work is never blocked.
 
 ## CLI
 
@@ -143,4 +131,3 @@ This section is intentionally outside the GitNexus managed block so it is not ov
 - If analyze fails with `@ladybugdb/core` / `lbugjs.node` errors:
 	1. Run `node node_modules/@ladybugdb/core/install.js`
 	2. Re-run `npx gitnexus analyze`
-

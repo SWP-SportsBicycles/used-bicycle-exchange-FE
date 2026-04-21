@@ -4,45 +4,62 @@ import { type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { 
   LayoutDashboard, 
   ClipboardList, 
   AlertOctagon,
+  UserPlus,
   ChevronRight,
   Settings
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Badge } from '@/components/ui/badge'
+import { adminApi } from '@/lib/api/admin-api'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
-
-const sidebarItems = [
-  { 
-    href: '/admin', 
-    icon: LayoutDashboard, 
-    label: { vi: 'Tổng Quan', en: 'Overview' },
-    exact: true
-  },
-  { 
-    href: '/admin/approvals', 
-    icon: ClipboardList, 
-    label: { vi: 'Duyệt Tin Đăng', en: 'Listing Approval' },
-    badge: 3
-  },
-  { 
-    href: '/admin/disputes', 
-    icon: AlertOctagon, 
-    label: { vi: 'Tranh Chấp', en: 'Disputes' },
-    badge: 2
-  },
-]
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { user } = useAuth()
   const { language } = useLanguage()
+
+  const listingsQuery = useQuery({
+    queryKey: ['admin-listings-sidebar'],
+    queryFn: adminApi.getListings,
+    refetchInterval: 15000,
+  })
+
+  const pendingApprovalsCount = (listingsQuery.data ?? []).filter((item) => item.status === 'pending').length
+
+  const sidebarItems = [
+    {
+      href: '/admin',
+      icon: LayoutDashboard,
+      label: { vi: 'Tổng Quan', en: 'Overview' },
+      exact: true,
+    },
+    {
+      href: '/admin/approvals',
+      icon: ClipboardList,
+      label: { vi: 'Duyệt Tin Đăng', en: 'Listing Approval' },
+      badge: pendingApprovalsCount,
+      badgeTone: 'alert',
+    },
+    {
+      href: '/admin/disputes',
+      icon: AlertOctagon,
+      label: { vi: 'Tranh Chấp', en: 'Disputes' },
+      badge: 2,
+    },
+    {
+      href: '/admin/create/inspectors',
+      icon: UserPlus,
+      label: { vi: 'Tạo Kiểm Định Viên', en: 'Create Inspector' },
+    },
+  ]
 
   return (
     <RoleGuard allow={['admin']}>
@@ -86,17 +103,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     >
                       <item.icon className="h-5 w-5" />
                       {item.label[language]}
-                      {item.badge && (
+                      {item.badge ? (
                         <Badge 
-                          variant={isActive ? 'secondary' : 'destructive'}
+                          variant={item.badgeTone === 'alert' ? 'destructive' : isActive ? 'secondary' : 'destructive'}
                           className="ml-auto h-5 px-1.5 text-xs"
                         >
                           {item.badge}
                         </Badge>
-                      )}
-                      {isActive && !item.badge && (
+                      ) : null}
+                      {isActive && !item.badge ? (
                         <ChevronRight className="h-4 w-4 ml-auto" />
-                      )}
+                      ) : null}
                     </Link>
                   </li>
                 )
@@ -127,11 +144,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label[language]}
-                  {item.badge && (
-                    <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                  {item.badge ? (
+                    <Badge
+                      variant={item.badgeTone === 'alert' ? 'destructive' : 'destructive'}
+                      className="h-5 px-1.5 text-xs"
+                    >
                       {item.badge}
                     </Badge>
-                  )}
+                  ) : null}
                 </Link>
               )
             })}
