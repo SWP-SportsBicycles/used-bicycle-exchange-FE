@@ -13,7 +13,7 @@ export const registerSchema = z.object({
   phoneNumber: z.string().regex(PHONE_REGEX, "So dien thoai phai theo dinh dang 0xxxxxxxxx"),
   email: z.string().email("Email khong hop le"),
   password: z.string().regex(PASSWORD_REGEX, "Mat khau can chu hoa, so, ky tu dac biet va toi thieu 6 ky tu"),
-  role: z.enum(["2", "3"], {
+  role: z.enum(["1", "2"], {
     errorMap: () => ({ message: "Vui long chon vai tro" }),
   }),
 });

@@ -57,29 +57,9 @@ function normalizeRoleLabel(value: unknown): string {
 
 function mapApiRoleToContextRole(role: unknown): UserRole | null {
   const roleLabel = normalizeRoleLabel(role)
-
-  // Backend RoleEnum: ADMIN=1, BUYER=2, SELLER=3, INSPECTOR=4
-  if (
-    role === 1 ||
-    role === '1' ||
-    roleLabel === 'admin' ||
-    roleLabel === 'role_admin'
-  ) {
-    return 'admin'
-  }
   if (
     role === 2 ||
     role === '2' ||
-    roleLabel === 'buyer' ||
-    roleLabel === 'nguoimua' ||
-    roleLabel === 'nguoi_mua' ||
-    roleLabel === 'role_buyer'
-  ) {
-    return 'buyer'
-  }
-  if (
-    role === 3 ||
-    role === '3' ||
     roleLabel === 'seller' ||
     roleLabel === 'nguoiban' ||
     roleLabel === 'nguoi_ban' ||
@@ -87,8 +67,17 @@ function mapApiRoleToContextRole(role: unknown): UserRole | null {
   ) {
     return 'seller'
   }
-  if (role === 4 || role === '4' || roleLabel === 'inspector' || roleLabel === 'role_inspector') {
-    return 'inspector'
+  if (role === 3 || role === '3' || roleLabel === 'inspector' || roleLabel === 'role_inspector') return 'inspector'
+  if (role === 4 || role === '4' || roleLabel === 'admin' || roleLabel === 'role_admin') return 'admin'
+  if (
+    role === 1 ||
+    role === '1' ||
+    roleLabel === 'buyer' ||
+    roleLabel === 'nguoimua' ||
+    roleLabel === 'nguoi_mua' ||
+    roleLabel === 'role_buyer'
+  ) {
+    return 'buyer'
   }
 
   return null
@@ -130,7 +119,6 @@ function clearRoleHintFromStorage() {
 }
 
 function resolveRole(candidate: Record<string, unknown>, fallbackRole: UserRole = 'buyer'): UserRole {
-  const hint = readRoleHintFromStorage()
   const mappedPrimary =
     mapRoleFromUnknown(candidate.role) ??
     mapRoleFromUnknown(candidate.roleId) ??
@@ -138,38 +126,19 @@ function resolveRole(candidate: Record<string, unknown>, fallbackRole: UserRole 
     mapRoleFromUnknown(candidate.roleCode) ??
     mapRoleFromUnknown(candidate.roleName)
 
-  // Prefer explicit user choice from signup flow when backend primary role is inconsistent
-  if (hint && mappedPrimary && hint !== mappedPrimary) {
-    if (hint === 'seller' && mappedPrimary === 'buyer') {
-      return hint
-    }
-  }
-
-  // If we have a hint and no mapped role, prefer the hint over fallback
-  if (hint && !mappedPrimary) {
-    return hint
-  }
-
   if (mappedPrimary) return mappedPrimary
 
-  if (Array.isArray(candidate.roles)) {
-    const roleSet = new Set<UserRole>(
-      candidate.roles
+  const roleFromArray = Array.isArray(candidate.roles)
+    ? candidate.roles
         .map((item) => {
           return mapRoleFromUnknown(item)
         })
-        .filter((role): role is UserRole => Boolean(role)),
-    )
+        .find((role): role is UserRole => Boolean(role))
+    : null
 
-    if (hint && roleSet.has(hint)) return hint
+  if (roleFromArray) return roleFromArray
 
-    if (roleSet.has('admin')) return 'admin'
-    if (roleSet.has('inspector')) return 'inspector'
-    if (roleSet.has('seller')) return 'seller'
-    if (roleSet.has('buyer')) return 'buyer'
-  }
-
-  return hint ?? fallbackRole
+  return readRoleHintFromStorage() ?? fallbackRole
 }
 
 function extractObject(value: unknown): Record<string, unknown> | null {
@@ -274,10 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(normalized)
     setRoleCookie(normalized.role)
-    // Only clear role hint if we successfully got a role from API
-    if (normalized.role !== 'buyer' || !readRoleHintFromStorage()) {
-      clearRoleHintFromStorage()
-    }
+    clearRoleHintFromStorage()
   }, [])
 
   const loginWithSession = useCallback(
@@ -290,7 +256,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await refreshMe()
       } catch {
         setUser(fallbackUser)
-        // Don't clear role hint on fallback, preserve it for next refresh attempt
       }
     },
     [refreshMe],
