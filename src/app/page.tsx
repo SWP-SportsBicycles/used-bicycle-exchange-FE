@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/auth-context'
-import { MOCK_LISTINGS } from '@/lib/mock-data'
+import { useFeaturedListings } from '@/modules/buyer/hooks/useListings'
 
 /* ────────────────────────────────────────────
    Constants
@@ -162,23 +162,8 @@ export default function HomePage() {
   const sellerCtaHref =
     user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'
 
-  const featuredListings = useMemo(() => {
-    const conditionScore = {
-      like_new: 4,
-      excellent: 3,
-      good: 2,
-      fair: 1,
-    } as const
-
-    return [...MOCK_LISTINGS]
-      .filter((listing) => listing.isVeloSafeVerified)
-      .sort((a, b) => {
-        const aScore = conditionScore[a.condition] * 100 + a.seller.rating * 10 + a.seller.totalSales
-        const bScore = conditionScore[b.condition] * 100 + b.seller.rating * 10 + b.seller.totalSales
-        return bScore - aScore
-      })
-      .slice(0, 6)
-  }, [])
+  const { data: featuredPage } = useFeaturedListings()
+  const featuredListings = featuredPage?.items ?? []
 
   const applyHeroSearch = () => {
     const params = new URLSearchParams()
