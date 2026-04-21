@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -116,7 +116,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     return message.includes('not found') || message.includes('404')
   }
 
-  const resolvePostLoginDestination = async (session?: AuthSession, roleHint?: AuthRole) => {
+  const resolvePostLoginDestination = useCallback(async (session?: AuthSession, roleHint?: AuthRole) => {
     const resolvedRole =
       mapAuthRoleToContextRole(session?.user?.role) ??
       mapAuthRoleToContextRole(roleHint)
@@ -134,7 +134,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       }
       return redirectTarget
     }
-  }
+  }, [redirectTarget])
 
   const resetPendingGoogle = () => {
     setPendingGoogleIdToken(null)
@@ -691,3 +691,4 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     </section>
   )
 }
+
