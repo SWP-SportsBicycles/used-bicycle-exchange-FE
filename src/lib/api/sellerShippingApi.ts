@@ -1,4 +1,4 @@
-import { http } from '@/lib/api/http'
+import { http } from "@/lib/api/http";
 
 export interface SellerShippingProfileRequest {
   senderName: string
@@ -23,40 +23,45 @@ export interface SellerShippingProfileResponse {
 export type SellerShippingProfileDraft = Partial<SellerShippingProfileResponse>
 
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
-  if (!payload || typeof payload !== 'object') {
-    return {}
+  if (!payload || typeof payload !== "object") {
+    return {};
   }
 
-  const maybe = payload as Record<string, unknown>
-  const nested = maybe.data && typeof maybe.data === 'object' ? (maybe.data as Record<string, unknown>) : undefined
-  return nested ?? maybe
+  const maybe = payload as Record<string, unknown>;
+  const nested =
+    maybe.data && typeof maybe.data === "object"
+      ? (maybe.data as Record<string, unknown>)
+      : undefined;
+  return nested ?? maybe;
 }
 
 function toDraftProfile(payload: unknown): SellerShippingProfileDraft {
-  const source = extractPayloadObject(payload)
+  const source = extractPayloadObject(payload);
   const maybeDistrictId =
-    typeof source.fromDistrictId === 'number' ? source.fromDistrictId : Number(source.fromDistrictId)
+    typeof source.fromDistrictId === "number"
+      ? source.fromDistrictId
+      : Number(source.fromDistrictId);
 
   return {
-    senderName: typeof source.senderName === 'string' ? source.senderName : undefined,
-    senderPhone: typeof source.senderPhone === 'string' ? source.senderPhone : undefined,
-    senderAddress: typeof source.senderAddress === 'string' ? source.senderAddress : undefined,
+    senderName: typeof source.senderName === "string" ? source.senderName : undefined,
+    senderPhone: typeof source.senderPhone === "string" ? source.senderPhone : undefined,
+    senderAddress: typeof source.senderAddress === "string" ? source.senderAddress : undefined,
     fromDistrictId: Number.isFinite(maybeDistrictId) ? maybeDistrictId : undefined,
-    fromWardCode: typeof source.fromWardCode === 'string' ? source.fromWardCode : undefined,
-    fromWardName: typeof source.fromWardName === 'string' ? source.fromWardName : undefined,
-    fromDistrictName: typeof source.fromDistrictName === 'string' ? source.fromDistrictName : undefined,
-    fromProvinceName: typeof source.fromProvinceName === 'string' ? source.fromProvinceName : undefined,
-    isDefault: typeof source.isDefault === 'boolean' ? source.isDefault : undefined,
-  }
+    fromWardCode: typeof source.fromWardCode === "string" ? source.fromWardCode : undefined,
+    fromWardName: typeof source.fromWardName === "string" ? source.fromWardName : undefined,
+    fromDistrictName: typeof source.fromDistrictName === "string" ? source.fromDistrictName : undefined,
+    fromProvinceName: typeof source.fromProvinceName === "string" ? source.fromProvinceName : undefined,
+    isDefault: typeof source.isDefault === "boolean" ? source.isDefault : undefined,
+  };
 }
 
 export const sellerShippingApi = {
   async getMyProfile() {
-    const response = await http.get<unknown>('/api/SellerShippingProfile')
-    return toDraftProfile(response)
+    const response = await http.get<unknown>("/api/SellerShippingProfile");
+    return toDraftProfile(response);
   },
 
   async upsertProfile(payload: SellerShippingProfileRequest) {
     return http.post<unknown>('/api/SellerShippingProfile', payload)
   },
-}
+};

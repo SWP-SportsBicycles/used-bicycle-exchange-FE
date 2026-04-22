@@ -1,327 +1,406 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Check, 
-  X, 
-  Eye,
-  Clock,
-  ExternalLink,
-  AlertCircle,
-  ChevronDown
-} from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { useState } from "react";
+import Image from "next/image";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Clock, Eye, Loader2, X } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { adminApi } from "@/lib/api/admin-api";
+import { useLanguage } from "@/lib/language-context";
+import { formatVND } from "@/lib/mock-data";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { useLanguage } from '@/lib/language-context'
-import { MOCK_ADMIN_APPROVALS, formatVND, CITIES } from '@/lib/mock-data'
-import { cn } from '@/lib/utils'
+} from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+
+const rejectSchema = z.object({
+  reason: z.string().trim().min(5, "Lý do từ chối tối thiểu 5 ký tự"),
+});
+
+type RejectValues = z.infer<typeof rejectSchema>;
+type ListingFilter = "all" | "pending" | "approved" | "rejected";
 
 export default function ApprovalsPage() {
-  const { language } = useLanguage()
-  const [approvals, setApprovals] = useState(MOCK_ADMIN_APPROVALS)
-  const [selectedApproval, setSelectedApproval] = useState<typeof MOCK_ADMIN_APPROVALS[0] | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const { language } = useLanguage();
+  const queryClient = useQueryClient();
+  const [activeStatus, setActiveStatus] = useState<ListingFilter>("pending");
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [rejectListingId, setRejectListingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleApprove = (id: string) => {
-    setApprovals(prev => prev.map(a => 
-      a.id === id ? { ...a, status: 'approved' as const } : a
-    ))
-  }
+  const rejectForm = useForm<RejectValues>({
+    resolver: zodResolver(rejectSchema),
+    defaultValues: {
+      reason: "",
+    },
+  });
 
-  const handleReject = () => {
-    if (selectedApproval) {
-      setApprovals(prev => prev.map(a => 
-        a.id === selectedApproval.id 
-          ? { ...a, status: 'rejected' as const, reviewNotes: rejectReason } 
-          : a
-      ))
-      setSelectedApproval(null)
-      setRejectReason('')
-    }
-  }
+  const listingsQuery = useQuery({
+    queryKey: ["admin-listings"],
+    queryFn: adminApi.getListings,
+  });
 
-  const pendingApprovals = approvals.filter(a => a.status === 'pending')
-  const processedApprovals = approvals.filter(a => a.status !== 'pending')
+  const listingDetailQuery = useQuery({
+    queryKey: ["admin-listing-detail", selectedListingId],
+    queryFn: () => adminApi.getListingDetail(selectedListingId as string),
+    enabled: !!selectedListingId,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (listingId: string) => adminApi.approveListing(listingId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      setFeedback(language === "vi" ? "Duyệt tin thành công." : "Listing approved.");
+      setErrorMessage(null);
+    },
+    onError: (error) => {
+      setErrorMessage(error instanceof Error ? error.message : "Approve listing failed.");
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ listingId, reason }: { listingId: string; reason: string }) => adminApi.rejectListing(listingId, reason),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      setFeedback(language === "vi" ? "Từ chối tin thành công." : "Listing rejected.");
+      setErrorMessage(null);
+      setRejectListingId(null);
+      rejectForm.reset();
+    },
+    onError: (error) => {
+      setErrorMessage(error instanceof Error ? error.message : "Reject listing failed.");
+    },
+  });
+
+  const allListings = listingsQuery.data ?? [];
+  const pendingApprovals = allListings.filter((item) => item.status === "pending");
+  const approvedApprovals = allListings.filter((item) => item.status === "approved");
+  const rejectedApprovals = allListings.filter((item) => item.status === "rejected");
+
+  const filteredApprovals = allListings.filter((item) => {
+    if (activeStatus === "all") return true;
+    return item.status === activeStatus;
+  });
+
+  const filterLabel = {
+    all: language === "vi" ? "Tất cả" : "All",
+    pending: language === "vi" ? "Chờ duyệt" : "Pending",
+    approved: language === "vi" ? "Đã duyệt" : "Approved",
+    rejected: language === "vi" ? "Từ chối" : "Rejected",
+  } as const;
+
+  const listTitle =
+    activeStatus === "all"
+      ? language === "vi"
+        ? "Tất Cả Tin Đăng"
+        : "All Listings"
+      : activeStatus === "pending"
+      ? language === "vi"
+        ? "Tin Đăng Chờ Duyệt"
+        : "Pending Listings"
+      : activeStatus === "approved"
+      ? language === "vi"
+        ? "Tin Đăng Đã Duyệt"
+        : "Approved Listings"
+      : language === "vi"
+      ? "Tin Đăng Bị Từ Chối"
+      : "Rejected Listings";
+
+  const listDescription =
+    activeStatus === "pending"
+      ? language === "vi"
+        ? "Xác minh số serial và thông tin trước khi duyệt"
+        : "Verify serial number and information before approval"
+      : language === "vi"
+      ? "Danh sách được lọc theo trạng thái"
+      : "List filtered by status";
+
+  const emptyText =
+    activeStatus === "all"
+      ? language === "vi"
+        ? "Không có tin đăng"
+        : "No listings"
+      : activeStatus === "pending"
+      ? language === "vi"
+        ? "Không có tin nào chờ duyệt"
+        : "No pending listings"
+      : activeStatus === "approved"
+      ? language === "vi"
+        ? "Không có tin nào đã duyệt"
+        : "No approved listings"
+      : language === "vi"
+      ? "Không có tin nào bị từ chối"
+      : "No rejected listings";
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          {language === 'vi' ? 'Duyệt Tin Đăng' : 'Listing Approval'}
+          {language === "vi" ? "Duyệt Tin Đăng" : "Listing Approval"}
         </h1>
         <p className="text-muted-foreground">
-          {language === 'vi' 
-            ? 'Xét duyệt tin đăng mới và xác minh số serial' 
-            : 'Review new listings and verify serial numbers'}
+          {language === "vi"
+            ? "Xét duyệt tin đăng mới và xác minh số serial"
+            : "Review new listings and verify serial numbers"}
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{pendingApprovals.length}</p>
-                <p className="text-sm text-muted-foreground">
-                  {language === 'vi' ? 'Chờ duyệt' : 'Pending'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-success/20 flex items-center justify-center">
-                <Check className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {processedApprovals.filter(a => a.status === 'approved').length}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {language === 'vi' ? 'Đã duyệt' : 'Approved'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center">
-                <X className="h-6 w-6 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {processedApprovals.filter(a => a.status === 'rejected').length}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {language === 'vi' ? 'Từ chối' : 'Rejected'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {feedback && (
+        <Alert>
+          <AlertDescription>{feedback}</AlertDescription>
+        </Alert>
+      )}
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
 
-      {/* Pending Approvals */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={activeStatus === "all" ? "default" : "outline"}
+              onClick={() => setActiveStatus("all")}
+            >
+              {filterLabel.all} ({allListings.length})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeStatus === "pending" ? "default" : "outline"}
+              onClick={() => setActiveStatus("pending")}
+            >
+              {filterLabel.pending} ({pendingApprovals.length})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeStatus === "approved" ? "default" : "outline"}
+              onClick={() => setActiveStatus("approved")}
+            >
+              {filterLabel.approved} ({approvedApprovals.length})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeStatus === "rejected" ? "default" : "outline"}
+              onClick={() => setActiveStatus("rejected")}
+            >
+              {filterLabel.rejected} ({rejectedApprovals.length})
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
-          <CardTitle>{language === 'vi' ? 'Tin Đăng Chờ Duyệt' : 'Pending Listings'}</CardTitle>
-          <CardDescription>
-            {language === 'vi' 
-              ? 'Xác minh số serial và thông tin trước khi duyệt' 
-              : 'Verify serial number and information before approval'}
-          </CardDescription>
+          <CardTitle>{listTitle}</CardTitle>
+          <CardDescription>{listDescription}</CardDescription>
         </CardHeader>
         <CardContent>
-          {pendingApprovals.length === 0 ? (
+          {listingsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {language === "vi" ? "Đang tải danh sách..." : "Loading listings..."}
+            </div>
+          ) : filteredApprovals.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Check className="h-12 w-12 mx-auto mb-4 text-success" />
-              <p>{language === 'vi' ? 'Không có tin đăng nào chờ duyệt' : 'No pending listings'}</p>
+              {activeStatus === "pending" && <Clock className="h-12 w-12 mx-auto mb-4 text-amber-500" />}
+              {activeStatus === "approved" && <Check className="h-12 w-12 mx-auto mb-4 text-success" />}
+              {activeStatus === "rejected" && <X className="h-12 w-12 mx-auto mb-4 text-destructive" />}
+              {activeStatus === "all" && <Eye className="h-12 w-12 mx-auto mb-4" />}
+              <p>{emptyText}</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingApprovals.map((approval) => (
-                <Collapsible
-                  key={approval.id}
-                  open={expandedId === approval.id}
-                  onOpenChange={() => setExpandedId(expandedId === approval.id ? null : approval.id)}
-                >
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <CollapsibleTrigger className="w-full">
-                      <div className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors">
-                        <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                          <img 
-                            src={approval.listing.images[0]} 
-                            alt={approval.listing.title}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="font-medium truncate">{approval.listing.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {approval.listing.brand} {approval.listing.model}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {CITIES.find(c => c.value === approval.listing.city)?.label}
-                            </Badge>
-                            <span className="text-sm font-semibold text-primary">
-                              {formatVND(approval.listing.price)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
+              {filteredApprovals.map((listing) => (
+                <div key={listing.id} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                    <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                      {listing.images[0] ? (
+                        <Image src={listing.images[0]} alt={listing.title} width={64} height={64} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">No image</div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{listing.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {listing.brand || "-"} {listing.model || ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {listing.city || (language === "vi" ? "Chưa cập nhật" : "N/A")}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            listing.status === "pending"
+                              ? "text-amber-600 border-amber-400/50"
+                              : listing.status === "approved"
+                              ? "text-emerald-600 border-emerald-400/50"
+                              : "text-destructive border-destructive/40"
+                          }
+                        >
+                          {filterLabel[listing.status]}
+                        </Badge>
+                        <span className="text-sm font-semibold text-primary">{formatVND(listing.price)}</span>
+                        {listing.submittedAt && (
                           <span className="text-xs text-muted-foreground">
-                            {new Date(approval.submittedAt).toLocaleDateString('vi-VN')}
+                            {new Date(listing.submittedAt).toLocaleDateString("vi-VN")}
                           </span>
-                          <ChevronDown className={cn(
-                            'h-5 w-5 text-muted-foreground transition-transform',
-                            expandedId === approval.id && 'rotate-180'
-                          )} />
-                        </div>
+                        )}
                       </div>
-                    </CollapsibleTrigger>
+                    </div>
 
-                    <CollapsibleContent>
-                      <div className="p-4 pt-0 border-t border-border bg-muted/30">
-                        <div className="grid gap-6 md:grid-cols-2">
-                          {/* Serial Verification */}
-                          <div className="space-y-3">
-                            <h4 className="font-semibold text-sm">
-                              {language === 'vi' ? 'Xác Minh Số Serial' : 'Serial Verification'}
-                            </h4>
-                            <div className="p-3 rounded-lg bg-card border border-border">
-                              <p className="text-xs text-muted-foreground mb-1">
-                                {language === 'vi' ? 'Số serial đăng ký:' : 'Registered serial:'}
-                              </p>
-                              <p className="font-mono font-semibold">{approval.listing.serial}</p>
-                            </div>
-                            <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-                              <img 
-                                src={approval.serialPhotoUrl} 
-                                alt="Serial photo"
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {language === 'vi' 
-                                ? 'So sánh số serial trong ảnh với số đăng ký' 
-                                : 'Compare serial in photo with registered number'}
-                            </p>
-                          </div>
-
-                          {/* Listing Details */}
-                          <div className="space-y-3">
-                            <h4 className="font-semibold text-sm">
-                              {language === 'vi' ? 'Thông Tin Xe' : 'Bike Details'}
-                            </h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">{language === 'vi' ? 'Loại' : 'Category'}</span>
-                                <span className="capitalize">{approval.listing.category}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">{language === 'vi' ? 'Khung' : 'Frame'}</span>
-                                <span>{approval.listing.frameMaterial}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">{language === 'vi' ? 'Size' : 'Size'}</span>
-                                <span>{approval.listing.frameSize}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Groupset</span>
-                                <span>{approval.listing.groupset}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">{language === 'vi' ? 'Tình trạng' : 'Condition'}</span>
-                                <span className="capitalize">{approval.listing.condition.replace('_', ' ')}</span>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-2 pt-4">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="flex-1"
-                                onClick={() => setSelectedApproval(approval)}
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                {language === 'vi' ? 'Từ chối' : 'Reject'}
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                className="flex-1"
-                                onClick={() => handleApprove(approval.id)}
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                {language === 'vi' ? 'Duyệt' : 'Approve'}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedListingId(listing.id)}>
+                        <Eye className="mr-1 h-4 w-4" />
+                        {language === "vi" ? "Chi tiết" : "Detail"}
+                      </Button>
+                      {listing.status === "pending" && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => setRejectListingId(listing.id)}>
+                            <X className="mr-1 h-4 w-4" />
+                            {language === "vi" ? "Từ chối" : "Reject"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => approveMutation.mutate(listing.id)}
+                            disabled={approveMutation.isPending}
+                          >
+                            <Check className="mr-1 h-4 w-4" />
+                            {language === "vi" ? "Duyệt" : "Approve"}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </Collapsible>
+                </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Reject Dialog */}
-      <Dialog open={!!selectedApproval} onOpenChange={() => setSelectedApproval(null)}>
+      <Dialog open={!!selectedListingId} onOpenChange={() => setSelectedListingId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {language === 'vi' ? 'Từ Chối Tin Đăng' : 'Reject Listing'}
-            </DialogTitle>
+            <DialogTitle>{language === "vi" ? "Chi Tiết Tin Đăng" : "Listing Detail"}</DialogTitle>
             <DialogDescription>
-              {language === 'vi' 
-                ? 'Vui lòng cung cấp lý do từ chối để người bán có thể chỉnh sửa'
-                : 'Please provide a reason so the seller can make corrections'}
+              {language === "vi" ? "Thông tin từ API /api/admin-listing/{id}" : "Data from /api/admin-listing/{id}"}
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted">
-              <p className="font-medium">{selectedApproval?.listing.title}</p>
-              <p className="text-sm text-muted-foreground">
-                Serial: {selectedApproval?.listing.serial}
-              </p>
+          {listingDetailQuery.isLoading ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+              {language === "vi" ? "Đang tải chi tiết..." : "Loading detail..."}
             </div>
-            
-            <div className="space-y-2">
-              <Label>{language === 'vi' ? 'Lý do từ chối' : 'Rejection reason'}</Label>
-              <Textarea
-                placeholder={language === 'vi' 
-                  ? 'VD: Số serial không khớp với ảnh...'
-                  : 'E.g., Serial number does not match photo...'}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                rows={4}
-              />
+          ) : listingDetailQuery.data ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">ID</span>
+                <span className="text-right">{listingDetailQuery.data.id}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{language === "vi" ? "Tiêu đề" : "Title"}</span>
+                <span className="text-right">{listingDetailQuery.data.title}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Serial</span>
+                <span className="text-right">{listingDetailQuery.data.serial || "-"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{language === "vi" ? "Thành phố" : "City"}</span>
+                <span className="text-right">{listingDetailQuery.data.city || "-"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{language === "vi" ? "Giá" : "Price"}</span>
+                <span className="text-right font-semibold">{formatVND(listingDetailQuery.data.price)}</span>
+              </div>
             </div>
-          </div>
-
+          ) : (
+            <div className="text-sm text-muted-foreground">{language === "vi" ? "Không có dữ liệu." : "No data."}</div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedApproval(null)}>
-              {language === 'vi' ? 'Hủy' : 'Cancel'}
-            </Button>
-            <Button variant="destructive" onClick={handleReject} disabled={!rejectReason.trim()}>
-              {language === 'vi' ? 'Xác nhận từ chối' : 'Confirm Rejection'}
+            <Button variant="outline" onClick={() => setSelectedListingId(null)}>
+              {language === "vi" ? "Đóng" : "Close"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!rejectListingId} onOpenChange={() => setRejectListingId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{language === "vi" ? "Từ Chối Tin Đăng" : "Reject Listing"}</DialogTitle>
+            <DialogDescription>
+              {language === "vi"
+                ? "Nhập lý do để gửi về seller."
+                : "Provide a rejection reason for seller."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...rejectForm}>
+            <form
+              className="space-y-4"
+              onSubmit={rejectForm.handleSubmit((values) => {
+                if (!rejectListingId) return;
+                rejectMutation.mutate({ listingId: rejectListingId, reason: values.reason });
+              })}
+            >
+              <FormField
+                control={rejectForm.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{language === "vi" ? "Lý do từ chối" : "Reason"}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder={
+                          language === "vi"
+                            ? "VD: Số serial không khớp với ảnh..."
+                            : "E.g., Serial number does not match the photo..."
+                        }
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setRejectListingId(null)}>
+                  {language === "vi" ? "Hủy" : "Cancel"}
+                </Button>
+                <Button type="submit" variant="destructive" disabled={rejectMutation.isPending}>
+                  {rejectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {language === "vi" ? "Xác nhận từ chối" : "Confirm rejection"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

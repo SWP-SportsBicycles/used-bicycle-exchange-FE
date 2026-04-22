@@ -1,11 +1,11 @@
 'use client'
 
-import { Suspense, useState, useMemo, useEffect } from 'react'
+import { Suspense, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Grid3X3, List, Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Header } from '@/components/header'
 import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/components/filter-sidebar'
@@ -70,49 +70,33 @@ const bikeTypeOptions = [
 function MarketplacePageContent() {
   const router = useRouter()
   const { user } = useAuth()
-  const searchParams = useSearchParams()
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('hcm')
   const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
   const sellerCtaHref =
     user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'
-  const { data: listings = [] } = useMarketplaceListings({
-    search: appliedSearch || undefined,
+
+  const { data: listingPage } = useMarketplaceListings({
+    keyword: appliedSearch || undefined,
     city: selectedCity !== 'all' ? selectedCity : undefined,
     category: selectedBikeType !== 'all' ? selectedBikeType : undefined,
+    brand: filters.brands[0] || undefined,
+    condition: filters.conditions[0] || undefined,
+    frameSize: filters.frameSizes[0] || undefined,
+    minPrice: filters.priceRange[0] > 0 ? filters.priceRange[0] : undefined,
+    maxPrice: filters.priceRange[1] < 100000000 ? filters.priceRange[1] : undefined,
+    pageNumber: currentPage,
+    pageSize: 12,
   })
-
-  useEffect(() => {
-    const term = (searchParams.get('q') || '').trim()
-    const city = searchParams.get('city')
-    const bikeType = searchParams.get('type')
-    const validCities = cityOptions.map((option) => option.value)
-    const validBikeTypes = bikeTypeOptions.map((option) => option.value)
-    const normalizedCity = validCities.includes(city as (typeof cityOptions)[number]['value'])
-      ? (city as (typeof cityOptions)[number]['value'])
-      : 'all'
-    const normalizedBikeType = validBikeTypes.includes(bikeType as (typeof bikeTypeOptions)[number]['value'])
-      ? (bikeType as (typeof bikeTypeOptions)[number]['value'])
-      : 'all'
-
-    setSearchInput(term)
-    setAppliedSearch(term)
-    setSelectedCity(normalizedCity)
-    setSelectedBikeType(normalizedBikeType)
-    setFilters(prev => ({
-      ...prev,
-      cities: normalizedCity === 'all' ? [] : [normalizedCity],
-      categories: normalizedBikeType === 'all' ? [] : [normalizedBikeType],
-    }))
-  }, [searchParams])
-
   const applyHeroSearch = () => {
     const term = searchInput.trim()
     setAppliedSearch(term)
+    setCurrentPage(1)
     setFilters(prev => ({
       ...prev,
       cities: selectedCity === 'all' ? [] : [selectedCity],
@@ -127,47 +111,13 @@ function MarketplacePageContent() {
     router.replace(query ? `/marketplace?${query}` : '/marketplace')
   }
 
-  // Filter and sort listings
+  // Client-side sort (server đã filter — chỉ sort local batch hiện tại)
   const filteredListings = useMemo(() => {
-    const result = listings.filter(listing => {
-      // VeloSafe filter
-      if (filters.veloSafeOnly && !listing.isVeloSafeVerified) return false
-
-      // Category filter
-      if (filters.categories.length > 0 && !filters.categories.includes(listing.category)) return false
-
-      // Brand filter
-      if (filters.brands.length > 0 && !filters.brands.includes(listing.brand)) return false
-
-      // Frame size filter
-      if (filters.frameSizes.length > 0 && !filters.frameSizes.includes(listing.frameSize)) return false
-
-      // Groupset filter
-      if (filters.groupsets.length > 0 && !filters.groupsets.includes(listing.groupset)) return false
-
-      // Condition filter
-      if (filters.conditions.length > 0 && !filters.conditions.includes(listing.condition)) return false
-
-      // City filter
-      if (filters.cities.length > 0 && !filters.cities.includes(listing.city)) return false
-
-      // Price range filter
-      if (listing.price < filters.priceRange[0] || listing.price > filters.priceRange[1]) return false
-
-      if (appliedSearch) {
-        const term = appliedSearch.toLowerCase()
-        const match =
-          listing.title.toLowerCase().includes(term) ||
-          listing.brand.toLowerCase().includes(term) ||
-          listing.model.toLowerCase().includes(term) ||
-          listing.description.toLowerCase().includes(term)
-        if (!match) return false
-      }
-
-      return true
-    })
-
-    // Sort
+    let result = listingPage?.items ?? []
+    if (filters.veloSafeOnly) {
+      result = result.filter(l => l.isVeloSafeVerified)
+    }
+    result = [...result]
     switch (sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.price - b.price)
@@ -179,12 +129,11 @@ function MarketplacePageContent() {
         result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         break
       case 'rating':
-        result.sort((a, b) => b.seller.rating - a.seller.rating)
+        result.sort((a, b) => (b.seller?.rating ?? 0) - (a.seller?.rating ?? 0))
         break
     }
-
     return result
-  }, [listings, filters, sortBy, appliedSearch])
+  }, [listingPage?.items, filters.veloSafeOnly, sortBy])
 
   return (
     <div className="min-h-screen bg-background">
@@ -199,7 +148,7 @@ function MarketplacePageContent() {
           }}
         />
         <div className="absolute left-0 top-0 h-full w-[22%] bg-[#aee86c]/95 [clip-path:polygon(0_0,100%_0,56%_100%,0_100%)]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#1d2a14]/70 via-[#1d2a14]/45 to-[#1d2a14]/65" />
+        <div className="absolute inset-0 bg-linear-to-r from-[#1d2a14]/70 via-[#1d2a14]/45 to-[#1d2a14]/65" />
         <div className="absolute inset-0 opacity-25 [background:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_42%),radial-gradient(circle_at_80%_15%,rgba(255,255,255,0.25),transparent_38%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 lg:py-24 lg:px-6">
           <motion.div
@@ -288,7 +237,7 @@ function MarketplacePageContent() {
       </section>
 
       {/* Category Headings */}
-      <section className="border-b border-border/60 bg-gradient-to-b from-background to-slate-50/70">
+      <section className="border-b border-border/60 bg-linear-to-b from-background to-slate-50/70">
         <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
           <div className="mb-6 flex items-end justify-between gap-3">
             <div>
@@ -307,7 +256,7 @@ function MarketplacePageContent() {
                 key={section.title}
                 className="group overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-athletic"
               >
-                <div className="relative aspect-[16/10] w-full bg-slate-100">
+                <div className="relative aspect-16/10 w-full bg-slate-100">
                   <Image
                     src={section.image}
                     alt={section.title}
@@ -342,13 +291,13 @@ function MarketplacePageContent() {
                   onFilterChange={setFilters}
                 />
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{filteredListings.length}</span> xe được tìm thấy
+                  <span className="font-medium text-foreground">{listingPage?.totalCount ?? filteredListings.length}</span> xe được tìm thấy
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[180px] bg-card">
+                  <SelectTrigger className="w-45 bg-card">
                     <SelectValue placeholder="Sắp xếp theo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -422,6 +371,43 @@ function MarketplacePageContent() {
                   Xóa tất cả bộ lọc
                 </Button>
               </motion.div>
+            )}
+
+            {/* Pagination */}
+            {listingPage && listingPage.totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                >
+                  ← Trước
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: listingPage.totalPages }, (_, i) => i + 1)
+                    .filter(p => Math.abs(p - currentPage) <= 2)
+                    .map(p => (
+                      <Button
+                        key={p}
+                        variant={p === currentPage ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                      >
+                        {p}
+                      </Button>
+                    ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= listingPage.totalPages}
+                  onClick={() => { setCurrentPage(p => Math.min(listingPage.totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                >
+                  Tiếp →
+                </Button>
+              </div>
             )}
           </div>
         </div>

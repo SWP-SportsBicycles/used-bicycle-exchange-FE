@@ -1,5 +1,5 @@
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getApps, initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -10,13 +10,27 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Prevent duplicate Firebase app initialization (Next.js hot reload)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+const hasRequiredFirebaseConfig = Boolean(
+  firebaseConfig.apiKey
+  && firebaseConfig.authDomain
+  && firebaseConfig.projectId
+  && firebaseConfig.appId
+);
 
-// Request access to user's email and profile
-googleProvider.addScope("email");
-googleProvider.addScope("profile");
+export const canUseFirebaseAuth = typeof window !== "undefined" && hasRequiredFirebaseConfig;
+
+let auth: Auth | null = null;
+let googleProvider: GoogleAuthProvider | null = null;
+
+if (canUseFirebaseAuth) {
+  // Prevent duplicate Firebase app initialization (Next.js hot reload)
+  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+
+  // Request access to user's email and profile
+  googleProvider.addScope("email");
+  googleProvider.addScope("profile");
+}
 
 export { auth, googleProvider };

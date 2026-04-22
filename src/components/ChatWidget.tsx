@@ -42,17 +42,21 @@ export function ChatWidget() {
         },
       ])
     } catch (error) {
+      const fallbackMessage =
+        'Sorry, AI is currently busy. Please try again in a few seconds.'
+      const message =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : fallbackMessage
+
       setMessages((prev) => [
         ...prev,
         {
           id: makeId(),
           role: 'assistant',
-          content:
-            'Sorry, I am having trouble connecting right now. Please check your API key or try again in a moment.',
+          content: message,
         },
       ])
-      // eslint-disable-next-line no-console
-      console.error(error)
     } finally {
       setLoading(false)
     }
