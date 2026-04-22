@@ -1,10 +1,24 @@
 "use client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL
-  ?? "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const API_BASE = "/api/proxy";
+
+const PUBLIC_AUTH_PATH_PREFIXES = [
+  "/api/Auth/signin",
+  "/api/Auth/signup",
+  "/api/Auth/google-login",
+  "/api/Auth/verify-otp",
+  "/api/Auth/resend-otp",
+  "/api/Auth/forgot-password",
+  "/api/Auth/reset-password-by-link",
+  "/api/Auth/renew-token",
+];
 
 function normalizePath(url: string): string {
   return url.startsWith("/") ? url : `/${url}`;
+}
+
+function isPublicAuthPath(url: string): boolean {
+  return PUBLIC_AUTH_PATH_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
 function extractApiErrorMessage(payload: unknown): string | null {
@@ -68,24 +82,33 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
     ? localStorage.getItem("accessToken")
     : null;
   const normalizedUrl = normalizePath(url);
-  const res = await fetch(`${API_BASE}${normalizedUrl}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-    credentials: "include", // for refresh token cookie
-  });
+  const skipAuthHeader = isPublicAuthPath(normalizedUrl);
 
-  if (res.status === 401) {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${normalizedUrl}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(!skipAuthHeader && token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+      credentials: "include", // for refresh token cookie
+    });
+  } catch {
+    throw new Error("Unable to connect to API. Please check backend service and network.");
+  }
+
+  if (res.status === 401 && !skipAuthHeader) {
     const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
       method: "POST",
       credentials: "include",
     });
     if (renewRes.ok) {
       const data = await renewRes.json();
-      localStorage.setItem("accessToken", data.accessToken);
+      if (data?.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+      }
       
       return fetchWithAuth(normalizedUrl, {
         ...options,
@@ -95,6 +118,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
         }
       });
     }
+    localStorage.removeItem("accessToken");
     window.location.href = "/auth/login";
     throw new Error("Unauthorized");
   }
@@ -119,6 +143,8 @@ export const http = {
     fetchWithAuth<T>(url, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   put: <T>(url: string, body: unknown) =>
     fetchWithAuth<T>(url, { method: "PUT", body: JSON.stringify(body) }),
+  patch: <T>(url: string, body: unknown) =>
+    fetchWithAuth<T>(url, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(url: string) => fetchWithAuth<T>(url, { method: "DELETE" }),
   upload: async <T>(url: string, file: File): Promise<T> => {
     const formData = new FormData();
