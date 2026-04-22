@@ -95,6 +95,10 @@ export const sellerApi = {
     return http.post<unknown>(`/api/seller-listing/${listingId}/submit`);
   },
 
+  resubmitListing(listingId: string) {
+    return http.post<unknown>(`/api/seller-listing/${listingId}/resubmit`);
+  },
+
   withdrawListing(listingId: string) {
     return http.post<unknown>(`/api/seller-listing/${listingId}/withdraw`);
   },

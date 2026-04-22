@@ -20,7 +20,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useLanguage } from '@/lib/language-context'
 import { MOCK_LISTINGS, formatVND } from '@/lib/mock-data'
-import { useDeleteListing, useSubmitListing, useWithdrawListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import {
+  useDeleteListing,
+  useResubmitListing,
+  useSubmitListing,
+  useWithdrawListing,
+} from '@/modules/seller/hooks/useSellerListingMutations'
 import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
 import { cn } from '@/lib/utils'
 
@@ -42,21 +47,23 @@ type SellerListingItem = {
   isVeloSafeVerified: boolean
 }
 
-type ConfirmAction = 'submit' | 'withdraw' | 'delete'
+type ConfirmAction = 'submit' | 'withdraw' | 'delete' | 'resubmit'
 
 function normalizeListingStatus(value: unknown): ListingStatus {
-  const raw = typeof value === 'string' ? value : ''
-  if (
-    raw === 'draft' ||
-    raw === 'pending_review' ||
-    raw === 'pending' ||
-    raw === 'published' ||
-    raw === 'sold' ||
-    raw === 'rejected' ||
-    raw === 'withdrawn'
-  ) {
-    return raw
-  }
+  const raw = typeof value === 'string' ? value.trim() : ''
+  const normalized = raw
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase()
+
+  if (normalized === 'draft') return 'draft'
+  if (normalized === 'pending_review' || normalized === 'pending') return 'pending_review'
+  if (normalized === 'pending_inspection') return 'pending_review'
+  if (normalized === 'published' || normalized === 'active') return 'published'
+  if (normalized === 'sold' || normalized === 'completed') return 'sold'
+  if (normalized === 'rejected') return 'rejected'
+  if (normalized === 'withdrawn' || normalized === 'cancelled' || normalized === 'canceled') return 'withdrawn'
+
   return 'draft'
 }
 
@@ -108,6 +115,8 @@ function normalizeListingsPayload(payload: unknown): SellerListingItem[] {
       const images = (Array.isArray(raw.images) ? raw.images : mediaImages).filter(
         (entry): entry is string => typeof entry === 'string',
       )
+      const thumbnail = typeof raw.thumbnail === 'string' ? raw.thumbnail : ''
+      const resolvedImages = images.length > 0 ? images : thumbnail ? [thumbnail] : []
 
       const id =
         (typeof raw.id === 'string' && raw.id) ||
@@ -123,7 +132,7 @@ function normalizeListingsPayload(payload: unknown): SellerListingItem[] {
         title: typeof raw.title === 'string' ? raw.title : 'Untitled listing',
         price: typeof raw.price === 'number' ? raw.price : Number(raw.price ?? 0),
         status: normalizeListingStatus(raw.status),
-        images,
+        images: resolvedImages,
         isVeloSafeVerified: Boolean(raw.isVeloSafeVerified),
       } satisfies SellerListingItem
     })
@@ -147,10 +156,11 @@ export default function SellerListingsPage() {
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
   const deleteMutation = useDeleteListing()
+  const resubmitMutation = useResubmitListing()
   const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; listing: SellerListingItem } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending
+  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
 
   const myListings = useMemo(() => {
     if (isError) {
@@ -186,6 +196,8 @@ export default function SellerListingsPage() {
         await submitMutation.mutateAsync(confirmState.listing.id)
       } else if (confirmState.action === 'withdraw') {
         await withdrawMutation.mutateAsync(confirmState.listing.id)
+      } else if (confirmState.action === 'resubmit') {
+        await resubmitMutation.mutateAsync(confirmState.listing.id)
       } else {
         await deleteMutation.mutateAsync(confirmState.listing.id)
       }
@@ -285,7 +297,7 @@ export default function SellerListingsPage() {
                   </Button>
                 )}
 
-                {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'withdrawn') && (
+                {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'withdrawn' || listing.status === 'pending_review' || listing.status === 'pending') && (
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/seller/listings/${listing.id}/edit`}>
                       {language === 'vi' ? 'Sửa' : 'Edit'}
@@ -293,9 +305,15 @@ export default function SellerListingsPage() {
                   </Button>
                 )}
 
-                {listing.status === 'published' && (
+                {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
                   <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'withdraw', listing })}>
                     {language === 'vi' ? 'Rút tin' : 'Withdraw'}
+                  </Button>
+                )}
+
+                {listing.status === 'rejected' && (
+                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'resubmit', listing })}>
+                    {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
                   </Button>
                 )}
 
@@ -321,19 +339,21 @@ export default function SellerListingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {confirmState?.action === 'submit'
-                  ? language === 'vi'
-                    ? 'Gửi tin để duyệt?'
-                    : 'Submit listing for review?'
+                  ? language === 'vi' ? 'Xác nhận gửi duyệt' : 'Confirm Submission'
                   : confirmState?.action === 'withdraw'
-                    ? language === 'vi'
-                      ? 'Rút tin đăng?'
-                      : 'Withdraw listing?'
-                    : language === 'vi'
-                      ? 'Xóa tin đăng?'
-                      : 'Delete listing?'}
+                    ? language === 'vi' ? 'Xác nhận rút tin' : 'Confirm Withdrawal'
+                    : confirmState?.action === 'resubmit'
+                      ? language === 'vi' ? 'Xác nhận gửi lại duyệt' : 'Confirm Resubmission'
+                      : language === 'vi' ? 'Xác nhận xóa' : 'Confirm Deletion'}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {confirmState?.listing.title}
+                {confirmState?.action === 'submit'
+                  ? language === 'vi' ? 'Bạn có chắc chắn muốn gửi tin đăng này cho quản trị viên phê duyệt không?' : 'Are you sure you want to submit this listing for admin approval?'
+                  : confirmState?.action === 'withdraw'
+                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không? Nó sẽ không còn hiển thị với người mua nữa.' : 'Are you sure you want to withdraw this listing? It will no longer be visible to buyers.'
+                    : confirmState?.action === 'resubmit'
+                      ? language === 'vi' ? 'Bạn có muốn gửi lại tin đăng này để quản trị viên xem xét lại không?' : 'Do you want to resubmit this listing for admin review?'
+                      : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

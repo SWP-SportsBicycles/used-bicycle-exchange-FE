@@ -55,6 +55,17 @@ export function useSubmitListing() {
   });
 }
 
+export function useResubmitListing() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (listingId: string) => sellerApi.resubmitListing(listingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
+    },
+  });
+}
+
 export function useWithdrawListing() {
   const queryClient = useQueryClient();
 

@@ -8,7 +8,12 @@ import { ArrowLeft, Trash2, Send, EyeOff, AlertTriangle, AlertCircle, RefreshCw,
 import { useQuery } from '@tanstack/react-query'
 
 import { sellerApi } from '@/lib/api/seller-api'
-import { useSubmitListing, useWithdrawListing, useDeleteListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import {
+  useDeleteListing,
+  useSubmitListing,
+  useWithdrawListing,
+  useResubmitListing,
+} from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +29,260 @@ import {
 import { useLanguage } from '@/lib/language-context'
 import { formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
+
+type ListingStatus = 'draft' | 'pending_review' | 'published' | 'rejected' | 'withdrawn' | 'sold'
+
+type ListingMediaKind = 'image' | 'video'
+
+type ListingMediaItem = {
+  url: string
+  kind: ListingMediaKind
+}
+
+type SellerListingDetail = {
+  id: string
+  title: string
+  status: ListingStatus
+  serialNumber: string
+  brand: string
+  model: string
+  category: string
+  condition: string
+  frameSize: string
+  frameMaterial: string
+  groupset: string
+  tireRim: string
+  operating: string
+  brakeType: string
+  paint: string
+  overall: string
+  city: string
+  description: string
+  price: number
+  rejectReason: string
+  mediaItems: ListingMediaItem[]
+}
+
+function normalizeStatus(value: unknown): ListingStatus {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  const normalized = raw
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase()
+
+  if (normalized === 'published' || normalized === 'active') return 'published'
+  if (normalized === 'pending_review' || normalized === 'pending' || normalized === 'pending_inspection') return 'pending_review'
+  if (normalized === 'rejected') return 'rejected'
+  if (normalized === 'withdrawn' || normalized === 'cancelled' || normalized === 'canceled') return 'withdrawn'
+  if (normalized === 'sold' || normalized === 'completed') return 'sold'
+  return 'draft'
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
+function collectNestedRecords(root: Record<string, unknown>, maxDepth = 5): Record<string, unknown>[] {
+  const records: Record<string, unknown>[] = []
+  const visited = new WeakSet<object>()
+
+  const walk = (node: unknown, depth: number) => {
+    if (!node || depth > maxDepth) return
+
+    if (Array.isArray(node)) {
+      node.forEach((entry) => walk(entry, depth + 1))
+      return
+    }
+
+    const record = toRecord(node)
+    if (!record) return
+    if (visited.has(record)) return
+
+    visited.add(record)
+    records.push(record)
+
+    Object.values(record).forEach((value) => walk(value, depth + 1))
+  }
+
+  walk(root, 0)
+  return records
+}
+
+function getValueByKey(source: Record<string, unknown>, key: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(source, key)) {
+    return source[key]
+  }
+
+  const loweredKey = key.toLowerCase()
+  const matchedKey = Object.keys(source).find((candidate) => candidate.toLowerCase() === loweredKey)
+  return matchedKey ? source[matchedKey] : undefined
+}
+
+function pickString(records: Record<string, unknown>[], keys: string[]): string {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = getValueByKey(record, key)
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value
+      }
+    }
+  }
+  return ''
+}
+
+function pickNumber(records: Record<string, unknown>[], keys: string[]): number {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = getValueByKey(record, key)
+      const parsed = typeof value === 'number' ? value : Number(value)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+  return 0
+}
+
+function unwrapListingPayload(payload: unknown): Record<string, unknown> | null {
+  let current = payload
+
+  for (let depth = 0; depth < 4; depth += 1) {
+    const record = toRecord(current)
+    if (!record) return null
+
+    const nested =
+      toRecord(record.data) ??
+      toRecord(record.result) ??
+      toRecord(record.item) ??
+      toRecord(record.listing)
+
+    if (!nested) return record
+    current = nested
+  }
+
+  return toRecord(current)
+}
+
+function isRenderableMediaUrl(url: string): boolean {
+  const normalized = url.trim()
+  if (!normalized) return false
+
+  return (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('/') ||
+    normalized.startsWith('data:image/') ||
+    normalized.startsWith('data:video/')
+  )
+}
+
+function inferMediaKind(url: string, typeHint?: string): ListingMediaKind {
+  const hint = (typeHint ?? '').toLowerCase()
+  if (hint.includes('video') || hint === '1') {
+    return 'video'
+  }
+
+  const normalized = url.toLowerCase()
+  if (
+    normalized.includes('/video/upload/') ||
+    normalized.endsWith('.mp4') ||
+    normalized.endsWith('.webm') ||
+    normalized.endsWith('.ogg') ||
+    normalized.endsWith('.mov') ||
+    normalized.endsWith('.m3u8')
+  ) {
+    return 'video'
+  }
+
+  return 'image'
+}
+
+function normalizeMediaItems(records: Record<string, unknown>[]): ListingMediaItem[] {
+  const mediaEntries: unknown[] = []
+  const mediaKeys = ['mediaFiles', 'medias', 'media', 'images']
+
+  for (const record of records) {
+    for (const key of mediaKeys) {
+      const maybeArray = getValueByKey(record, key)
+      if (Array.isArray(maybeArray)) {
+        mediaEntries.push(...maybeArray)
+      }
+    }
+  }
+
+  const mediaItems = mediaEntries
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        return isRenderableMediaUrl(entry)
+          ? { url: entry, kind: inferMediaKind(entry) }
+          : null
+      }
+
+      const mediaRecord = toRecord(entry)
+      if (!mediaRecord) return null
+
+      const url = pickString([mediaRecord], ['url', 'image', 'videoUrl', 'thumbnail', 'path'])
+      if (!isRenderableMediaUrl(url)) return null
+
+      const typeHint = pickString([mediaRecord], ['type', 'mediaType', 'resourceType', 'mimeType'])
+      return {
+        url,
+        kind: inferMediaKind(url, typeHint),
+      }
+    })
+    .filter((item): item is ListingMediaItem => Boolean(item))
+
+  const thumbnail = pickString(records, ['thumbnail'])
+  if (thumbnail && isRenderableMediaUrl(thumbnail)) {
+    mediaItems.unshift({ url: thumbnail, kind: inferMediaKind(thumbnail) })
+  }
+
+  const deduped = new Map<string, ListingMediaItem>()
+  mediaItems.forEach((item) => {
+    if (!deduped.has(item.url)) {
+      deduped.set(item.url, item)
+    }
+  })
+
+  return Array.from(deduped.values())
+}
+
+function normalizeListingDetail(payload: unknown): SellerListingDetail | null {
+  const source = unwrapListingPayload(payload)
+  if (!source) return null
+  const records = collectNestedRecords(source)
+
+  const id = pickString(records, ['id', 'listingId'])
+  const title = pickString(records, ['title', 'listingTitle']) || 'Untitled'
+
+  return {
+    id,
+    title,
+    status: normalizeStatus(pickString(records, ['status'])),
+    serialNumber: pickString(records, ['serialNumber', 'serial', 'frameNumber']),
+    brand: pickString(records, ['brand']),
+    model: pickString(records, ['model']),
+    category: pickString(records, ['category']),
+    condition: pickString(records, ['condition']),
+    frameSize: pickString(records, ['frameSize', 'size']),
+    frameMaterial: pickString(records, ['frameMaterial']),
+    groupset: pickString(records, ['groupset']),
+    tireRim: pickString(records, ['tireRim', 'wheelSize']),
+    operating: pickString(records, ['operating', 'usageHistory']),
+    brakeType: pickString(records, ['brakeType']),
+    paint: pickString(records, ['paint']),
+    overall: pickString(records, ['overall']),
+    city: pickString(records, ['city', 'location']),
+    description: pickString(records, ['description']),
+    price: pickNumber(records, ['price']),
+    rejectReason: pickString(records, ['rejectReason', 'rejectionReason']),
+    mediaItems: normalizeMediaItems(records),
+  }
+}
 
 export default function SellerListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -41,15 +300,19 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
   const deleteMutation = useDeleteListing()
+  const resubmitMutation = useResubmitListing()
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
 
-  const listing = (rawData as any)?.data || rawData
+  const listing = normalizeListingDetail(rawData)
 
-  const handleAction = async (action: 'submit' | 'withdraw' | 'delete') => {
+  const handleAction = async (action: 'submit' | 'withdraw' | 'delete' | 'resubmit') => {
     try {
       if (action === 'submit') {
         await submitMutation.mutateAsync(listingId)
+        refetch()
+      } else if (action === 'resubmit') {
+        await resubmitMutation.mutateAsync(listingId)
         refetch()
       } else if (action === 'withdraw') {
         await withdrawMutation.mutateAsync(listingId)
@@ -81,7 +344,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
     )
   }
 
-  const statusMap: Record<string, { label: string, color: string }> = {
+  const statusMap: Record<ListingStatus, { label: string, color: string }> = {
     draft: { label: language === 'vi' ? 'Bản nháp' : 'Draft', color: 'bg-muted text-muted-foreground' },
     pending_review: { label: language === 'vi' ? 'Đang chờ duyệt' : 'Pending', color: 'bg-warning/20 text-warning-foreground' },
     published: { label: language === 'vi' ? 'Đang hiển thị' : 'Published', color: 'bg-success/20 text-success-foreground' },
@@ -90,7 +353,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
     sold: { label: language === 'vi' ? 'Đã bán' : 'Sold', color: 'bg-primary/20 text-primary-foreground' },
   }
 
-  const currentStatus = (listing.status as string) || 'draft'
+  const currentStatus = listing.status || 'draft'
   const isSubmitDisabled = submitMutation.isPending || currentStatus !== 'draft'
 
   return (
@@ -105,27 +368,34 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight mb-2">{listing.title || 'Untitled'}</h1>
-          <Badge className={cn('text-sm', statusMap[currentStatus]?.color || 'bg-muted')}>
-            {statusMap[currentStatus]?.label || currentStatus}
+          <Badge className={cn('text-sm', statusMap[currentStatus].color)}>
+            {statusMap[currentStatus].label}
           </Badge>
         </div>
         
         <div className="flex flex-wrap gap-2">
           {currentStatus === 'draft' && (
-            <Button onClick={() => handleAction('submit')} disabled={isSubmitDisabled} className="bg-primary">
+            <Button onClick={() => handleAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Gửi duyệt ngay' : 'Submit Now'}
             </Button>
           )}
 
-          {currentStatus === 'published' && (
-            <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="secondary">
-              <EyeOff className="h-4 w-4 mr-2" />
-              {language === 'vi' ? 'Ẩn tin này' : 'Withdraw'}
+          {currentStatus === 'rejected' && (
+            <Button onClick={() => handleAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
+              <Send className="h-4 w-4 mr-2" />
+              {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
             </Button>
           )}
 
-          {(currentStatus === 'draft' || currentStatus === 'rejected' || currentStatus === 'withdrawn') && (
+          {(currentStatus === 'published' || currentStatus === 'pending_review') && (
+            <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="secondary">
+              <EyeOff className="h-4 w-4 mr-2" />
+              {language === 'vi' ? 'Rút tin này' : 'Withdraw'}
+            </Button>
+          )}
+
+          {(currentStatus === 'draft' || currentStatus === 'rejected' || currentStatus === 'withdrawn' || currentStatus === 'pending_review') && (
             <Button variant="outline" asChild>
               <Link href={`/seller/listings/${listingId}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
@@ -171,6 +441,10 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
             <div>
+              <p className="text-muted-foreground mb-1">Serial</p>
+              <p className="font-medium">{listing.serialNumber || '-'}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Thương hiệu' : 'Brand'}</p>
               <p className="font-medium">{listing.brand || '-'}</p>
             </div>
@@ -191,8 +465,36 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
               <p className="font-medium">{listing.frameSize || '-'}</p>
             </div>
             <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Chất liệu khung' : 'Frame material'}</p>
+              <p className="font-medium">{listing.frameMaterial || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Groupset</p>
+              <p className="font-medium">{listing.groupset || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Lốp/Vành' : 'Tire/Rim'}</p>
+              <p className="font-medium">{listing.tireRim || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Bộ phanh' : 'Brake type'}</p>
+              <p className="font-medium">{listing.brakeType || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Sơn' : 'Paint'}</p>
+              <p className="font-medium">{listing.paint || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Đánh giá tổng thể' : 'Overall'}</p>
+              <p className="font-medium">{listing.overall || '-'}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Tỉnh/Thành phố' : 'City'}</p>
               <p className="font-medium">{listing.city || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Lịch sử sử dụng' : 'Usage history'}</p>
+              <p className="font-medium">{listing.operating || '-'}</p>
             </div>
             <div className="col-span-2 mt-4">
                <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Mô tả chi tiết' : 'Description'}</p>
@@ -227,11 +529,21 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
              <CardTitle>{language === 'vi' ? 'Hình Ảnh / Video' : 'Media'}</CardTitle>
           </CardHeader>
           <CardContent>
-             {listing.mediaFiles?.length > 0 ? (
+             {listing.mediaItems.length > 0 ? (
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {listing.mediaFiles.map((media: any, index: number) => (
+                  {listing.mediaItems.map((media, index) => (
                     <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                        <Image src={media.url || media.image} alt="Media" fill className="object-cover" />
+                      {media.kind === 'video' ? (
+                        <video
+                          src={media.url}
+                          className="h-full w-full object-cover"
+                          controls
+                          preload="metadata"
+                          playsInline
+                        />
+                      ) : (
+                        <Image src={media.url} alt="Media" fill className="object-cover" />
+                      )}
                     </div>
                   ))}
                </div>

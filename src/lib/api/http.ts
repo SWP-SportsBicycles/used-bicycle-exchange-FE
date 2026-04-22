@@ -138,7 +138,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
 }
 
 /** Gửi FormData (multipart/form-data) — KHÔNG set Content-Type thủ công để browser tự handle boundary */
-export async function httpMultipart<T>(path: string, form: FormData, options?: { method?: HttpMethod }): Promise<T> {
+export async function httpMultipart<T>(path: string, form: FormData, options?: { method?: RequestInit["method"] }): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
