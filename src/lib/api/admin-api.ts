@@ -92,7 +92,13 @@ function pickString(source: Record<string, unknown>, keys: string[]) {
 function toListingStatus(value: unknown): ListingStatus {
   if (typeof value !== "string") return "pending";
   const normalized = value.toLowerCase();
-  if (normalized.includes("approved")) return "approved";
+  if (
+    normalized.includes("approved") ||
+    normalized.includes("published") ||
+    normalized.includes("pendinginspection")
+  ) {
+    return "approved";
+  }
   if (normalized.includes("reject")) return "rejected";
   return "pending";
 }
@@ -185,6 +191,11 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
 }
 
 export const adminApi = {
+  async getAllListings() {
+    const response = await http.get<unknown>("/api/admin-listing/all");
+    return extractArray(response).map(normalizeListing);
+  },
+
   async getListings() {
     const response = await http.get<unknown>("/api/admin-listing");
     return extractArray(response).map(normalizeListing);

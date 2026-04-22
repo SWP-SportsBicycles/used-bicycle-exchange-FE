@@ -48,15 +48,23 @@ export default function ApprovalsPage() {
     },
   });
 
-  const listingsQuery = useQuery({
-    queryKey: ["admin-listings"],
+  const allListingsQuery = useQuery({
+    queryKey: ["admin-listings", "all"],
+    queryFn: adminApi.getAllListings,
+  });
+
+  const pendingListingsQuery = useQuery({
+    queryKey: ["admin-listings", "pending"],
     queryFn: adminApi.getListings,
   });
 
   const approveMutation = useMutation({
     mutationFn: (listingId: string) => adminApi.approveListing(listingId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
+      ]);
       setFeedback(language === "vi" ? "Duyệt tin thành công." : "Listing approved.");
       setErrorMessage(null);
     },
@@ -68,7 +76,10 @@ export default function ApprovalsPage() {
   const rejectMutation = useMutation({
     mutationFn: ({ listingId, reason }: { listingId: string; reason: string }) => adminApi.rejectListing(listingId, reason),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
+      ]);
       setFeedback(language === "vi" ? "Từ chối tin thành công." : "Listing rejected.");
       setErrorMessage(null);
       setRejectListingId(null);
@@ -79,15 +90,22 @@ export default function ApprovalsPage() {
     },
   });
 
-  const allListings = listingsQuery.data ?? [];
-  const pendingApprovals = allListings.filter((item) => item.status === "pending");
+  const allListings = allListingsQuery.data ?? [];
+  const pendingListings = pendingListingsQuery.data ?? [];
+  const pendingApprovals = pendingListings.filter((item) => item.status === "pending");
   const approvedApprovals = allListings.filter((item) => item.status === "approved");
   const rejectedApprovals = allListings.filter((item) => item.status === "rejected");
 
-  const filteredApprovals = allListings.filter((item) => {
-    if (activeStatus === "all") return true;
-    return item.status === activeStatus;
-  });
+  const filteredApprovals =
+    activeStatus === "all"
+      ? allListings
+      : activeStatus === "pending"
+      ? pendingApprovals
+      : activeStatus === "approved"
+      ? approvedApprovals
+      : rejectedApprovals;
+
+  const isCurrentListLoading = activeStatus === "pending" ? pendingListingsQuery.isLoading : allListingsQuery.isLoading;
 
   const filterLabel = {
     all: language === "vi" ? "Tất cả" : "All",
@@ -157,9 +175,18 @@ export default function ApprovalsPage() {
           <AlertDescription>{feedback}</AlertDescription>
         </Alert>
       )}
-      {errorMessage && (
+      {(errorMessage || allListingsQuery.error || pendingListingsQuery.error) && (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage}</AlertDescription>
+          <AlertDescription>
+            {errorMessage ??
+              (allListingsQuery.error instanceof Error
+                ? allListingsQuery.error.message
+                : pendingListingsQuery.error instanceof Error
+                ? pendingListingsQuery.error.message
+                : language === "vi"
+                ? "Không thể tải danh sách tin đăng."
+                : "Unable to load listings.")}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -208,7 +235,7 @@ export default function ApprovalsPage() {
           <CardDescription>{listDescription}</CardDescription>
         </CardHeader>
         <CardContent>
-          {listingsQuery.isLoading ? (
+          {isCurrentListLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {language === "vi" ? "Đang tải danh sách..." : "Loading listings..."}
