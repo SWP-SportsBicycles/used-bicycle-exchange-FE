@@ -1,8 +1,20 @@
 import { type NextRequest } from "next/server";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const DEFAULT_API_BASE = "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+
+function resolveApiBase() {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+  const normalized = raw?.trim();
+
+  // Empty env values should behave like "missing" and fall back to default.
+  if (!normalized) {
+    return DEFAULT_API_BASE;
+  }
+
+  return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+}
+
+const API_BASE = resolveApiBase();
 
 interface RouteContext {
   params: Promise<{ path: string[] }>;
