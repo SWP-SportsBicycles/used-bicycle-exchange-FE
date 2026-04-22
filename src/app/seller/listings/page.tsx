@@ -29,7 +29,6 @@ type ListingStatus =
   | 'pending_review'
   | 'pending'
   | 'published'
-  | 'reserved'
   | 'sold'
   | 'rejected'
   | 'withdrawn'
@@ -52,7 +51,6 @@ function normalizeListingStatus(value: unknown): ListingStatus {
     raw === 'pending_review' ||
     raw === 'pending' ||
     raw === 'published' ||
-    raw === 'reserved' ||
     raw === 'sold' ||
     raw === 'rejected' ||
     raw === 'withdrawn'
@@ -162,13 +160,12 @@ export default function SellerListingsPage() {
   }, [data, isError])
 
   const resolveStatusLabel = (status: ListingStatus) => {
-    if (status === 'published') return language === 'vi' ? 'Dang ban' : 'Active'
-    if (status === 'pending_review' || status === 'pending') return language === 'vi' ? 'Cho duyet' : 'Pending'
-    if (status === 'reserved') return language === 'vi' ? 'Da giu cho' : 'Reserved'
-    if (status === 'sold') return language === 'vi' ? 'Da ban' : 'Sold'
-    if (status === 'rejected') return language === 'vi' ? 'Bi tu choi' : 'Rejected'
-    if (status === 'withdrawn') return language === 'vi' ? 'Da rut' : 'Withdrawn'
-    return language === 'vi' ? 'Nhap' : 'Draft'
+    if (status === 'published') return language === 'vi' ? 'Đang bán' : 'Active'
+    if (status === 'pending_review' || status === 'pending') return language === 'vi' ? 'Chờ duyệt' : 'Pending'
+    if (status === 'sold') return language === 'vi' ? 'Đã bán' : 'Sold'
+    if (status === 'rejected') return language === 'vi' ? 'Bị từ chối' : 'Rejected'
+    if (status === 'withdrawn') return language === 'vi' ? 'Đã rút' : 'Withdrawn'
+    return language === 'vi' ? 'Nháp' : 'Draft'
   }
 
   const resolveStatusClass = (status: ListingStatus) => {
@@ -198,7 +195,7 @@ export default function SellerListingsPage() {
         mutationError instanceof Error
           ? mutationError.message
           : language === 'vi'
-            ? 'Thao tac that bai. Vui long thu lai.'
+            ? 'Thao tác thất bại. Vui lòng thử lại.'
             : 'Action failed. Please try again.',
       )
     }
@@ -226,7 +223,7 @@ export default function SellerListingsPage() {
           <Alert className="mb-4 border-amber-300 bg-amber-50 text-amber-900">
             <AlertDescription>
               {language === 'vi'
-                ? 'Khong the tai du lieu tu API, dang hien thi du lieu fallback.'
+                ? 'Không thể tải dữ liệu từ API, đang hiển thị dữ liệu fallback.'
                 : 'Unable to load API data, showing fallback mock data.'}
               {error instanceof Error ? ` (${error.message})` : ''}
             </AlertDescription>
@@ -242,11 +239,11 @@ export default function SellerListingsPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {language === 'vi' ? 'Dang tai tin dang...' : 'Loading listings...'}
+            {language === 'vi' ? 'Đang tải tin đăng...' : 'Loading listings...'}
           </div>
         ) : myListings.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            {language === 'vi' ? 'Ban chua co tin dang nao.' : 'You do not have any listings yet.'}
+            {language === 'vi' ? 'Bạn chưa có tin đăng nào.' : 'You do not have any listings yet.'}
           </div>
         ) : (
         <div className="space-y-4">
@@ -284,24 +281,32 @@ export default function SellerListingsPage() {
 
                 {listing.status === 'draft' && (
                   <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'submit', listing })}>
-                    {language === 'vi' ? 'Gui duyet' : 'Submit'}
+                    {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
+                  </Button>
+                )}
+
+                {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'withdrawn') && (
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/seller/listings/${listing.id}/edit`}>
+                      {language === 'vi' ? 'Sửa' : 'Edit'}
+                    </Link>
                   </Button>
                 )}
 
                 {listing.status === 'published' && (
                   <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'withdraw', listing })}>
-                    {language === 'vi' ? 'Rut tin' : 'Withdraw'}
+                    {language === 'vi' ? 'Rút tin' : 'Withdraw'}
                   </Button>
                 )}
 
                 {(listing.status === 'draft' || listing.status === 'rejected') && (
                   <Button size="sm" variant="destructive" onClick={() => setConfirmState({ action: 'delete', listing })}>
-                    {language === 'vi' ? 'Xoa' : 'Delete'}
+                    {language === 'vi' ? 'Xóa' : 'Delete'}
                   </Button>
                 )}
 
                 <Button size="icon-sm" variant="ghost" asChild>
-                  <Link href={`/listing/${listing.id}`}>
+                  <Link href={`/seller/listings/${listing.id}`}>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
                 </Button>
@@ -317,14 +322,14 @@ export default function SellerListingsPage() {
               <AlertDialogTitle>
                 {confirmState?.action === 'submit'
                   ? language === 'vi'
-                    ? 'Gui tin de duyet?'
+                    ? 'Gửi tin để duyệt?'
                     : 'Submit listing for review?'
                   : confirmState?.action === 'withdraw'
                     ? language === 'vi'
-                      ? 'Rut tin dang?'
+                      ? 'Rút tin đăng?'
                       : 'Withdraw listing?'
                     : language === 'vi'
-                      ? 'Xoa tin dang?'
+                      ? 'Xóa tin đăng?'
                       : 'Delete listing?'}
               </AlertDialogTitle>
               <AlertDialogDescription>
@@ -333,16 +338,16 @@ export default function SellerListingsPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isActionPending}>
-                {language === 'vi' ? 'Huy' : 'Cancel'}
+                {language === 'vi' ? 'Hủy' : 'Cancel'}
               </AlertDialogCancel>
               <AlertDialogAction onClick={executeAction} disabled={isActionPending}>
                 {isActionPending ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {language === 'vi' ? 'Dang xu ly' : 'Processing'}
+                    {language === 'vi' ? 'Đang xử lý' : 'Processing'}
                   </span>
                 ) : language === 'vi' ? (
-                  'Xac nhan'
+                  'Xác nhận'
                 ) : (
                   'Confirm'
                 )}

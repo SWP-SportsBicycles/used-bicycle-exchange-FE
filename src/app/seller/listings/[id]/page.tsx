@@ -4,7 +4,7 @@ import React, { use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Trash2, Send, EyeOff, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Trash2, Send, EyeOff, AlertTriangle, AlertCircle, RefreshCw, Edit } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 
 import { sellerApi } from '@/lib/api/seller-api'
@@ -122,6 +122,15 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
             <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="secondary">
               <EyeOff className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Ẩn tin này' : 'Withdraw'}
+            </Button>
+          )}
+
+          {(currentStatus === 'draft' || currentStatus === 'rejected' || currentStatus === 'withdrawn') && (
+            <Button variant="outline" asChild>
+              <Link href={`/seller/listings/${listingId}/edit`}>
+                <Edit className="h-4 w-4 mr-2" />
+                {language === 'vi' ? 'Cập nhật' : 'Update'}
+              </Link>
             </Button>
           )}
 

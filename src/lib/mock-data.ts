@@ -17,7 +17,7 @@ export interface Listing {
   city: string
   images: string[]
   videoUrl?: string
-  status: 'draft' | 'pending_review' | 'published' | 'reserved' | 'sold' | 'withdrawn'
+  status: 'draft' | 'pending_review' | 'published' | 'sold' | 'withdrawn'
   isVeloSafeVerified: boolean
   seller: Seller
   inspection?: Inspection
@@ -414,7 +414,6 @@ export interface SellerOrder {
   totalAmount: number
   status:
     | 'pending_deposit'
-    | 'soft_reserved'
     | 'inspection_scheduled'
     | 'inspection_completed'
     | 'pending_payment'
@@ -675,7 +674,6 @@ export const MOCK_ANALYTICS = {
 // Order status labels
 export const ORDER_STATUS_LABELS = {
   pending_deposit: { vi: 'Chờ Đặt Cọc', en: 'Pending Deposit' },
-  soft_reserved: { vi: 'Đã Soft Reserve', en: 'Soft Reserved' },
   inspection_scheduled: { vi: 'Đã Lên Lịch Kiểm Định', en: 'Inspection Scheduled' },
   inspection_completed: { vi: 'Kiểm Định Hoàn Tất', en: 'Inspection Completed' },
   pending_payment: { vi: 'Chờ Thanh Toán', en: 'Pending Payment' },

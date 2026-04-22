@@ -36,14 +36,14 @@ async function fetchJson<T>(path: string, method: HttpMethod, body?: unknown): P
 }
 
 /** Gửi FormData (multipart/form-data) — KHÔNG set Content-Type thủ công để browser tự handle boundary */
-export async function httpMultipart<T>(path: string, form: FormData): Promise<T> {
+export async function httpMultipart<T>(path: string, form: FormData, options?: { method?: HttpMethod }): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${normalizedPath}`, {
-      method: "POST",
+      method: options?.method || "POST",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         // NOTE: Không set Content-Type — browser tự thêm multipart/form-data + boundary

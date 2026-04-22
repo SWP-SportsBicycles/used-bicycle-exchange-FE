@@ -52,13 +52,13 @@ async function forward(req: NextRequest, context: RouteContext, method: string) 
   const targetUrl = buildTargetUrl(req, path);
   const headers = copyRequestHeaders(req);
 
-  const bodyText = method === "GET" || method === "HEAD" ? undefined : await req.text();
+  const bodyBuffer = method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer();
 
   try {
     const upstream = await fetch(targetUrl, {
       method,
       headers,
-      body: bodyText && bodyText.length > 0 ? bodyText : undefined,
+      body: bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined,
       redirect: "manual",
       cache: "no-store",
     });

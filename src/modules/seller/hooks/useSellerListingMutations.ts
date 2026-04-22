@@ -12,6 +12,19 @@ export function useCreateListing() {
   });
 }
 
+export function useUpdateListing() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ listingId, data }: { listingId: string; data: SellerListingFormData }) =>
+      sellerApi.updateListing(listingId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-listing-detail", variables.listingId] });
+    },
+  });
+}
+
 export function useUploadMedia() {
   return useMutation({
     mutationFn: ({ listingId, files }: { listingId: string; files: File[] }) =>

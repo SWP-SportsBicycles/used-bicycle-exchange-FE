@@ -99,6 +99,10 @@ export const sellerApi = {
     return http.post<unknown>(`/api/seller-listing/${listingId}/withdraw`);
   },
 
+  updateListing(listingId: string, data: SellerListingFormData) {
+    return http.put<unknown>(`/api/seller-listing/${listingId}`, data);
+  },
+
   deleteListing(listingId: string) {
     return http.delete<unknown>(`/api/seller-listing/${listingId}`);
   },
