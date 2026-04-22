@@ -363,14 +363,8 @@ export const MOCK_LISTINGS: Listing[] = [
   },
 ]
 
-// Helper to format Vietnamese Dong
-export function formatVND(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+// Helper to format Vietnamese Dong — re-exported from @/lib/utils for backward compatibility
+export { formatVND } from '@/lib/utils'
 
 // Calculate deposit amount (10% max 2M VND per SRS)
 export function calculateDeposit(price: number): number {

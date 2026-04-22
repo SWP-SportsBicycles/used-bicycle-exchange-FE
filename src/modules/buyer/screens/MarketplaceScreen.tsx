@@ -8,8 +8,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Header } from '@/components/header'
-import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/components/filter-sidebar'
-import { ListingCard } from '@/components/listing-card'
+import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/modules/buyer/components/ListingFilters'
+import { ListingCard } from '@/modules/buyer/components/ListingCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -76,7 +76,7 @@ function MarketplacePageContent() {
   const [searchInput, setSearchInput] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('hcm')
+  const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('all')
   const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
   const sellerCtaHref =
     user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'

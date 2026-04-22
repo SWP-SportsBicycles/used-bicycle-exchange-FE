@@ -2,17 +2,19 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Heart, MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles, BadgeCheck } from 'lucide-react'
+import { MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles, BadgeCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { type Listing, formatVND } from '@/lib/mock-data'
+import { type BuyerListing } from '@/lib/api/buyer-api'
+import { formatVND } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { WishlistButton } from '@/modules/buyer/components/WishlistButton'
 
 interface ListingCardProps {
-  listing: Listing
+  listing: BuyerListing
   index?: number
   /** Optional promo tag shown on top-right ribbon */
   promoTag?: 'best_deal' | 'popular' | 'new'
@@ -33,7 +35,7 @@ function getMarketPrice(price: number, id: string): number {
   return Math.round((price * (1 + pct)) / 500_000) * 500_000
 }
 
-function getAutoPromoTag(listing: Listing, savingPct: number): ListingCardProps['promoTag'] {
+function getAutoPromoTag(listing: BuyerListing, savingPct: number): ListingCardProps['promoTag'] {
   if (savingPct >= 20) return 'best_deal'
   if (listing.seller.totalSales >= 10 || listing.seller.rating >= 4.8) return 'popular'
   if (listing.condition === 'like_new') return 'new'
@@ -56,7 +58,6 @@ const PROMO_TAG_CONFIG = {
 /* ─── component ──────────────────────────────── */
 
 export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) {
-  const [isWishlisted, setIsWishlisted] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
 
   const condition = CONDITION_STYLES[listing.condition] ?? CONDITION_STYLES.good
@@ -79,12 +80,14 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.05 }}
     >
-      <Link href={`/listing/${listing.id}`} className="block group">
+      {/* ✅ Đã sửa: Route từ /listing/[id] -> /marketplace/[id] */}
+      <Link href={`/marketplace/${listing.id}`} className="block group">
         <div
           className={cn(
             'relative flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60',
             'shadow-sm transition-all duration-300',
             'hover:shadow-[0_8px_30px_-8px_rgba(174,232,108,0.25)] hover:-translate-y-1 hover:border-primary/40',
+            listing.isLocked && 'opacity-70',
           )}
         >
 
@@ -104,6 +107,13 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
 
             {/* Gradient overlay — richer on hover */}
             <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/10 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80" />
+
+            {/* ── Locked overlay */}
+            {listing.isLocked && (
+              <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] flex items-center justify-center">
+                <Badge className="bg-slate-700 text-white text-sm px-4 py-1.5">Đang có người đặt cọc</Badge>
+              </div>
+            )}
 
             {/* ── VeloSafe badge (top-left) */}
             {listing.isVeloSafeVerified && (
@@ -126,7 +136,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             )}
 
             {/* ── Promo ribbon (top-right) */}
-            {resolvedTag && PromoIcon && (
+            {resolvedTag && PromoIcon && !listing.isLocked && (
               <div
                 className={cn(
                   'absolute right-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 shadow-lg text-[11px] font-bold',
@@ -139,22 +149,13 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             )}
 
             {/* ── Wishlist button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                'absolute bottom-3 right-3 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm',
-                'shadow-md hover:bg-background hover:scale-110 transition-all duration-200',
-                isWishlisted && 'text-rose-500',
-              )}
-              onClick={(e) => {
-                e.preventDefault()
-                setIsWishlisted(!isWishlisted)
-              }}
-            >
-              <Heart className={cn('h-4 w-4', isWishlisted && 'fill-current')} />
-              <span className="sr-only">Thêm vào wishlist</span>
-            </Button>
+            <div className="absolute bottom-3 right-3 z-10">
+              <WishlistButton
+                listingId={listing.id}
+                variant="ghost"
+                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-md hover:bg-background hover:scale-110"
+              />
+            </div>
 
             {/* ── Condition badge (overlay on image bottom-left) */}
             <div className="absolute bottom-3 left-3">

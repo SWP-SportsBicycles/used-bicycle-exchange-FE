@@ -302,6 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const bootstrapAuth = async () => {
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
       if (!accessToken) {
+        clearAuthCookies()
         if (mounted) {
           setUser(GUEST_USER)
           setIsInitializing(false)

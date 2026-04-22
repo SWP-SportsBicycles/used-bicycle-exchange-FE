@@ -13,6 +13,13 @@ const PUBLIC_AUTH_PATH_PREFIXES = [
   "/api/Auth/renew-token",
 ];
 
+// Endpoints that should NOT trigger forceLogout on 401.
+// These are "browsing" endpoints that should degrade gracefully.
+const SOFT_FAIL_PATH_PREFIXES = [
+  "/api/buyer-listing",
+  "/api/wishlist",
+];
+
 function normalizePath(url: string): string {
   return url.startsWith("/") ? url : `/${url}`;
 }
@@ -20,6 +27,13 @@ function normalizePath(url: string): string {
 function isPublicAuthPath(url: string): boolean {
   return PUBLIC_AUTH_PATH_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
+
+function isSoftFailPath(url: string): boolean {
+  return SOFT_FAIL_PATH_PREFIXES.some((prefix) => url.startsWith(prefix));
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+let logoutInProgress = false;
 
 function extractApiErrorMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") {
@@ -77,7 +91,56 @@ async function safeParseBody(response: Response): Promise<unknown> {
   return text.trim() ? text : null;
 }
 
-async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function forceLogout() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (logoutInProgress) {
+    return;
+  }
+
+  logoutInProgress = true;
+  localStorage.removeItem("accessToken");
+  window.location.href = "/auth/login";
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (!renewRes.ok) {
+      return null;
+    }
+
+    const data = await renewRes.json().catch(() => null);
+    const nextToken =
+      data && typeof data.accessToken === "string" && data.accessToken.trim()
+        ? data.accessToken
+        : null;
+
+    if (nextToken && typeof window !== "undefined") {
+      localStorage.setItem("accessToken", nextToken);
+    }
+
+    return nextToken;
+  })()
+    .catch(() => null)
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
+async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetried = false): Promise<T> {
   const token = typeof window !== "undefined"
     ? localStorage.getItem("accessToken")
     : null;
@@ -99,28 +162,40 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
     throw new Error("Unable to connect to API. Please check backend service and network.");
   }
 
+
+
   if (res.status === 401 && !skipAuthHeader) {
-    const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (renewRes.ok) {
-      const data = await renewRes.json();
-      if (data?.accessToken) {
-        localStorage.setItem("accessToken", data.accessToken);
+    const softFail = isSoftFailPath(normalizedUrl);
+
+    if (hasRetried || !token) {
+      // For browsing endpoints, DON'T force logout — just throw so
+      // React Query can show an empty/error state gracefully.
+      if (!softFail) {
+        await forceLogout();
       }
-      
-      return fetchWithAuth(normalizedUrl, {
+      throw new Error("Unauthorized");
+    }
+
+    const nextToken = await refreshAccessToken();
+
+    if (!nextToken) {
+      if (!softFail) {
+        await forceLogout();
+      }
+      throw new Error("Unauthorized");
+    }
+
+    return fetchWithAuth<T>(
+      normalizedUrl,
+      {
         ...options,
         headers: {
           ...options.headers,
-          Authorization: `Bearer ${data.accessToken}`,
-        }
-      });
-    }
-    localStorage.removeItem("accessToken");
-    window.location.href = "/auth/login";
-    throw new Error("Unauthorized");
+          Authorization: `Bearer ${nextToken}`,
+        },
+      },
+      true,
+    );
   }
 
   if (!res.ok) {
@@ -134,6 +209,30 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
   }
 
   const payload = await safeParseBody(res);
+
+  // Backend wraps responses in { isSucess/isSuccess/success, data, ... }.
+  // NOTE: BE has a typo — "isSucess" (missing 'c'). We handle all variants.
+  if (payload && typeof payload === "object") {
+    const obj = payload as Record<string, unknown>;
+    const hasWrapper =
+      ("isSucess" in obj || "isSuccess" in obj || "success" in obj) &&
+      "data" in obj;
+
+    if (hasWrapper) {
+      const isOk = obj.isSucess ?? obj.isSuccess ?? obj.success;
+
+      // BE sometimes returns { success: false, message: "..." } on HTTP 200.
+      if (isOk === false) {
+        const msg =
+          (typeof obj.message === "string" && obj.message.trim()) ||
+          "Thao tác không thành công";
+        throw new Error(msg);
+      }
+
+      return obj.data as T;
+    }
+  }
+
   return payload as T;
 }
 
