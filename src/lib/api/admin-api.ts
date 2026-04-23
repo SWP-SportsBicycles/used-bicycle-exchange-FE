@@ -42,6 +42,28 @@ export interface CreateInspectorPayload {
   password: string;
 }
 
+export type UserRole = 'Buyer' | 'Seller' | 'Admin' | 'Inspector';
+export type UserStatus = 'Active' | 'InActive' | 'Banned';
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  phoneNumber: string;
+  password: string;
+  avtUrl?: string;
+  firebaseUID?: string;
+  role: UserRole;
+  walletBalance: number;
+  status: UserStatus;
+  pickupAddress?: string;
+  pickupDistrictId?: number;
+  pickupWardCode?: string;
+  pickupWardName?: string;
+  pickupDistrictName?: string;
+  pickupProvinceName?: string;
+}
+
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
     return {};
@@ -190,6 +212,118 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
   };
 }
 
+function normalizeUser(raw: unknown): AdminUser {
+  const source = extractPayloadObject(raw);
+  
+  const role = (pickString(source, ["role"]) || "Buyer") as UserRole;
+  const status = (pickString(source, ["status"]) || "InActive") as UserStatus;
+  
+  return {
+    id: pickString(source, ["id", "userId"]) || crypto.randomUUID(),
+    email: pickString(source, ["email"]) || "",
+    fullName: pickString(source, ["fullName", "full_name", "name"]) || "",
+    phoneNumber: pickString(source, ["phoneNumber", "phone_number", "phone"]) || "",
+    password: pickString(source, ["password"]) || "",
+    avtUrl: pickString(source, ["avtUrl", "avatar", "avatarUrl", "image"]) || undefined,
+    firebaseUID: pickString(source, ["firebaseUID", "firebase_uid", "firebaseId"]) || undefined,
+    role,
+    walletBalance: typeof source.walletBalance === "number" ? source.walletBalance : Number(source.walletBalance) || 0,
+    status,
+    pickupAddress: pickString(source, ["pickupAddress", "pickup_address", "address"]) || undefined,
+    pickupDistrictId: typeof source.pickupDistrictId === "number" ? source.pickupDistrictId : undefined,
+    pickupWardCode: pickString(source, ["pickupWardCode", "pickup_ward_code"]) || undefined,
+    pickupWardName: pickString(source, ["pickupWardName", "pickup_ward_name"]) || undefined,
+    pickupDistrictName: pickString(source, ["pickupDistrictName", "pickup_district_name"]) || undefined,
+    pickupProvinceName: pickString(source, ["pickupProvinceName", "pickup_province_name"]) || undefined,
+  };
+}
+
+// Mock data for users until API is ready
+const MOCK_USERS: AdminUser[] = [
+  {
+    id: "1",
+    email: "buyer1@example.com",
+    fullName: "Nguyễn Văn A",
+    phoneNumber: "0901234567",
+    password: "password123",
+    avtUrl: "https://i.pravatar.cc/150?u=1",
+    role: "Buyer",
+    walletBalance: 1500000,
+    status: "Active",
+    pickupAddress: "123 Đường Lê Lợi",
+    pickupDistrictId: 1,
+    pickupWardCode: "W001",
+    pickupWardName: "Phường Bến Nghé",
+    pickupDistrictName: "Quận 1",
+    pickupProvinceName: "TP.HCM",
+  },
+  {
+    id: "2",
+    email: "seller1@example.com",
+    fullName: "Trần Thị B",
+    phoneNumber: "0912345678",
+    password: "sellerpass456",
+    avtUrl: "https://i.pravatar.cc/150?u=2",
+    role: "Seller",
+    walletBalance: 5000000,
+    status: "Active",
+    pickupAddress: "456 Đường Nguyễn Huệ",
+    pickupDistrictId: 2,
+    pickupWardCode: "W002",
+    pickupWardName: "Phường Bến Thành",
+    pickupDistrictName: "Quận 1",
+    pickupProvinceName: "TP.HCM",
+  },
+  {
+    id: "3",
+    email: "buyer2@example.com",
+    fullName: "Lê Văn C",
+    phoneNumber: "0923456789",
+    password: "buyerpass789",
+    role: "Buyer",
+    walletBalance: 0,
+    status: "InActive",
+  },
+  {
+    id: "4",
+    email: "seller2@example.com",
+    fullName: "Phạm Thị D",
+    phoneNumber: "0934567890",
+    password: "sellerpass012",
+    avtUrl: "https://i.pravatar.cc/150?u=4",
+    role: "Seller",
+    walletBalance: 2500000,
+    status: "Active",
+    pickupAddress: "789 Đường Trần Hưng Đạo",
+    pickupDistrictId: 3,
+    pickupWardCode: "W003",
+    pickupWardName: "Phường Cầu Ông Lãnh",
+    pickupDistrictName: "Quận 1",
+    pickupProvinceName: "TP.HCM",
+  },
+  {
+    id: "5",
+    email: "inspector1@example.com",
+    fullName: "Hoàng Văn E",
+    phoneNumber: "0945678901",
+    password: "inspectorpass",
+    avtUrl: "https://i.pravatar.cc/150?u=5",
+    role: "Inspector",
+    walletBalance: 3000000,
+    status: "Active",
+  },
+  {
+    id: "6",
+    email: "admin@example.com",
+    fullName: "Admin User",
+    phoneNumber: "0956789012",
+    password: "adminpass",
+    role: "Admin",
+    walletBalance: 10000000,
+    status: "Active",
+  },
+];
+
 export const adminApi = {
   async getAllListings() {
     const response = await http.get<unknown>("/api/admin-listing/all");
@@ -216,5 +350,28 @@ export const adminApi = {
 
   createInspector(payload: CreateInspectorPayload) {
     return http.post<unknown>("/api/AdminAccount/admin/create-inspector", payload);
+  },
+
+  // User management - using mock data for now, will switch to real API later
+  async getUsers(): Promise<AdminUser[]> {
+    // TODO: Replace with real API call when backend is ready
+    // const response = await http.get<unknown>("/api/admin/users");
+    // return extractArray(response).map(normalizeUser);
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(MOCK_USERS), 300);
+    });
+  },
+
+  async getUserById(userId: string): Promise<AdminUser | null> {
+    // TODO: Replace with real API call when backend is ready
+    // const response = await http.get<unknown>(`/api/admin/users/${userId}`);
+    // const normalized = normalizeUser(response);
+    // return normalized.id ? normalized : null;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const user = MOCK_USERS.find(u => u.id === userId) || null;
+        resolve(user);
+      }, 300);
+    });
   },
 };
