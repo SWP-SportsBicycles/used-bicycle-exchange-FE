@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useLanguage } from '@/lib/language-context'
-import { inspectorApi, type InspectorHistory } from '@/lib/api/inspector-api'
+import { inspectorApi } from '@/lib/api/inspector-api'
 import { cn } from '@/lib/utils'
 
 export default function HistoryDetailPage() {

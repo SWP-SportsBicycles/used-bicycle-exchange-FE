@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   ClipboardCheck, 
   Calendar,
@@ -20,8 +21,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { 
   MOCK_INSPECTOR_ASSIGNMENTS, 
-  formatVND,
-  CITIES 
+  formatVND
 } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
@@ -185,9 +185,11 @@ export default function InspectorDashboardPage() {
                   {/* Bike Image & Info */}
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
-                      <img 
+                      <Image 
                         src={assignment.listing.images[0]} 
                         alt={assignment.listing.title}
+                        width={64}
+                        height={64}
                         className="h-full w-full object-cover"
                       />
                     </div>

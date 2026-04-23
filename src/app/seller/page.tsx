@@ -2,15 +2,14 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   Package, 
   ShoppingCart, 
   Wallet, 
   TrendingUp, 
   Eye,
-  Clock,
   CheckCircle2,
-  AlertCircle,
   ArrowUpRight,
   ChevronRight
 } from 'lucide-react'
@@ -266,9 +265,11 @@ export default function SellerDashboardPage() {
                     className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
-                      <img 
+                      <Image 
                         src={listing.images[0]} 
                         alt={listing.title}
+                        width={48}
+                        height={48}
                         className="h-full w-full object-cover"
                       />
                     </div>

@@ -212,32 +212,6 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
   };
 }
 
-function normalizeUser(raw: unknown): AdminUser {
-  const source = extractPayloadObject(raw);
-  
-  const role = (pickString(source, ["role"]) || "Buyer") as UserRole;
-  const status = (pickString(source, ["status"]) || "InActive") as UserStatus;
-  
-  return {
-    id: pickString(source, ["id", "userId"]) || crypto.randomUUID(),
-    email: pickString(source, ["email"]) || "",
-    fullName: pickString(source, ["fullName", "full_name", "name"]) || "",
-    phoneNumber: pickString(source, ["phoneNumber", "phone_number", "phone"]) || "",
-    password: pickString(source, ["password"]) || "",
-    avtUrl: pickString(source, ["avtUrl", "avatar", "avatarUrl", "image"]) || undefined,
-    firebaseUID: pickString(source, ["firebaseUID", "firebase_uid", "firebaseId"]) || undefined,
-    role,
-    walletBalance: typeof source.walletBalance === "number" ? source.walletBalance : Number(source.walletBalance) || 0,
-    status,
-    pickupAddress: pickString(source, ["pickupAddress", "pickup_address", "address"]) || undefined,
-    pickupDistrictId: typeof source.pickupDistrictId === "number" ? source.pickupDistrictId : undefined,
-    pickupWardCode: pickString(source, ["pickupWardCode", "pickup_ward_code"]) || undefined,
-    pickupWardName: pickString(source, ["pickupWardName", "pickup_ward_name"]) || undefined,
-    pickupDistrictName: pickString(source, ["pickupDistrictName", "pickup_district_name"]) || undefined,
-    pickupProvinceName: pickString(source, ["pickupProvinceName", "pickup_province_name"]) || undefined,
-  };
-}
-
 // Mock data for users until API is ready
 const MOCK_USERS: AdminUser[] = [
   {

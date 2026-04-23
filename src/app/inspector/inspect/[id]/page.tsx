@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { 
   ArrowLeft,
   Check,
-  AlertTriangle,
   X,
   ChevronRight,
   ChevronLeft,
@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useLanguage } from '@/lib/language-context'
 import { formatVND } from '@/lib/mock-data'
-import { inspectorApi, type InspectorListingMedia, type SubmitInspectionPayload } from '@/lib/api/inspector-api'
+import { inspectorApi, type SubmitInspectionPayload } from '@/lib/api/inspector-api'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -358,7 +358,7 @@ export default function InspectionPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {imageList.slice(0, 6).map((img, idx) => (
                       <div key={idx} className="h-44 rounded-lg overflow-hidden border border-border/70 bg-muted">
-                        <img src={img} alt={`Bike ${idx + 1}`} className="h-full w-full object-cover" />
+                        <Image src={img} alt={`Bike ${idx + 1}`} width={176} height={176} className="h-full w-full object-cover" />
                       </div>
                     ))}
                   </div>
@@ -468,7 +468,7 @@ export default function InspectionPage() {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                         {imageList.map((img, idx) => (
                           <div key={`${item.id}-${idx}`} className="h-32 rounded-lg overflow-hidden border border-border/60 bg-muted">
-                            <img src={img} alt={`${item.id}-${idx}`} className="h-full w-full object-cover" />
+                            <Image src={img} alt={`${item.id}-${idx}`} width={128} height={128} className="h-full w-full object-cover" />
                           </div>
                         ))}
                       </div>

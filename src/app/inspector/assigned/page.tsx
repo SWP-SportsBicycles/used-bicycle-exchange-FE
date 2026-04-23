@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Eye,
   MapPin,
   Phone,
   User,
@@ -174,7 +174,7 @@ function PendingListingsView({ isLoading, error, listings, language }: PendingLi
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
                   {listing.thumbnail ? (
-                    <img src={listing.thumbnail} alt={listing.title} className="h-full w-full object-cover" />
+                    <Image src={listing.thumbnail} alt={listing.title} width={64} height={64} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
                       No image

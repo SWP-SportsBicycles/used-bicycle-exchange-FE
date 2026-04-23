@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -24,7 +25,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { type Listing, formatVND, calculateDeposit } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
@@ -116,9 +116,11 @@ export function DepositModal({
                 {/* Listing Summary */}
                 <div className="flex gap-4 p-4 rounded-lg bg-secondary/50 border border-border">
                   <div className="h-20 w-20 rounded-lg overflow-hidden bg-muted shrink-0">
-                    <img 
+                    <Image 
                       src={listing.images[0]} 
                       alt={listing.title}
+                      width={80}
+                      height={80}
                       className="h-full w-full object-cover"
                     />
                   </div>
