@@ -5,7 +5,7 @@
 > **Nghiệp vụ tham chiếu:** [01-order-and-payment-rules.md](../01-order-and-payment-rules.md) | [business-spec.md](../business-spec.md) | [03-platform-policy.md](../03-platform-policy.md)
 
 ---
-
+Đã xong
 ## Màn hình & Component cần build
 
 | # | Màn hình | Route | Độ phức tạp |
