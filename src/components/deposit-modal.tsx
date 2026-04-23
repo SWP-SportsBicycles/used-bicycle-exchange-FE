@@ -56,6 +56,7 @@ export function DepositModal({
   const [paymentMethod, setPaymentMethod] = useState('bank')
   const [isProcessing, setIsProcessing] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [orderCode, setOrderCode] = useState('')
 
   const inspectionDepositAmount = calculateDeposit(listing.price)
   const softReserveAmount = Math.min(Math.round(listing.price * 0.02), 500000)
@@ -74,6 +75,7 @@ export function DepositModal({
     // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 2000))
     setIsProcessing(false)
+    setOrderCode(`VT-${Date.now().toString(36).toUpperCase()}`)
     setStep('confirmation')
     onSuccess?.(flowType)
   }
@@ -82,6 +84,7 @@ export function DepositModal({
     setStep('review')
     setPaymentMethod('bank')
     setAgreedToTerms(false)
+    setOrderCode('')
     onClose()
   }
 
@@ -327,7 +330,7 @@ export function DepositModal({
 
               <h3 className="text-xl font-bold text-foreground mb-2">{isSoftReserve ? 'Soft Reserve thành công!' : 'Đặt cọc thành công!'}</h3>
               <p className="text-muted-foreground mb-6">
-                Mã đơn hàng: <span className="font-mono text-foreground">VT-{Date.now().toString(36).toUpperCase()}</span>
+                Mã đơn hàng: <span className="font-mono text-foreground">{orderCode}</span>
               </p>
 
               <div className="rounded-lg bg-success/10 border border-success/30 p-4 mb-6 text-left">

@@ -20,7 +20,16 @@ import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
 
-const sidebarItems = [
+type SidebarItem = {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  label: { vi: string; en: string }
+  exact?: boolean
+  badge?: number
+  badgeTone?: 'alert' | 'default'
+}
+
+const sidebarItems: SidebarItem[] = [
   { 
     href: '/inspector', 
     icon: LayoutDashboard, 
