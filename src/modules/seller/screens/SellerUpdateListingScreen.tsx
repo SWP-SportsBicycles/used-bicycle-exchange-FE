@@ -28,7 +28,7 @@ const steps = [
 
 interface SellerUpdateListingScreenProps {
   listingId: string
-  initialData: any
+  initialData: Record<string, unknown>
 }
 
 type MediaSeed = {
@@ -158,6 +158,10 @@ function extractMediaSeed(initialData: unknown): MediaSeed {
   }
 }
 
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v != null ? String(v) : ''
+}
+
 export default function SellerUpdateListingScreen({ listingId, initialData }: SellerUpdateListingScreenProps) {
   const { language } = useLanguage()
   const updateListingMutation = useUpdateListing()
@@ -170,23 +174,23 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [formData, setFormData] = useState({
-    title: initialData?.title || '',
-    category: initialData?.category || '',
-    brand: initialData?.brand || '',
-    model: initialData?.model || '',
-    condition: initialData?.condition || '',
-    description: initialData?.description || '',
-    frameSize: initialData?.frameSize || '',
-    frameMaterial: initialData?.frameMaterial || '',
-    groupset: initialData?.groupset || '',
-    wheelSize: initialData?.wheelSize || initialData?.tireRim || '',
-    usageHistory: initialData?.usageHistory || initialData?.operating || '',
-    serial: initialData?.serialNumber || initialData?.serial || '',
-    city: initialData?.city || '',
-    price: initialData?.price?.toString() || '',
-    paint: initialData?.paint || '',
-    brakeType: initialData?.brakeType || '',
-    overall: initialData?.overall || '',
+    title: str(initialData?.title),
+    category: str(initialData?.category),
+    brand: str(initialData?.brand),
+    model: str(initialData?.model),
+    condition: str(initialData?.condition),
+    description: str(initialData?.description),
+    frameSize: str(initialData?.frameSize),
+    frameMaterial: str(initialData?.frameMaterial),
+    groupset: str(initialData?.groupset),
+    wheelSize: str(initialData?.wheelSize) || str(initialData?.tireRim),
+    usageHistory: str(initialData?.usageHistory) || str(initialData?.operating),
+    serial: str(initialData?.serialNumber) || str(initialData?.serial),
+    city: str(initialData?.city),
+    price: str(initialData?.price),
+    paint: str(initialData?.paint),
+    brakeType: str(initialData?.brakeType),
+    overall: str(initialData?.overall),
   })
 
   // State for files

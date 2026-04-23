@@ -175,8 +175,10 @@ export default function SellerCreateListingScreen() {
       }
 
       const createRes = await createListingMutation.mutateAsync(payload)
-      const dataObj = typeof createRes === 'object' && createRes !== null ? (createRes as any).data || createRes : createRes
-      const listingId = dataObj?.id || dataObj?.listingId
+      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+      const rawId = nested.id ?? nested.listingId
+      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
       
       if (!listingId) {
         throw new Error('Failed to retrieve listingId from response')
