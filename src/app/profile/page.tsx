@@ -8,12 +8,12 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  Shield,
-  Edit,
-  Save,
-  X,
-  Star,
-  Package,
+  Shield, 
+  Edit, 
+  Save, 
+  X, 
+  Star, 
+  Package, 
   Clock
 } from 'lucide-react'
 import { Header } from '@/components/header'
