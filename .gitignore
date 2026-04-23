@@ -16,4 +16,5 @@ node_modules
 .DS_Store
 .gitnexus
 .env
-src_legacy_*/
+src_legacy_*/nul
+NUL

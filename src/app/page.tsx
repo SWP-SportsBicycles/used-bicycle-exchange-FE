@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
-  Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike, ArrowRight,
+  Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike, ArrowRight,
   Lock, Scale, CheckCircle2, Star, Quote, Mountain, Zap, Users, Baby,
   CircleDollarSign, Package, ChevronRight, Facebook, Instagram, Youtube
 } from 'lucide-react'
@@ -194,8 +194,8 @@ export default function HomePage() {
           />
         </div>
         {/* Multi-layer gradient for depth */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0d1a08]/95 via-[#0d1a08]/70 to-[#0d1a08]/30" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0d1a08]/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-r from-[#0d1a08]/95 via-[#0d1a08]/70 to-[#0d1a08]/30" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#0d1a08]/80 via-transparent to-transparent" />
         {/* Subtle green radial glow */}
         <div className="absolute left-0 top-1/3 h-[500px] w-[500px] -translate-x-1/4 rounded-full bg-primary/10 blur-[120px]" />
 
@@ -225,10 +225,10 @@ export default function HomePage() {
               Xe chuẩn kiểm,
               <br />
               <span className="relative inline-block">
-                <span className="relative z-10 bg-gradient-to-r from-[#aee86c] via-[#d9f59d] to-[#bff06e] bg-clip-text text-transparent">
+                <span className="relative z-10 bg-linear-to-r from-[#aee86c] via-[#d9f59d] to-[#bff06e] bg-clip-text text-transparent">
                   chốt chuẩn tin
                 </span>
-                <span className="absolute -bottom-2 left-0 h-1.5 w-full rounded-full bg-gradient-to-r from-primary/70 via-primary/35 to-transparent" />
+                <span className="absolute -bottom-2 left-0 h-1.5 w-full rounded-full bg-linear-to-r from-primary/70 via-primary/35 to-transparent" />
               </span>
             </motion.h1>
 
@@ -366,7 +366,7 @@ export default function HomePage() {
           </motion.div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent via-[#1a2810]/35 to-[#eff6e5]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent via-[#1a2810]/35 to-[#eff6e5]" />
       </section>
 
       {/* ═══════════════════════════════════════
@@ -600,7 +600,7 @@ export default function HomePage() {
               className="hidden lg:flex items-center justify-center"
             >
               <div className="relative">
-                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary/20 to-transparent blur-2xl" />
+                <div className="absolute -inset-4 rounded-3xl bg-linear-to-br from-primary/20 to-transparent blur-2xl" />
                 <div className="relative rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">

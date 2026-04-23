@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ShieldCheck, 
@@ -24,7 +25,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { type Listing, formatVND, calculateDeposit } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
@@ -56,6 +56,7 @@ export function DepositModal({
   const [paymentMethod, setPaymentMethod] = useState('bank')
   const [isProcessing, setIsProcessing] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [orderCode, setOrderCode] = useState('')
 
   const inspectionDepositAmount = calculateDeposit(listing.price)
   const softReserveAmount = Math.min(Math.round(listing.price * 0.02), 500000)
@@ -74,6 +75,7 @@ export function DepositModal({
     // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 2000))
     setIsProcessing(false)
+    setOrderCode(`VT-${Date.now().toString(36).toUpperCase()}`)
     setStep('confirmation')
     onSuccess?.(flowType)
   }
@@ -82,6 +84,7 @@ export function DepositModal({
     setStep('review')
     setPaymentMethod('bank')
     setAgreedToTerms(false)
+    setOrderCode('')
     onClose()
   }
 
@@ -113,9 +116,11 @@ export function DepositModal({
                 {/* Listing Summary */}
                 <div className="flex gap-4 p-4 rounded-lg bg-secondary/50 border border-border">
                   <div className="h-20 w-20 rounded-lg overflow-hidden bg-muted shrink-0">
-                    <img 
+                    <Image 
                       src={listing.images[0]} 
                       alt={listing.title}
+                      width={80}
+                      height={80}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -327,7 +332,7 @@ export function DepositModal({
 
               <h3 className="text-xl font-bold text-foreground mb-2">{isSoftReserve ? 'Soft Reserve thành công!' : 'Đặt cọc thành công!'}</h3>
               <p className="text-muted-foreground mb-6">
-                Mã đơn hàng: <span className="font-mono text-foreground">VT-{Date.now().toString(36).toUpperCase()}</span>
+                Mã đơn hàng: <span className="font-mono text-foreground">{orderCode}</span>
               </p>
 
               <div className="rounded-lg bg-success/10 border border-success/30 p-4 mb-6 text-left">

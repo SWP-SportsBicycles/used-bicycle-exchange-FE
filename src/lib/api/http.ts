@@ -77,7 +77,35 @@ async function safeParseBody(response: Response): Promise<unknown> {
   return text.trim() ? text : null;
 }
 
-async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
+function extractAccessToken(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const root = payload as Record<string, unknown>;
+  const nested = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
+
+  const token =
+    (typeof root.accessToken === "string" && root.accessToken) ||
+    (typeof root.token === "string" && root.token) ||
+    (nested && typeof nested.accessToken === "string" && nested.accessToken) ||
+    (nested && typeof nested.token === "string" && nested.token) ||
+    null;
+
+  return token && token.trim().length > 0 ? token : null;
+}
+
+function clearAuthArtifacts() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+  }
+
+  if (typeof document !== "undefined") {
+    document.cookie = "accessToken=; path=/; max-age=0; samesite=lax";
+    document.cookie = "role=; path=/; max-age=0; samesite=lax";
+  }
+}
+
+async function fetchWithAuth<T>(url: string, options: RequestInit = {}, allowRefresh = true): Promise<T> {
   const token = typeof window !== "undefined"
     ? localStorage.getItem("accessToken")
     : null;
@@ -100,25 +128,35 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
   }
 
   if (res.status === 401 && !skipAuthHeader) {
+    if (!allowRefresh) {
+      clearAuthArtifacts();
+      window.location.href = "/auth/login";
+      throw new Error("Unauthorized");
+    }
+
     const renewRes = await fetch(`${API_BASE}/api/Auth/renew-token`, {
       method: "POST",
       credentials: "include",
     });
+
     if (renewRes.ok) {
-      const data = await renewRes.json();
-      if (data?.accessToken) {
-        localStorage.setItem("accessToken", data.accessToken);
+      const data = await renewRes.json().catch(() => null);
+      const renewedToken = extractAccessToken(data);
+
+      if (renewedToken) {
+        localStorage.setItem("accessToken", renewedToken);
+
+        return fetchWithAuth(normalizedUrl, {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${renewedToken}`,
+          }
+        }, false);
       }
-      
-      return fetchWithAuth(normalizedUrl, {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${data.accessToken}`,
-        }
-      });
     }
-    localStorage.removeItem("accessToken");
+
+    clearAuthArtifacts();
     window.location.href = "/auth/login";
     throw new Error("Unauthorized");
   }

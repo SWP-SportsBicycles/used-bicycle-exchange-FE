@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -142,7 +143,7 @@ export default function InspectorCompletedPage() {
                   <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="h-14 w-14 rounded-lg overflow-hidden bg-muted shrink-0">
-                        <img src={listing.images[0]} alt={listing.title} className="h-full w-full object-cover" />
+                        <Image src={listing.images[0]} alt={listing.title} width={56} height={56} className="h-full w-full object-cover" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold truncate">{listing.title}</p>
