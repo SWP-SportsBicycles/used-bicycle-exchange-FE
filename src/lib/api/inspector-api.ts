@@ -68,6 +68,31 @@ export interface SubmitInspectionPayload {
   isFlagged: boolean;
 }
 
+export interface InspectorHistory {
+  id: string;
+  userId: string;
+  user: unknown | null;
+  frame: boolean;
+  paintCondition: boolean;
+  drivetrain: boolean;
+  brakes: boolean;
+  score: number;
+  comment: string;
+  inspectionDate: string;
+  bike: unknown | null;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+}
+
+export interface InspectorHistoryPaginated {
+  items: InspectorHistory[];
+  totalItems: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
     return {};
@@ -226,4 +251,46 @@ export const inspectorApi = {
   submitToAdmin(listingId: string, payload: SubmitInspectionPayload) {
     return http.post<unknown>(`/api/inspector-listing/${listingId}/submit-to-admin`, payload);
   },
+
+  // Inspector History APIs
+  async getHistory(pageNumber = 1, pageSize = 10): Promise<InspectorHistoryPaginated> {
+    const response = await http.get<unknown>(`/api/inspector/history?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+    const source = extractPayloadObject(response);
+    const data = source.data && typeof source.data === "object" ? (source.data as Record<string, unknown>) : source;
+
+    return {
+      items: extractArray(data.items).map(normalizeHistory),
+      totalItems: pickNumber(data, ["totalItems", "totalCount"]),
+      totalPages: pickNumber(data, ["totalPages"]),
+      pageNumber: pickNumber(data, ["pageNumber", "page"]),
+      pageSize: pickNumber(data, ["pageSize", "limit"]),
+    };
+  },
+
+  async getHistoryById(inspectionId: string): Promise<InspectorHistory | null> {
+    const response = await http.get<unknown>(`/api/inspector/history/${inspectionId}`);
+    const normalized = normalizeHistory(response);
+    return normalized.id ? normalized : null;
+  },
 };
+
+function normalizeHistory(raw: unknown): InspectorHistory {
+  const source = extractPayloadObject(raw);
+
+  return {
+    id: pickString(source, ["id", "inspectionId"]) || crypto.randomUUID(),
+    userId: pickString(source, ["userId"]) || "",
+    user: source.user ?? null,
+    frame: pickBoolean(source, ["frame"]),
+    paintCondition: pickBoolean(source, ["paintCondition", "paint_condition"]),
+    drivetrain: pickBoolean(source, ["drivetrain"]),
+    brakes: pickBoolean(source, ["brakes"]),
+    score: pickNumber(source, ["score"]),
+    comment: pickString(source, ["comment", "notes"]) || "",
+    inspectionDate: pickString(source, ["inspectionDate", "inspection_date", "date"]) || "",
+    bike: source.bike ?? null,
+    createdAt: pickString(source, ["createdAt", "created_at"]) || "",
+    updatedAt: pickString(source, ["updatedAt", "updated_at"]) || "",
+    isDeleted: pickBoolean(source, ["isDeleted", "is_deleted", "deleted"]),
+  };
+}

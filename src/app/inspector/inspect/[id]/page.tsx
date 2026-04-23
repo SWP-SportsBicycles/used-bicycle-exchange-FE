@@ -433,7 +433,7 @@ export default function InspectionPage() {
                       )}
                     </div>
 
-                    <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -447,25 +447,6 @@ export default function InspectionPage() {
                       >
                         <Check className="h-4 w-4" />
                         {language === 'vi' ? 'Đạt' : 'Pass'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          toast({
-                            title: language === 'vi' ? 'Đã ghi nhận Cảnh báo' : 'Warning noted',
-                            description:
-                              language === 'vi'
-                                ? 'Trạng thái Cảnh báo đang được backend bổ sung.'
-                                : 'Warning state handling will be completed later.',
-                          })
-                        }}
-                        className={cn(
-                          'justify-center gap-2 border-amber-400/50 text-amber-700 hover:bg-amber-50'
-                        )}
-                      >
-                        <AlertTriangle className="h-4 w-4" />
-                        {language === 'vi' ? 'Cảnh báo' : 'Warning'}
                       </Button>
                       <Button
                         type="button"
