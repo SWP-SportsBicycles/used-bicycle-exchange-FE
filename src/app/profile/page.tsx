@@ -9,7 +9,6 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-<<<<<<< vu-dev
   Shield,
   Edit,
   Save,
@@ -19,14 +18,6 @@ import {
   Clock,
   Building,
   CreditCard
-=======
-  Shield, 
-  Edit, 
-  Save, 
-  X, 
-  Package, 
-  Clock
->>>>>>> main
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
