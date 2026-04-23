@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   Package, 
   Users,
@@ -226,10 +227,12 @@ export default function AdminDashboardPage() {
                     key={approval.id} 
                     className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
-                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img 
+                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
+                      <Image 
                         src={approval.listing.images[0]} 
                         alt={approval.listing.title}
+                        width={48}
+                        height={48}
                         className="h-full w-full object-cover"
                       />
                     </div>

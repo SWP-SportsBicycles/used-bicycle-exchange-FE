@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Heart, 
@@ -139,11 +140,12 @@ export default function WishlistPage() {
                         {/* Image */}
                         <Link 
                           href={`/listing/${listing.id}`}
-                          className="relative sm:w-48 aspect-[4/3] sm:aspect-square overflow-hidden bg-muted"
+                          className="relative sm:w-48 aspect-4/3 sm:aspect-square overflow-hidden bg-muted"
                         >
-                          <img 
+                          <Image 
                             src={listing.images[0]} 
                             alt={listing.title}
+                            fill
                             className="h-full w-full object-cover hover:scale-105 transition-transform duration-300"
                           />
                           {listing.isVeloSafeVerified && (
@@ -169,7 +171,7 @@ export default function WishlistPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
                                 onClick={() => removeFromWishlist(listing.id)}
                               >
                                 <Trash2 className="h-4 w-4" />

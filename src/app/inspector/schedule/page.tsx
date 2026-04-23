@@ -162,7 +162,7 @@ export default function InspectorSchedulePage() {
 
                         <div className="flex lg:flex-col gap-2">
                           <Button asChild className="flex-1">
-                            <Link href={`/inspector/inspect/${assignment.id}`}>
+                            <Link href={`/inspector/assigned/${assignment.id}`}>
                               {assignment.status === 'in_progress'
                                 ? language === 'vi'
                                   ? 'Tiếp tục'

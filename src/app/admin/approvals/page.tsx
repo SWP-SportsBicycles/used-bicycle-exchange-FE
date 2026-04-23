@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Clock, Eye, Loader2, X } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +37,6 @@ export default function ApprovalsPage() {
   const { language } = useLanguage();
   const queryClient = useQueryClient();
   const [activeStatus, setActiveStatus] = useState<ListingFilter>("pending");
-  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [rejectListingId, setRejectListingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,21 +48,23 @@ export default function ApprovalsPage() {
     },
   });
 
-  const listingsQuery = useQuery({
-    queryKey: ["admin-listings"],
-    queryFn: adminApi.getListings,
+  const allListingsQuery = useQuery({
+    queryKey: ["admin-listings", "all"],
+    queryFn: adminApi.getAllListings,
   });
 
-  const listingDetailQuery = useQuery({
-    queryKey: ["admin-listing-detail", selectedListingId],
-    queryFn: () => adminApi.getListingDetail(selectedListingId as string),
-    enabled: !!selectedListingId,
+  const pendingListingsQuery = useQuery({
+    queryKey: ["admin-listings", "pending"],
+    queryFn: adminApi.getListings,
   });
 
   const approveMutation = useMutation({
     mutationFn: (listingId: string) => adminApi.approveListing(listingId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
+      ]);
       setFeedback(language === "vi" ? "Duyệt tin thành công." : "Listing approved.");
       setErrorMessage(null);
     },
@@ -74,7 +76,10 @@ export default function ApprovalsPage() {
   const rejectMutation = useMutation({
     mutationFn: ({ listingId, reason }: { listingId: string; reason: string }) => adminApi.rejectListing(listingId, reason),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-listings"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
+      ]);
       setFeedback(language === "vi" ? "Từ chối tin thành công." : "Listing rejected.");
       setErrorMessage(null);
       setRejectListingId(null);
@@ -85,15 +90,22 @@ export default function ApprovalsPage() {
     },
   });
 
-  const allListings = listingsQuery.data ?? [];
-  const pendingApprovals = allListings.filter((item) => item.status === "pending");
+  const allListings = allListingsQuery.data ?? [];
+  const pendingListings = pendingListingsQuery.data ?? [];
+  const pendingApprovals = pendingListings.filter((item) => item.status === "pending");
   const approvedApprovals = allListings.filter((item) => item.status === "approved");
   const rejectedApprovals = allListings.filter((item) => item.status === "rejected");
 
-  const filteredApprovals = allListings.filter((item) => {
-    if (activeStatus === "all") return true;
-    return item.status === activeStatus;
-  });
+  const filteredApprovals =
+    activeStatus === "all"
+      ? allListings
+      : activeStatus === "pending"
+      ? pendingApprovals
+      : activeStatus === "approved"
+      ? approvedApprovals
+      : rejectedApprovals;
+
+  const isCurrentListLoading = activeStatus === "pending" ? pendingListingsQuery.isLoading : allListingsQuery.isLoading;
 
   const filterLabel = {
     all: language === "vi" ? "Tất cả" : "All",
@@ -163,9 +175,18 @@ export default function ApprovalsPage() {
           <AlertDescription>{feedback}</AlertDescription>
         </Alert>
       )}
-      {errorMessage && (
+      {(errorMessage || allListingsQuery.error || pendingListingsQuery.error) && (
         <Alert variant="destructive">
-          <AlertDescription>{errorMessage}</AlertDescription>
+          <AlertDescription>
+            {errorMessage ??
+              (allListingsQuery.error instanceof Error
+                ? allListingsQuery.error.message
+                : pendingListingsQuery.error instanceof Error
+                ? pendingListingsQuery.error.message
+                : language === "vi"
+                ? "Không thể tải danh sách tin đăng."
+                : "Unable to load listings.")}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -214,7 +235,7 @@ export default function ApprovalsPage() {
           <CardDescription>{listDescription}</CardDescription>
         </CardHeader>
         <CardContent>
-          {listingsQuery.isLoading ? (
+          {isCurrentListLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {language === "vi" ? "Đang tải danh sách..." : "Loading listings..."}
@@ -271,9 +292,11 @@ export default function ApprovalsPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setSelectedListingId(listing.id)}>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/admin/approvals/details/${listing.id}`}>
                         <Eye className="mr-1 h-4 w-4" />
                         {language === "vi" ? "Chi tiết" : "Detail"}
+                        </Link>
                       </Button>
                       {listing.status === "pending" && (
                         <>
@@ -299,53 +322,6 @@ export default function ApprovalsPage() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={!!selectedListingId} onOpenChange={() => setSelectedListingId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{language === "vi" ? "Chi Tiết Tin Đăng" : "Listing Detail"}</DialogTitle>
-            <DialogDescription>
-              {language === "vi" ? "Thông tin từ API /api/admin-listing/{id}" : "Data from /api/admin-listing/{id}"}
-            </DialogDescription>
-          </DialogHeader>
-          {listingDetailQuery.isLoading ? (
-            <div className="py-6 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-              {language === "vi" ? "Đang tải chi tiết..." : "Loading detail..."}
-            </div>
-          ) : listingDetailQuery.data ? (
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">ID</span>
-                <span className="text-right">{listingDetailQuery.data.id}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{language === "vi" ? "Tiêu đề" : "Title"}</span>
-                <span className="text-right">{listingDetailQuery.data.title}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Serial</span>
-                <span className="text-right">{listingDetailQuery.data.serial || "-"}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{language === "vi" ? "Thành phố" : "City"}</span>
-                <span className="text-right">{listingDetailQuery.data.city || "-"}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{language === "vi" ? "Giá" : "Price"}</span>
-                <span className="text-right font-semibold">{formatVND(listingDetailQuery.data.price)}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">{language === "vi" ? "Không có dữ liệu." : "No data."}</div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedListingId(null)}>
-              {language === "vi" ? "Đóng" : "Close"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!rejectListingId} onOpenChange={() => setRejectListingId(null)}>
         <DialogContent>

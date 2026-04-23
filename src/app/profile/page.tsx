@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { 
   User, 
   Mail, 
   Phone, 
   MapPin, 
+<<<<<<< vu-dev
   Shield,
   Edit,
   Save,
@@ -17,6 +19,14 @@ import {
   Clock,
   Building,
   CreditCard
+=======
+  Shield, 
+  Edit, 
+  Save, 
+  X, 
+  Package, 
+  Clock
+>>>>>>> main
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -440,9 +450,11 @@ export default function ProfilePage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted">
-                          <img 
+                          <Image 
                             src={tx.listing.images[0]} 
                             alt={tx.listing.title}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-cover"
                           />
                         </div>

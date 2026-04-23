@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   normalizeListingsPayload, 
   normalizeOrdersPayload 
@@ -13,9 +14,7 @@ import {
   Wallet, 
   TrendingUp, 
   Eye,
-  Clock,
   CheckCircle2,
-  AlertCircle,
   ArrowUpRight,
   ChevronRight
 } from 'lucide-react'
