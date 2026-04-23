@@ -21,19 +21,83 @@ export interface SellerListingFormData {
   city: string;
 }
 
-// ===== Order Types =====
+export interface SellerListing {
+  id: string;
+  title: string;
+  description: string;
+  serialNumber: string;
+  category: string;
+  brand: string;
+  model: string;
+  frameSize: string;
+  frameMaterial: string;
+  condition: string;
+  price: number;
+  city: string;
+  status: 'draft' | 'pending_review' | 'published' | 'sold' | 'withdrawn' | string;
+  isVeloSafeVerified: boolean;
+  images: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type SellerOrderStatus =
-  | 'pending_seller_confirm'
-  | 'seller_confirmed'
-  | 'pending_inspection'
-  | 'inspection_passed'
-  | 'inspection_failed'
-  | 'shipping'
-  | 'delivered'
-  | 'completed'
-  | 'cancelled'
-  | string;
+export interface SellerListingPage {
+  items: SellerListing[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface SellerOrder {
+  orderId: string;
+  listingId?: string;
+  listing?: {
+    id: string;
+    title: string;
+    price: number;
+    images: string[];
+  };
+  buyer?: {
+    id: string;
+    name: string;
+    avatar?: string;
+    phone?: string;
+    address?: string;
+  };
+  bikeName?: string;
+  buyerName?: string;
+  buyerPhone?: string;
+  receiverAddress?: string;
+  status:
+    | 'Pending'
+    | 'Confirmed'
+    | 'Locked'
+    | 'pending_seller_confirm'
+    | 'seller_confirmed'
+    | 'pending_inspection'
+    | 'inspection_passed'
+    | 'inspection_failed'
+    | 'shipping'
+    | 'delivered'
+    | 'completed'
+    | 'cancelled'
+    | string;
+  depositAmount?: number;
+  totalAmount?: number;
+  totalPrice?: number;
+  price?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SellerOrderPage {
+  items: SellerOrder[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+}
 
 // ===== API =====
 
@@ -84,11 +148,11 @@ export const sellerApi = {
   },
 
   getListings(pageNumber = 1, pageSize = 10) {
-    return http.get<unknown>(`/api/seller-listing?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+    return http.get<SellerListingPage>(`/api/seller-listing?pageNumber=${pageNumber}&pageSize=${pageSize}`);
   },
 
   getListingDetail(listingId: string) {
-    return http.get<unknown>(`/api/seller-listing/${listingId}`);
+    return http.get<SellerListing>(`/api/seller-listing/${listingId}`);
   },
 
   submitListing(listingId: string) {
@@ -114,16 +178,20 @@ export const sellerApi = {
   // --- Orders (GET /api/SellerOrder) ---
 
   getOrders(page = 1, size = 10) {
-    return http.get<unknown>(`/api/SellerOrder?page=${page}&size=${size}`);
+    return http.get<SellerOrderPage>(`/api/SellerOrder?page=${page}&size=${size}`);
   },
 
   getOrderDetail(orderId: string) {
-    return http.get<unknown>(`/api/SellerOrder/${orderId}`);
+    return http.get<SellerOrder>(`/api/SellerOrder/${orderId}`);
   },
 
-  /** Seller xác nhận đơn hàng (SLA 12h) */
   confirmOrder(orderId: string) {
     return http.post<unknown>(`/api/SellerOrder/${orderId}/confirm`);
+  },
+
+  /** Seller xác nhận đã giao hàng cho đơn vị vận chuyển (GHN) */
+  shipOrder(orderId: string) {
+    return http.post<unknown>(`/api/SellerOrder/${orderId}/ship`);
   },
 
   cancelOrder(orderId: string) {

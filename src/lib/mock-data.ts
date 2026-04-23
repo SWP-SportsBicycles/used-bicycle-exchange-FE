@@ -674,13 +674,14 @@ export const MOCK_ANALYTICS = {
 // Order status labels
 export const ORDER_STATUS_LABELS = {
   pending_deposit: { vi: 'Chờ Đặt Cọc', en: 'Pending Deposit' },
-  inspection_scheduled: { vi: 'Đã Lên Lịch Kiểm Định', en: 'Inspection Scheduled' },
-  inspection_completed: { vi: 'Kiểm Định Hoàn Tất', en: 'Inspection Completed' },
-  pending_payment: { vi: 'Chờ Thanh Toán', en: 'Pending Payment' },
+  pending: { vi: 'Chờ Xử Lý', en: 'Pending' },
+  paid: { vi: 'Chờ Xác Nhận', en: 'Pending Confirmation' },
+  confirmed: { vi: 'Đã Xác Nhận', en: 'Confirmed' },
+  shipping: { vi: 'Đang Giao Hàng', en: 'Shipping' },
   delivered: { vi: 'Đã Giao Hàng', en: 'Delivered' },
-  pending_confirmation: { vi: 'Chờ Xác Nhận', en: 'Pending Confirmation' },
   completed: { vi: 'Hoàn Thành', en: 'Completed' },
   cancelled: { vi: 'Đã Hủy', en: 'Cancelled' },
+  locked: { vi: 'Đã Khóa', en: 'Locked' },
   disputed: { vi: 'Đang Tranh Chấp', en: 'In Dispute' },
 }
 

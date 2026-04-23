@@ -8,7 +8,7 @@ import { format, differenceInSeconds } from 'date-fns'
 import { vi, enUS } from 'date-fns/locale'
 
 import { useSellerOrderDetail } from '@/modules/seller/hooks/useSellerOrders'
-import { useConfirmOrder, useCancelOrder } from '@/modules/seller/hooks/useSellerOrderMutations'
+import { useConfirmOrder, useShipOrder, useCancelOrder } from '@/modules/seller/hooks/useSellerOrderMutations'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,7 @@ import {
 import { useLanguage } from '@/lib/language-context'
 import { ORDER_STATUS_LABELS, formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
+import { normalizeOrderDetail } from '@/modules/seller/utils/normalization'
 
 const SLA_HOURS = 12
 
@@ -37,17 +38,20 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
   
   const { data: rawData, isLoading, isError } = useSellerOrderDetail(orderId)
   const confirmMutation = useConfirmOrder()
+  const shipMutation = useShipOrder()
   const cancelMutation = useCancelOrder()
 
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null)
 
-  const order = (rawData as any)?.data || rawData
+  const order = normalizeOrderDetail(rawData)
 
-  const isPendingConfirm = order?.status === 'pending_seller_confirm'
+  const isPaid = order?.status === 'paid'
+  const isConfirmed = order?.status === 'confirmed'
+  const isShipping = order?.status === 'shipping'
 
   useEffect(() => {
-    if (!order?.createdAt || !isPendingConfirm) return
+    if (!order?.createdAt || !isPaid) return
 
     const deadline = new Date(order.createdAt)
     deadline.setHours(deadline.getHours() + SLA_HOURS)
@@ -68,16 +72,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [order?.createdAt, isPendingConfirm])
-
-  const handleConfirm = async () => {
-    try {
-      await confirmMutation.mutateAsync(orderId)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
+  }, [order?.createdAt, isPaid])
   const handleCancel = async () => {
     try {
       await cancelMutation.mutateAsync(orderId)
@@ -129,19 +124,27 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
           </p>
         </div>
         
-        {isPendingConfirm && (
+        {isPaid && (
           <div className="flex gap-2">
             <Button variant="destructive" onClick={() => setIsCancelDialogOpen(true)} disabled={cancelMutation.isPending}>
               {language === 'vi' ? 'Từ chối' : 'Decline'}
             </Button>
-            <Button onClick={handleConfirm} disabled={confirmMutation.isPending} className="bg-success text-success-foreground hover:bg-success/90">
-              {confirmMutation.isPending ? '...' : (language === 'vi' ? 'Xác Nhan Đóng Gói' : 'Confirm Packed')}
+            <Button onClick={() => confirmMutation.mutate(orderId)} disabled={confirmMutation.isPending} className="bg-success text-success-foreground hover:bg-success/90">
+              {confirmMutation.isPending ? '...' : (language === 'vi' ? 'Xác Nhận Đóng Gói' : 'Confirm Packed')}
+            </Button>
+          </div>
+        )}
+
+        {isConfirmed && (
+          <div className="flex gap-2">
+            <Button onClick={() => shipMutation.mutate(orderId)} disabled={shipMutation.isPending} className="bg-blue-600 text-white hover:bg-blue-700">
+              {shipMutation.isPending ? '...' : (language === 'vi' ? 'Xác Nhận Giao Hàng' : 'Confirm Shipping')}
             </Button>
           </div>
         )}
       </div>
 
-      {isPendingConfirm && timeLeft && (
+      {isPaid && timeLeft && (
         <Alert className={cn(timeLeft.hours < 2 ? 'border-destructive bg-destructive/10 text-destructive' : 'border-warning bg-warning/10 text-warning-foreground')}>
           <Clock className={cn("h-4 w-4", timeLeft.hours < 2 ? 'text-destructive' : 'text-warning-foreground')} />
           <AlertTitle className="font-bold">
@@ -180,20 +183,20 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
           <CardContent className="space-y-4 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'Sản phẩm' : 'Product'}</span>
-              <span className="font-medium text-right ml-4">{order.listing?.title || order.listingTitle || 'N/A'}</span>
+              <span className="font-medium text-right ml-4">{order.listing.title}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'Số Serial' : 'Serial No'}</span>
-              <span className="font-medium">{order.listing?.serialNumber || order.serialNumber || 'N/A'}</span>
+              <span className="font-medium">{order.listing.serialNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'Giá xe' : 'Price'}</span>
-              <span className="font-medium text-lg">{formatVND(order.listing?.price || order.price || 0)}</span>
+              <span className="font-medium text-lg">{formatVND(order.listing.price)}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-bold">
               <span>{language === 'vi' ? 'Tổng thu nhập dự kiến' : 'Estimated Earnings'}</span>
-              <span className="text-success">{formatVND((order.listing?.price || order.price || 0) * 0.95)}</span>
+              <span className="text-success">{formatVND(order.listing.price * 0.95)}</span>
             </div>
             <p className="text-xs text-muted-foreground text-right mt-1">
               {language === 'vi' ? '(Sau khi trừ 5% phí nền tảng)' : '(After 5% platform fee)'}
@@ -201,7 +204,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
           </CardContent>
           <CardFooter>
             <Button variant="outline" className="w-full" asChild>
-              <Link href={`/seller/listings/${order.listingId || order.listing?.id}`}>
+              <Link href={`/seller/listings/${order.listing.id}`}>
                 {language === 'vi' ? 'Xem tin đăng gốc' : 'View original listing'}
               </Link>
             </Button>
@@ -215,18 +218,48 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
           <CardContent className="space-y-4 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'Họ tên' : 'Name'}</span>
-              <span className="font-medium">{order.buyer?.name || order.buyerName || 'N/A'}</span>
+              <span className="font-medium">{order.buyer.name}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'SĐT liên lạc' : 'Phone'}</span>
-              <span className="font-medium">{order.buyer?.phone || order.buyerPhone || 'N/A'}</span>
+              <span className="font-medium">{order.buyer.phone}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">{language === 'vi' ? 'Địa chỉ giao hàng' : 'Shipping Address'}</span>
-              <span className="font-medium text-right max-w-[200px]">{order.buyer?.address || order.shippingAddress || 'N/A'}</span>
+              <span className="font-medium text-right max-w-[200px]">{order.buyer.address}</span>
             </div>
           </CardContent>
         </Card>
+
+        {isShipping && (
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader>
+              <CardTitle className="text-blue-700 flex items-center gap-2">
+                <PackageSearch className="h-5 w-5" />
+                {language === 'vi' ? 'Thông tin vận chuyển (GHN)' : 'Shipping Information (GHN)'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Đơn vị vận chuyển' : 'Carrier'}</span>
+                <span className="font-medium">Giao Hàng Nhanh (GHN)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Mã vận đơn' : 'Waybill Code'}</span>
+                <span className="font-medium text-blue-700">{(order as any).waybillCode || 'Đang cập nhật...'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>
+                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                  {language === 'vi' ? 'Đang giao hàng' : 'In Transit'}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                {language === 'vi' ? '* Thông tin được cập nhật tự động từ hệ thống GHN' : '* Information updated automatically from GHN system'}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Cancel Confirmation Dialog */}

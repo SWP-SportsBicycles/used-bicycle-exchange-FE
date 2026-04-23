@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowUpRight, Search, Eye, Filter } from 'lucide-react'
 import { format } from 'date-fns'
 import { vi, enUS } from 'date-fns/locale'
 
 import { useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
+import { useConfirmOrder, useShipOrder } from '@/modules/seller/hooks/useSellerOrderMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,49 +18,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useLanguage } from '@/lib/language-context'
 import { ORDER_STATUS_LABELS, formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
+import { normalizeOrdersPayload, SellerOrderItem } from '@/modules/seller/utils/normalization'
 
 const statusColors: Record<string, string> = {
-  pending_seller_confirm: 'bg-yellow-500/15 text-yellow-600',
-  seller_confirmed: 'bg-blue-500/15 text-blue-600',
-  pending_inspection: 'bg-blue-500/15 text-blue-600',
-  inspection_passed: 'bg-green-500/15 text-green-600',
-  inspection_failed: 'bg-red-500/15 text-red-600',
+  pending: 'bg-yellow-500/15 text-yellow-600',
+  paid: 'bg-yellow-500/15 text-yellow-600',
+  confirmed: 'bg-blue-500/15 text-blue-600',
   shipping: 'bg-purple-500/15 text-purple-600',
   delivered: 'bg-green-500/15 text-green-600',
   completed: 'bg-[#407F3E]/15 text-[#407F3E]',
   cancelled: 'bg-destructive/20 text-destructive',
+  locked: 'bg-zinc-500/15 text-zinc-600',
 }
 
 const TABS = [
   { value: 'all', label: { vi: 'Tất cả', en: 'All' } },
-  { value: 'pending_seller_confirm', label: { vi: 'Chờ xác nhận', en: 'Pending Confirm' } },
+  { value: 'paid', label: { vi: 'Chờ xác nhận', en: 'Pending' } },
+  { value: 'confirmed', label: { vi: 'Đã xác nhận', en: 'Confirmed' } },
   { value: 'shipping', label: { vi: 'Đang giao', en: 'Shipping' } },
   { value: 'completed', label: { vi: 'Hoàn thành', en: 'Completed' } },
 ]
 
 export default function SellerOrdersPage() {
   const { language } = useLanguage()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [page, setPage] = useState(1)
 
   const { data: response, isLoading, isError } = useSellerOrders({ page, size: 10 })
+  const confirmMutation = useConfirmOrder()
+  const shipMutation = useShipOrder()
 
   // Extract orders dynamically dealing with common nested backend responses
-  const orders = Array.isArray(response) 
-    ? response 
-    : (response as any)?.data 
-      ? Array.isArray((response as any).data) ? (response as any).data : (response as any).data.items || []
-      : (response as any)?.items || []
+  const orders = normalizeOrdersPayload(response)
 
   // Filter local for now if not supported via API
-  const filteredOrders = orders.filter((order: any) => {
+  const filteredOrders = orders.filter((order: SellerOrderItem) => {
+    // Seller only handles orders from 'paid' onwards
+    const isVisibleToSeller = ['paid', 'confirmed', 'shipping', 'delivered', 'completed', 'cancelled', 'disputed'].includes(order.status)
+    if (!isVisibleToSeller) return false
+
     if (activeTab !== 'all' && order.status !== activeTab) return false
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      const titleMatch = order.listing?.title?.toLowerCase().includes(searchLower)
-      const buyerMatch = order.buyer?.name?.toLowerCase().includes(searchLower)
-      const codeMatch = order.id?.toLowerCase().includes(searchLower)
+      const titleMatch = order.listing.title.toLowerCase().includes(searchLower)
+      const buyerMatch = order.buyer.name.toLowerCase().includes(searchLower)
+      const codeMatch = order.id.toLowerCase().includes(searchLower)
       return titleMatch || buyerMatch || codeMatch
     }
     return true
@@ -135,22 +141,26 @@ export default function SellerOrdersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order: any) => (
-                    <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  filteredOrders.map((order: SellerOrderItem) => (
+                    <TableRow 
+                      key={order.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/seller/orders/${order.id}`)}
+                    >
                       <TableCell className="font-medium text-xs">
-                        #{order.id?.substring(0, 8).toUpperCase() || 'N/A'}
+                        #{order.id.substring(0, 8).toUpperCase() || 'N/A'}
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate">
-                        {order.listing?.title || order.listingTitle || 'Unknown Product'}
+                        {order.listing.title}
                       </TableCell>
-                      <TableCell>{order.buyer?.name || order.buyerName || 'Unknown Buyer'}</TableCell>
+                      <TableCell>{order.buyer.name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {order.createdAt 
                           ? format(new Date(order.createdAt), 'dd MMM yyyy', { locale: language === 'vi' ? vi : enUS }) 
                           : '-'}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {formatVND(order.totalAmount || order.price || 0)}
+                        {formatVND(order.totalPrice)}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -160,13 +170,35 @@ export default function SellerOrdersPage() {
                           {(ORDER_STATUS_LABELS as Record<string, { vi: string, en: string }>)[order.status]?.[language as 'vi' | 'en'] || order.status?.replace(/_/g, ' ') || 'Unknown'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/seller/orders/${order.id}`}>
-                            <Eye className="h-4 w-4 mr-1" />
-                            {language === 'vi' ? 'Chi tiết' : 'View'}
-                          </Link>
-                        </Button>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-2">
+                          {order.status === 'paid' && (
+                            <Button 
+                              size="sm" 
+                              className="bg-success text-success-foreground hover:bg-success/90 h-8 text-xs"
+                              onClick={() => confirmMutation.mutate(order.id)}
+                              disabled={confirmMutation.isPending}
+                            >
+                              {confirmMutation.isPending ? '...' : (language === 'vi' ? 'Xác nhận' : 'Confirm')}
+                            </Button>
+                          )}
+                          {order.status === 'confirmed' && (
+                            <Button 
+                              size="sm" 
+                              className="bg-blue-600 text-white hover:bg-blue-700 h-8 text-xs"
+                              onClick={() => shipMutation.mutate(order.id)}
+                              disabled={shipMutation.isPending}
+                            >
+                              {shipMutation.isPending ? '...' : (language === 'vi' ? 'Giao hàng' : 'Ship')}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
+                            <Link href={`/seller/orders/${order.id}`}>
+                              <Eye className="h-4 w-4 mr-1" />
+                              {language === 'vi' ? 'Chi tiết' : 'View'}
+                            </Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

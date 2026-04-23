@@ -29,115 +29,14 @@ import {
 import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
 import { cn } from '@/lib/utils'
 
-type ListingStatus =
-  | 'draft'
-  | 'pending_review'
-  | 'pending'
-  | 'published'
-  | 'sold'
-  | 'rejected'
-  | 'withdrawn'
-
-type SellerListingItem = {
-  id: string
-  title: string
-  price: number
-  status: ListingStatus
-  images: string[]
-  isVeloSafeVerified: boolean
-}
+import { 
+  normalizeListingsPayload, 
+  normalizeListingStatus,
+  type SellerListingItem,
+  type ListingStatus 
+} from '@/modules/seller/utils/normalization'
 
 type ConfirmAction = 'submit' | 'withdraw' | 'delete' | 'resubmit'
-
-function normalizeListingStatus(value: unknown): ListingStatus {
-  const raw = typeof value === 'string' ? value.trim() : ''
-  const normalized = raw
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/[\s-]+/g, '_')
-    .toLowerCase()
-
-  if (normalized === 'draft') return 'draft'
-  if (normalized === 'pending_review' || normalized === 'pending') return 'pending_review'
-  if (normalized === 'pending_inspection') return 'pending_review'
-  if (normalized === 'published' || normalized === 'active') return 'published'
-  if (normalized === 'sold' || normalized === 'completed') return 'sold'
-  if (normalized === 'rejected') return 'rejected'
-  if (normalized === 'withdrawn' || normalized === 'cancelled' || normalized === 'canceled') return 'withdrawn'
-
-  return 'draft'
-}
-
-function normalizeListingsPayload(payload: unknown): SellerListingItem[] {
-  const findArray = (value: unknown): unknown[] => {
-    if (Array.isArray(value)) {
-      return value
-    }
-
-    if (value && typeof value === 'object') {
-      const container = value as Record<string, unknown>
-      const candidates = ['items', 'data', 'listings', 'results']
-
-      for (const key of candidates) {
-        if (Array.isArray(container[key])) {
-          return container[key] as unknown[]
-        }
-
-        if (container[key] && typeof container[key] === 'object') {
-          const nested = container[key] as Record<string, unknown>
-          for (const nestedKey of candidates) {
-            if (Array.isArray(nested[nestedKey])) {
-              return nested[nestedKey] as unknown[]
-            }
-          }
-        }
-      }
-    }
-
-    return []
-  }
-
-  return findArray(payload)
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null
-      }
-
-      const raw = item as Record<string, unknown>
-      const medias = Array.isArray(raw.medias) ? raw.medias : []
-      const mediaImages = medias
-        .map((media) => {
-          if (!media || typeof media !== 'object') return ''
-          const record = media as Record<string, unknown>
-          return typeof record.image === 'string' ? record.image : ''
-        })
-        .filter(Boolean)
-
-      const images = (Array.isArray(raw.images) ? raw.images : mediaImages).filter(
-        (entry): entry is string => typeof entry === 'string',
-      )
-      const thumbnail = typeof raw.thumbnail === 'string' ? raw.thumbnail : ''
-      const resolvedImages = images.length > 0 ? images : thumbnail ? [thumbnail] : []
-
-      const id =
-        (typeof raw.id === 'string' && raw.id) ||
-        (typeof raw.listingId === 'string' && raw.listingId) ||
-        ''
-
-      if (!id) {
-        return null
-      }
-
-      return {
-        id,
-        title: typeof raw.title === 'string' ? raw.title : 'Untitled listing',
-        price: typeof raw.price === 'number' ? raw.price : Number(raw.price ?? 0),
-        status: normalizeListingStatus(raw.status),
-        images: resolvedImages,
-        isVeloSafeVerified: Boolean(raw.isVeloSafeVerified),
-      } satisfies SellerListingItem
-    })
-    .filter((item): item is SellerListingItem => Boolean(item))
-}
 
 function mapMockToSellerListings(): SellerListingItem[] {
   return MOCK_LISTINGS.slice(0, 6).map((listing) => ({

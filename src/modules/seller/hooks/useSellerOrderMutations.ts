@@ -13,6 +13,18 @@ export function useConfirmOrder() {
   });
 }
 
+export function useShipOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderId: string) => sellerApi.shipOrder(orderId),
+    onSuccess: (_data, orderId) => {
+      queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-order-detail", orderId] });
+    },
+  });
+}
+
 export function useCancelOrder() {
   const queryClient = useQueryClient();
 
