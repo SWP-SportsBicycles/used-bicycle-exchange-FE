@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     {
       href: "/admin",
       icon: LayoutDashboard,
-      label: { vi: "Tổng Quan", en: "Overview" },
+      label: { vi: "Bảng Báo Cáo", en: "Dashboard" },
       exact: true,
     },
     {

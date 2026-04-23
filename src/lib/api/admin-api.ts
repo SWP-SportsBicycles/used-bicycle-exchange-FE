@@ -54,6 +54,21 @@ export interface AdminOrder {
   paidOutAt: string | null;
 }
 
+export interface AdminDashboardSummary {
+  totalUsers: number;
+  totalSellers: number;
+  totalBuyers: number;
+  totalListings: number;
+  pendingListings: number;
+  totalOrders: number;
+  completedOrders: number;
+  lockedOrders: number;
+  confirmedOrders: number;
+  totalRevenue: number;
+  pendingPayoutAmount: number;
+  openDisputes: number;
+}
+
 export type UserRole = "BUYER" | "SELLER" | "ADMIN" | "INSPECTOR";
 export type UserStatus = "Active" | "InActive" | "Banned";
 
@@ -300,6 +315,34 @@ function extractTotalItems(payload: unknown): number {
   return extractArray(payload).length;
 }
 
+function pickNumber(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number") return value;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function normalizeAdminDashboardSummary(raw: unknown): AdminDashboardSummary {
+  const source = extractPayloadObject(raw);
+  return {
+    totalUsers: pickNumber(source, ["totalUsers", "userCount"]),
+    totalSellers: pickNumber(source, ["totalSellers", "sellerCount"]),
+    totalBuyers: pickNumber(source, ["totalBuyers", "buyerCount"]),
+    totalListings: pickNumber(source, ["totalListings", "listingCount"]),
+    pendingListings: pickNumber(source, ["pendingListings", "pendingListingCount"]),
+    totalOrders: pickNumber(source, ["totalOrders", "orderCount"]),
+    completedOrders: pickNumber(source, ["completedOrders", "completedOrderCount"]),
+    lockedOrders: pickNumber(source, ["lockedOrders", "lockedOrderCount"]),
+    confirmedOrders: pickNumber(source, ["confirmedOrders", "confirmedOrderCount"]),
+    totalRevenue: pickNumber(source, ["totalRevenue", "revenue"]),
+    pendingPayoutAmount: pickNumber(source, ["pendingPayoutAmount", "pendingPayout"]),
+    openDisputes: pickNumber(source, ["openDisputes", "disputeCount"]),
+  };
+}
+
 export const adminApi = {
   async getAllListings() {
     const response = await http.get<unknown>("/api/admin-listing/all");
@@ -386,5 +429,10 @@ export const adminApi = {
 
   confirmPayout(orderId: string) {
     return http.post<unknown>(`/api/AdminOrder/${orderId}/confirm-payout`);
+  },
+
+  async getDashboardSummary(): Promise<AdminDashboardSummary> {
+    const response = await http.get<unknown>("/api/AdminDashboard");
+    return normalizeAdminDashboardSummary(response);
   },
 };
