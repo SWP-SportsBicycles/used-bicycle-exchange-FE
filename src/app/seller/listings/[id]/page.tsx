@@ -293,9 +293,16 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   
   const { data: rawData, isLoading, isError, refetch } = useQuery({
     queryKey: ['seller-listing-detail', listingId],
-    queryFn: () => sellerApi.getListingDetail(listingId),
+    queryFn: () => {
+      console.log('DEBUG Listing Detail Page - Fetching listing with ID:', listingId)
+      return sellerApi.getListingDetail(listingId)
+    },
     enabled: Boolean(listingId)
   })
+
+  // DEBUG: Log the API response
+  console.log('DEBUG Listing Detail Page - Raw API response:', rawData)
+  console.log('DEBUG Listing Detail Page - Is error:', isError)
 
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
@@ -337,9 +344,20 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
       <div className="text-center py-20 text-destructive">
         <AlertTriangle className="h-10 w-10 mx-auto mb-4" />
         <h2 className="text-xl font-bold">{language === 'vi' ? 'Không tìm thấy tin đăng' : 'Listing not found'}</h2>
-        <Button variant="outline" className="mt-4" onClick={() => router.push('/seller/listings')}>
-          {language === 'vi' ? 'Quay lại' : 'Go back'}
-        </Button>
+        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+          {language === 'vi' 
+            ? 'Tin đăng này có thể đã bị xóa, ẩn, hoặc bạn không có quyền truy cập. Vui lòng kiểm tra lại ID tin đăng.' 
+            : 'This listing may have been deleted, withdrawn, or you may not have permission to access it. Please check the listing ID.'}
+        </p>
+        <div className="mt-6 space-y-2">
+          <Button variant="outline" className="mt-2" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {language === 'vi' ? 'Thử lại' : 'Try Again'}
+          </Button>
+          <Button variant="outline" className="mt-2" onClick={() => router.push('/seller/listings')}>
+            {language === 'vi' ? 'Quay lại danh sách' : 'Back to Listings'}
+          </Button>
+        </div>
       </div>
     )
   }

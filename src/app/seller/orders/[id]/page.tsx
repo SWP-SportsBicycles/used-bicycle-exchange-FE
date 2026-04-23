@@ -3,13 +3,14 @@
 import React, { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Clock, AlertTriangle, PackageSearch, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, Clock, AlertTriangle, PackageSearch, CheckCircle2, XCircle, Package, Phone, MapPin, User, RefreshCw, EyeOff } from 'lucide-react'
 import { format, differenceInSeconds } from 'date-fns'
 import { vi, enUS } from 'date-fns/locale'
 
-import { useSellerOrderDetail } from '@/modules/seller/hooks/useSellerOrders'
+import { useSellerOrderDetail, useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
 import { useConfirmOrder, useShipOrder, useCancelOrder } from '@/modules/seller/hooks/useSellerOrderMutations'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
+import { normalizeOrderDetail, normalizeOrdersPayload } from '@/modules/seller/utils/normalization'
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -25,9 +26,7 @@ import {
 import { useLanguage } from '@/lib/language-context'
 import { ORDER_STATUS_LABELS, formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
-import { normalizeOrderDetail } from '@/modules/seller/utils/normalization'
 
-const SLA_HOURS = 12
 
 export default function SellerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -42,37 +41,30 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
   const cancelMutation = useCancelOrder()
 
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
-  const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null)
 
-  const order = normalizeOrderDetail(rawData)
+  const order = normalizeOrderDetail(rawData, orderId)
+
+  // Fallback: nếu detail API không trả về listingId, lấy từ list cache
+  const { data: ordersListData } = useSellerOrders({ size: 50 })
+  const ordersFromList = normalizeOrdersPayload(ordersListData)
+  const orderFromList = ordersFromList.find(o => o.id === orderId)
+  // Ưu tiên listingId từ detail response, fallback sang list cache
+  const effectiveListingId = order?.listing?.id || orderFromList?.listing?.id || ''
 
   const isPaid = order?.status === 'paid'
   const isConfirmed = order?.status === 'confirmed'
   const isShipping = order?.status === 'shipping'
 
-  useEffect(() => {
-    if (!order?.createdAt || !isPaid) return
+  // Merge listing display data: detail API may lack bikeName/price, use list cache as fallback
+  const displayTitle = (
+    order?.listing?.title && order.listing.title !== 'Untitled bike' && order.listing.title !== 'Untitled'
+      ? order.listing.title
+      : orderFromList?.listing?.title
+  ) || order?.listing?.title || 'N/A'
 
-    const deadline = new Date(order.createdAt)
-    deadline.setHours(deadline.getHours() + SLA_HOURS)
+  const displayPrice = order?.listing?.price || orderFromList?.listing?.price || 0
+  const displaySerialNumber = order?.listing?.serialNumber || orderFromList?.listing?.serialNumber || '-'
 
-    const timer = setInterval(() => {
-      const now = new Date()
-      const diff = differenceInSeconds(deadline, now)
-      
-      if (diff <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isExpired: true })
-        clearInterval(timer)
-      } else {
-        const hours = Math.floor(diff / 3600)
-        const minutes = Math.floor((diff % 3600) / 60)
-        const seconds = diff % 60
-        setTimeLeft({ hours, minutes, seconds, isExpired: false })
-      }
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [order?.createdAt, isPaid])
   const handleCancel = async () => {
     try {
       await cancelMutation.mutateAsync(orderId)
@@ -142,125 +134,168 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
             </Button>
           </div>
         )}
-      </div>
 
-      {isPaid && timeLeft && (
-        <Alert className={cn(timeLeft.hours < 2 ? 'border-destructive bg-destructive/10 text-destructive' : 'border-warning bg-warning/10 text-warning-foreground')}>
-          <Clock className={cn("h-4 w-4", timeLeft.hours < 2 ? 'text-destructive' : 'text-warning-foreground')} />
-          <AlertTitle className="font-bold">
-            {language === 'vi' ? 'Yêu cầu hành động (SLA 12h)' : 'Action Required (SLA 12h)'}
-          </AlertTitle>
-          <AlertDescription className="mt-1 flex items-center gap-2 font-mono text-lg">
-            {timeLeft.isExpired ? (
-              <span className="text-destructive font-bold">{language === 'vi' ? 'ĐÃ QUÁ HẠN' : 'EXPIRED'}</span>
-            ) : (
-              <span>
-                {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
-              </span>
-            )}
-            <span className="text-sm font-sans">
-              {language === 'vi' ? 'Hãy xác nhận đóng gói trước khi hết hạn.' : 'Please confirm packaging before time runs out.'}
-            </span>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {order.status === 'seller_confirmed' && (
-        <Alert className="border-info bg-info/10 text-info-foreground">
-          <PackageSearch className="h-4 w-4" />
-          <AlertTitle>{language === 'vi' ? 'Chở lấy hàng' : 'Waiting for pickup'}</AlertTitle>
-          <AlertDescription>
-            {language === 'vi' ? 'Đơn vị vận chuyển sẽ sớm liên hệ để lấy xe.' : 'Courier will contact you soon for pickup.'}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{language === 'vi' ? 'Thông tin Xe Đạp' : 'Bicycle Information'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'Sản phẩm' : 'Product'}</span>
-              <span className="font-medium text-right ml-4">{order.listing.title}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'Số Serial' : 'Serial No'}</span>
-              <span className="font-medium">{order.listing.serialNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'Giá xe' : 'Price'}</span>
-              <span className="font-medium text-lg">{formatVND(order.listing.price)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-bold">
-              <span>{language === 'vi' ? 'Tổng thu nhập dự kiến' : 'Estimated Earnings'}</span>
-              <span className="text-success">{formatVND(order.listing.price * 0.95)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground text-right mt-1">
-              {language === 'vi' ? '(Sau khi trừ 5% phí nền tảng)' : '(After 5% platform fee)'}
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" className="w-full" asChild>
-              <Link href={`/seller/listings/${order.listing.id}`}>
-                {language === 'vi' ? 'Xem tin đăng gốc' : 'View original listing'}
+        {order.status === 'completed' && effectiveListingId && (
+          <div className="flex gap-2">
+            <Button variant="outline" className="border-primary text-primary hover:bg-primary/5" asChild>
+              <Link href={`/seller/listings/${effectiveListingId}`}>
+                {language === 'vi' ? 'Rút tin đăng gốc' : 'Withdraw original listing'}
               </Link>
             </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{language === 'vi' ? 'Thông tin Người Mua' : 'Buyer Information'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'Họ tên' : 'Name'}</span>
-              <span className="font-medium">{order.buyer.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'SĐT liên lạc' : 'Phone'}</span>
-              <span className="font-medium">{order.buyer.phone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{language === 'vi' ? 'Địa chỉ giao hàng' : 'Shipping Address'}</span>
-              <span className="font-medium text-right max-w-[200px]">{order.buyer.address}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {isShipping && (
-          <Card className="border-blue-200 bg-blue-50/30">
-            <CardHeader>
-              <CardTitle className="text-blue-700 flex items-center gap-2">
-                <PackageSearch className="h-5 w-5" />
-                {language === 'vi' ? 'Thông tin vận chuyển (GHN)' : 'Shipping Information (GHN)'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{language === 'vi' ? 'Đơn vị vận chuyển' : 'Carrier'}</span>
-                <span className="font-medium">Giao Hàng Nhanh (GHN)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{language === 'vi' ? 'Mã vận đơn' : 'Waybill Code'}</span>
-                <span className="font-medium text-blue-700">{(order as any).waybillCode || 'Đang cập nhật...'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>
-                <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
-                  {language === 'vi' ? 'Đang giao hàng' : 'In Transit'}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground italic">
-                {language === 'vi' ? '* Thông tin được cập nhật tự động từ hệ thống GHN' : '* Information updated automatically from GHN system'}
-              </p>
-            </CardContent>
-          </Card>
+        {order.status === 'completed' && (!effectiveListingId) && (
+          <Alert className="border-warning bg-warning/10 text-warning-foreground">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{language === 'vi' ? 'Không tìm thấy ID tin đăng' : 'Listing ID Not Found'}</AlertTitle>
+            <AlertDescription>
+              {language === 'vi' 
+                ? 'Không thể xác định ID tin đăng liên kết với đơn hàng này. Vui lòng liên hệ hỗ trợ.' 
+                : 'Cannot determine the listing ID associated with this order. Please contact support.'}
+            </AlertDescription>
+          </Alert>
         )}
       </div>
+
+      {order.status === 'completed' ? (
+        <Card className="border-success bg-success/5 py-12 flex flex-col items-center text-center">
+          <CheckCircle2 className="h-16 w-16 text-success mb-6" />
+          <h2 className="text-2xl font-bold text-success mb-2">
+            {language === 'vi' ? 'Giao dịch hoàn tất' : 'Transaction Completed'}
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-md px-4">
+            {language === 'vi' 
+              ? 'Đơn hàng đã được thanh toán và giao thành công. Bạn nên rút tin đăng gốc để tránh các yêu cầu mua hàng mới cho xe này.' 
+              : 'Order has been paid and delivered. You should withdraw the original listing to prevent new purchase requests.'}
+          </p>
+          {effectiveListingId ? (
+            <Button size="lg" className="bg-primary hover:bg-primary/90 px-8" asChild>
+              <Link href={`/seller/listings/${effectiveListingId}`}>
+                <EyeOff className="h-4 w-4 mr-2" />
+                {language === 'vi' ? 'Đi tới Tin Đăng để Rút' : 'Go to Listing to Withdraw'}
+              </Link>
+            </Button>
+          ) : (
+            <Alert className="border-warning bg-warning/10 text-warning-foreground max-w-md">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>{language === 'vi' ? 'Không tìm thấy tin đăng' : 'Listing Not Found'}</AlertTitle>
+              <AlertDescription>
+                {language === 'vi' 
+                  ? 'Không thể xác định tin đăng liên kết với đơn hàng này. Vui lòng liên hệ hỗ trợ kỹ thuật.' 
+                  : 'Cannot determine the listing associated with this order. Please contact technical support.'}
+              </AlertDescription>
+            </Alert>
+          )}
+        </Card>
+      ) : (
+        <>
+          {order.status === 'confirmed' && (
+            <Alert className="border-info bg-info/10 text-info-foreground">
+              <PackageSearch className="h-4 w-4" />
+              <AlertTitle>{language === 'vi' ? 'Chở lấy hàng' : 'Waiting for pickup'}</AlertTitle>
+              <AlertDescription>
+                {language === 'vi' ? 'Đơn vị vận chuyển sẽ sớm liên hệ để lấy xe.' : 'Courier will contact you soon for pickup.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>{language === 'vi' ? 'Thông tin Xe Đạp' : 'Bicycle Information'}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'Sản phẩm' : 'Product'}</span>
+                  <span className="font-medium text-right ml-4">{displayTitle}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'Số Serial' : 'Serial No'}</span>
+                  <span className="font-medium">{displaySerialNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'Giá xe' : 'Price'}</span>
+                  <span className="font-medium text-lg">{formatVND(displayPrice)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-bold">
+                  <span>{language === 'vi' ? 'Tổng thu nhập dự kiến' : 'Estimated Earnings'}</span>
+                  <span className="text-success">{formatVND(displayPrice * 0.95)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground text-right mt-1">
+                  {language === 'vi' ? '(Sau khi trừ 5% phí nền tảng)' : '(After 5% platform fee)'}
+                </p>
+              </CardContent>
+              <CardFooter>
+                {effectiveListingId ? (
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link href={`/seller/listings/${effectiveListingId}`}>
+                      {language === 'vi' ? 'Xem tin đăng gốc' : 'View original listing'}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>
+                    {language === 'vi' ? 'Không tìm thấy tin đăng' : 'Listing not found'}
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{language === 'vi' ? 'Thông tin Người Mua' : 'Buyer Information'}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'Họ tên' : 'Name'}</span>
+                  <span className="font-medium">{order.buyer.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'SĐT liên lạc' : 'Phone'}</span>
+                  <span className="font-medium">{order.buyer.phone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{language === 'vi' ? 'Địa chỉ giao hàng' : 'Shipping Address'}</span>
+                  <span className="font-medium text-right max-w-[200px]">{order.buyer.address}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {isShipping && (
+              <Card className="border-blue-200 bg-blue-50/30">
+                <CardHeader>
+                  <CardTitle className="text-blue-700 flex items-center gap-2">
+                    <PackageSearch className="h-5 w-5" />
+                    {language === 'vi' ? 'Thông tin vận chuyển (GHN)' : 'Shipping Information (GHN)'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{language === 'vi' ? 'Đơn vị vận chuyển' : 'Carrier'}</span>
+                    <span className="font-medium">Giao Hàng Nhanh (GHN)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{language === 'vi' ? 'Mã vận đơn' : 'Waybill Code'}</span>
+                    <span className="font-medium text-blue-700">{(order as any).waybillCode || 'Đang cập nhật...'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                      {language === 'vi' ? 'Đang giao hàng' : 'In Transit'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">
+                    {language === 'vi' ? '* Thông tin được cập nhật tự động từ hệ thống GHN' : '* Information updated automatically from GHN system'}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Cancel Confirmation Dialog */}
       <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>

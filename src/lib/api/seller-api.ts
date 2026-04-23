@@ -51,12 +51,14 @@ export interface SellerListingPage {
 
 export interface SellerOrder {
   orderId: string;
+  /** ID của tin đăng (listing) liên kết với đơn hàng — trả về từ backend */
   listingId?: string;
   listing?: {
     id: string;
     title: string;
     price: number;
     images: string[];
+    serialNumber?: string;
   };
   buyer?: {
     id: string;
@@ -66,13 +68,19 @@ export interface SellerOrder {
     address?: string;
   };
   bikeName?: string;
+  serialNumber?: string;
   buyerName?: string;
   buyerPhone?: string;
   receiverAddress?: string;
   status:
     | 'Pending'
+    | 'Paid'
     | 'Confirmed'
     | 'Locked'
+    | 'Shipping'
+    | 'Delivered'
+    | 'Completed'
+    | 'Cancelled'
     | 'pending_seller_confirm'
     | 'seller_confirmed'
     | 'pending_inspection'
@@ -87,6 +95,10 @@ export interface SellerOrder {
   totalAmount?: number;
   totalPrice?: number;
   price?: number;
+  isPaidOut?: boolean;
+  isDelivered?: boolean;
+  paidOutAt?: string | null;
+  payoutAmount?: number;
   createdAt: string;
   updatedAt?: string;
 }

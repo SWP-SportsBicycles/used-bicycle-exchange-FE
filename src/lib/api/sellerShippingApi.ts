@@ -6,6 +6,9 @@ export interface SellerShippingProfileRequest {
   senderAddress: string
   fromDistrictId: number
   fromWardCode: string
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountName?: string
 }
 
 export interface SellerShippingProfileResponse {
@@ -18,6 +21,9 @@ export interface SellerShippingProfileResponse {
   fromDistrictName?: string
   fromProvinceName?: string
   isDefault?: boolean
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountName?: string
 }
 
 export type SellerShippingProfileDraft = Partial<SellerShippingProfileResponse>
@@ -52,6 +58,9 @@ function toDraftProfile(payload: unknown): SellerShippingProfileDraft {
     fromDistrictName: typeof source.fromDistrictName === "string" ? source.fromDistrictName : undefined,
     fromProvinceName: typeof source.fromProvinceName === "string" ? source.fromProvinceName : undefined,
     isDefault: typeof source.isDefault === "boolean" ? source.isDefault : undefined,
+    bankName: typeof source.bankName === "string" ? source.bankName : undefined,
+    bankAccountNumber: typeof source.bankAccountNumber === "string" ? source.bankAccountNumber : undefined,
+    bankAccountName: typeof source.bankAccountName === "string" ? source.bankAccountName : undefined,
   };
 }
 

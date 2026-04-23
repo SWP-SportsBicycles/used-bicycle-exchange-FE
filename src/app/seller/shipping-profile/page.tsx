@@ -22,6 +22,9 @@ type ShippingProfileForm = {
   fromWardName: string
   fromDistrictName: string
   fromProvinceName: string
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountName?: string
 }
 
 const EMPTY_FORM: ShippingProfileForm = {
@@ -33,6 +36,9 @@ const EMPTY_FORM: ShippingProfileForm = {
   fromWardName: '',
   fromDistrictName: '',
   fromProvinceName: '',
+  bankName: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
 }
 
 function isNotFoundError(error: unknown) {
@@ -84,6 +90,9 @@ export default function SellerShippingProfilePage() {
           fromWardName: profile.fromWardName ?? '',
           fromDistrictName: profile.fromDistrictName ?? '',
           fromProvinceName: profile.fromProvinceName ?? '',
+          bankName: profile.bankName ?? '',
+          bankAccountNumber: profile.bankAccountNumber ?? '',
+          bankAccountName: profile.bankAccountName ?? '',
         })
       } catch (error) {
         if (!active) return
@@ -182,8 +191,8 @@ export default function SellerShippingProfilePage() {
       return
     }
 
-    if (!form.senderName || !form.senderPhone || !form.senderAddress || !form.fromWardCode || !selectedProvinceId) {
-      setErrorMessage(language === 'vi' ? 'Vui lòng nhập đầy đủ thông tin bắt buộc' : 'Please complete all required fields')
+    if (!form.senderName || !form.senderPhone || !form.senderAddress || !form.fromWardCode || !selectedProvinceId || !form.bankName || !form.bankAccountNumber || !form.bankAccountName) {
+      setErrorMessage(language === 'vi' ? 'Vui lòng nhập đầy đủ thông tin bắt buộc, bao gồm cả thông tin ngân hàng' : 'Please complete all required fields, including bank information')
       return
     }
 
@@ -195,6 +204,9 @@ export default function SellerShippingProfilePage() {
         senderAddress: form.senderAddress.trim(),
         fromDistrictId: districtId,
         fromWardCode: form.fromWardCode.trim(),
+        bankName: form.bankName?.trim(),
+        bankAccountNumber: form.bankAccountNumber?.trim(),
+        bankAccountName: form.bankAccountName?.trim(),
       })
       setSuccessMessage(language === 'vi' ? 'Cập nhật địa chỉ gửi hàng thành công' : 'Shipping profile updated successfully')
       router.push(redirectTarget)
@@ -211,12 +223,12 @@ export default function SellerShippingProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPinHouse className="h-5 w-5" />
-            {language === 'vi' ? 'Cập nhật địa chỉ lấy hàng' : 'Update pickup address'}
+            {language === 'vi' ? 'Cập nhật thông tin người bán' : 'Update seller information'}
           </CardTitle>
           <CardDescription>
             {language === 'vi'
-              ? 'Thông tin này dùng để shipper đến lấy hàng và hệ thống tính phí vận chuyển.'
-              : 'This information is used for shipment pickup and shipping fee estimation.'}
+              ? 'Cập nhật thông tin địa chỉ và tài khoản ngân hàng để nhận thanh toán và giao hàng.'
+              : 'Update address and bank information for payment and shipping.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -302,9 +314,50 @@ export default function SellerShippingProfilePage() {
                 </div>
               </div>
 
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-lg font-medium">
+                  {language === 'vi' ? 'Thông tin ngân hàng' : 'Bank Information'}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'vi' 
+                    ? 'Thông tin tài khoản ngân hàng để nhận thanh toán khi bán xe.' 
+                    : 'Bank account information to receive payments when selling bicycles.'}
+                </p>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">{language === 'vi' ? 'Ngân hàng *' : 'Bank *'}</Label>
+                  <Input 
+                    id="bankName" 
+                    value={form.bankName || ''} 
+                    onChange={(e) => updateField('bankName', e.target.value)}
+                    placeholder={language === 'vi' ? 'VD: Vietcombank' : 'E.g., Vietcombank'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountNumber">{language === 'vi' ? 'Số tài khoản *' : 'Account Number *'}</Label>
+                  <Input 
+                    id="bankAccountNumber" 
+                    value={form.bankAccountNumber || ''} 
+                    onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                    placeholder={language === 'vi' ? 'VD: 1234567890' : 'E.g., 1234567890'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountName">{language === 'vi' ? 'Tên chủ tài khoản *' : 'Account Holder Name *'}</Label>
+                  <Input 
+                    id="bankAccountName" 
+                    value={form.bankAccountName || ''} 
+                    onChange={(e) => updateField('bankAccountName', e.target.value)}
+                    placeholder={language === 'vi' ? 'VD: Nguyễn Văn A' : 'E.g., John Doe'}
+                  />
+                </div>
+              </div>
+
               <Button type="submit" className="w-full sm:w-auto" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {language === 'vi' ? 'Lưu địa chỉ gửi hàng' : 'Save shipping profile'}
+                {language === 'vi' ? 'Lưu thông tin' : 'Save Information'}
               </Button>
             </form>
           )}
