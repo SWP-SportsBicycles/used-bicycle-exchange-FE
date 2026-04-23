@@ -9,7 +9,7 @@ import { signInWithPopup } from 'firebase/auth'
 import { auth, canUseFirebaseAuth, googleProvider } from '@/lib/firebase'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 import { authApi } from '@/lib/api/auth-api'
 import type { AuthSession } from '@/lib/api/auth-api'
 import { useAuth } from '@/lib/auth-context'
@@ -66,6 +66,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const [pendingGoogleIdToken, setPendingGoogleIdToken] = useState<string | null>(null)
   const [pendingGoogleIntent, setPendingGoogleIntent] = useState<GoogleIntent | null>(null)
   const [pendingGoogleRole, setPendingGoogleRole] = useState<'2' | '3'>('2')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false)
 
   const defaultEmail = useMemo(() => searchParams.get('email') ?? '', [searchParams])
   const redirectTarget = useMemo(() => searchParams.get('redirect') ?? '/', [searchParams])
@@ -297,10 +299,25 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       const result = await signInWithPopup(auth, googleProvider)
       const idToken = await result.user.getIdToken()
 
-      setPendingGoogleIdToken(idToken)
-      setPendingGoogleIntent(target)
-      // Backend: BUYER=2, SELLER=3
-      setPendingGoogleRole(target === 'register' && registerRole === '3' ? '3' : '2')
+      if (target === 'login') {
+        // Try First, Ask Later: gọi API ngay với role mặc định.
+        // Nếu tài khoản đã tồn tại, backend trả về session có role đúng
+        // và loginWithSession/refreshMe sẽ lấy role thực từ /me → redirect thẳng.
+        // Nếu tài khoản chưa tồn tại (API lỗi) → hiện UI chọn role.
+        const success = await submitGoogleSession(idToken, 2, 'login')
+        if (!success) {
+          // Tài khoản chưa đăng ký – xoá lỗi API rồi cho user chọn role
+          setLoginErrorMessage(null)
+          setPendingGoogleIdToken(idToken)
+          setPendingGoogleIntent('login')
+          setPendingGoogleRole('2')
+        }
+      } else {
+        // Register flow: luôn hỏi role trước khi gọi API
+        setPendingGoogleIdToken(idToken)
+        setPendingGoogleIntent('register')
+        setPendingGoogleRole(registerRole === '3' ? '3' : '2')
+      }
     } catch (err) {
       const message = language === 'vi' ? 'Không thể mở cửa sổ đăng nhập Google' : 'Unable to open Google sign-in'
       if (target === 'login') {
@@ -426,7 +443,29 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                               <FormItem>
                                 <FormLabel>{language === 'vi' ? 'Mật khẩu' : 'Password'}</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="••••••••" type="password" autoComplete="current-password" {...field} />
+                                  <div className="relative">
+                                    <Input
+                                      placeholder="••••••••"
+                                      type={showLoginPassword ? 'text' : 'password'}
+                                      autoComplete="current-password"
+                                      className={cn(!field.value && 'placeholder:text-foreground/30')}
+                                      {...field}
+                                    />
+                                    <button
+                                      type="button"
+                                      aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors select-none"
+                                      onMouseDown={() => setShowLoginPassword(true)}
+                                      onMouseUp={() => setShowLoginPassword(false)}
+                                      onMouseLeave={() => setShowLoginPassword(false)}
+                                      onTouchStart={() => setShowLoginPassword(true)}
+                                      onTouchEnd={() => setShowLoginPassword(false)}
+                                    >
+                                      {showLoginPassword
+                                        ? <EyeOff className="h-4 w-4" />
+                                        : <Eye className="h-4 w-4" />}
+                                    </button>
+                                  </div>
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -477,7 +516,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                           {pendingGoogleIdToken && pendingGoogleIntent === 'login' && (
                             <div className="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
                               <p className="text-sm font-medium text-foreground">
-                                {language === 'vi' ? 'Chọn vai trò để hoàn tất đăng nhập Google' : 'Choose role to finish Google sign-in'}
+                                {language === 'vi'
+                                  ? 'Tài khoản Google chưa được đăng ký. Chọn vai trò để tạo tài khoản mới.'
+                                  : 'Google account not registered yet. Choose a role to create your account.'}
                               </p>
                               <Select value={pendingGoogleRole} onValueChange={(value) => setPendingGoogleRole(value as '2' | '3')}>
                                 <SelectTrigger>
@@ -595,7 +636,29 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                         <FormItem>
                           <FormLabel>{language === 'vi' ? 'Mật khẩu' : 'Password'}</FormLabel>
                           <FormControl>
-                            <Input placeholder="••••••••" type="password" autoComplete="new-password" {...field} />
+                            <div className="relative">
+                              <Input
+                                placeholder="••••••••"
+                                type={showRegisterPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                className={cn(!field.value && 'placeholder:text-foreground/30')}
+                                {...field}
+                              />
+                              <button
+                                type="button"
+                                aria-label={showRegisterPassword ? 'Hide password' : 'Show password'}
+                                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors select-none"
+                                onMouseDown={() => setShowRegisterPassword(true)}
+                                onMouseUp={() => setShowRegisterPassword(false)}
+                                onMouseLeave={() => setShowRegisterPassword(false)}
+                                onTouchStart={() => setShowRegisterPassword(true)}
+                                onTouchEnd={() => setShowRegisterPassword(false)}
+                              >
+                                {showRegisterPassword
+                                  ? <EyeOff className="h-4 w-4" />
+                                  : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>

@@ -14,10 +14,10 @@ export interface Listing {
   condition: 'like_new' | 'excellent' | 'good' | 'fair'
   usageHistory?: string
   serial: string
-  city: 'hanoi' | 'hcm' | 'danang'
+  city: string
   images: string[]
   videoUrl?: string
-  status: 'draft' | 'pending_review' | 'published' | 'reserved' | 'sold' | 'withdrawn'
+  status: 'draft' | 'pending_review' | 'published' | 'sold' | 'withdrawn'
   isVeloSafeVerified: boolean
   seller: Seller
   inspection?: Inspection
@@ -95,9 +95,9 @@ export const CONDITIONS = [
 ]
 
 export const CITIES = [
-  { value: 'hanoi', label: 'Hà Nội' },
-  { value: 'hcm', label: 'TP. Hồ Chí Minh' },
-  { value: 'danang', label: 'Đà Nẵng' },
+  { value: 'Hà Nội', label: 'Hà Nội' },
+  { value: 'TP.HCM', label: 'TP. Hồ Chí Minh' },
+  { value: 'Đà Nẵng', label: 'Đà Nẵng' },
 ]
 
 export const CATEGORIES = [
@@ -124,7 +124,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'excellent',
     usageHistory: '3000km trong 18 tháng, chủ yếu đi weekend',
     serial: 'GNT2023TCR001234',
-    city: 'hanoi',
+    city: 'Hà Nội',
     images: [
       'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80',
       'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=800&q=80',
@@ -172,7 +172,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'good',
     usageHistory: '5000km, đi tour Tây Bắc 2 lần',
     serial: 'TRK2022DOM005678',
-    city: 'hcm',
+    city: 'TP.HCM',
     images: [
       'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=800&q=80',
       'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=800&q=80',
@@ -219,7 +219,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'like_new',
     usageHistory: '1500km, chỉ đi race và training',
     serial: 'SPZ2023TAR009012',
-    city: 'danang',
+    city: 'Đà Nẵng',
     images: [
       'https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?w=800&q=80',
       'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800&q=80',
@@ -266,7 +266,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'good',
     usageHistory: '2 năm sử dụng, đi trail hàng tuần',
     serial: 'SCT2022SPK003456',
-    city: 'hanoi',
+    city: 'Hà Nội',
     images: [
       'https://images.unsplash.com/photo-1544191696-102dbdaeeaa0?w=800&q=80',
       'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
@@ -298,7 +298,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'excellent',
     usageHistory: '2000km, đi gravel events',
     serial: 'CYN2023GRL007890',
-    city: 'hcm',
+    city: 'TP.HCM',
     images: [
       'https://images.unsplash.com/photo-1511994298241-608e28f14fde?w=800&q=80',
       'https://images.unsplash.com/photo-1505705694340-019e1e335916?w=800&q=80',
@@ -345,7 +345,7 @@ export const MOCK_LISTINGS: Listing[] = [
     condition: 'good',
     usageHistory: '4000km, tập luyện hàng ngày',
     serial: 'MRD2022SCL001122',
-    city: 'danang',
+    city: 'Đà Nẵng',
     images: [
       'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=800&q=80',
     ],
@@ -414,7 +414,6 @@ export interface SellerOrder {
   totalAmount: number
   status:
     | 'pending_deposit'
-    | 'soft_reserved'
     | 'inspection_scheduled'
     | 'inspection_completed'
     | 'pending_payment'
@@ -666,23 +665,23 @@ export const MOCK_ANALYTICS = {
   veloSafeInspections: 78,
   disputeRate: 2.3,
   citiesBreakdown: {
-    hanoi: { listings: 67, transactions: 98 },
-    hcm: { listings: 54, transactions: 112 },
-    danang: { listings: 35, transactions: 24 },
+    'Hà Nội': { listings: 67, transactions: 98 },
+    'TP.HCM': { listings: 54, transactions: 112 },
+    'Đà Nẵng': { listings: 35, transactions: 24 },
   },
 }
 
 // Order status labels
 export const ORDER_STATUS_LABELS = {
   pending_deposit: { vi: 'Chờ Đặt Cọc', en: 'Pending Deposit' },
-  soft_reserved: { vi: 'Đã Soft Reserve', en: 'Soft Reserved' },
-  inspection_scheduled: { vi: 'Đã Lên Lịch Kiểm Định', en: 'Inspection Scheduled' },
-  inspection_completed: { vi: 'Kiểm Định Hoàn Tất', en: 'Inspection Completed' },
-  pending_payment: { vi: 'Chờ Thanh Toán', en: 'Pending Payment' },
+  pending: { vi: 'Chờ Xử Lý', en: 'Pending' },
+  paid: { vi: 'Chờ Xác Nhận', en: 'Pending Confirmation' },
+  confirmed: { vi: 'Đã Xác Nhận', en: 'Confirmed' },
+  shipping: { vi: 'Đang Giao Hàng', en: 'Shipping' },
   delivered: { vi: 'Đã Giao Hàng', en: 'Delivered' },
-  pending_confirmation: { vi: 'Chờ Xác Nhận', en: 'Pending Confirmation' },
   completed: { vi: 'Hoàn Thành', en: 'Completed' },
   cancelled: { vi: 'Đã Hủy', en: 'Cancelled' },
+  locked: { vi: 'Đã Khóa', en: 'Locked' },
   disputed: { vi: 'Đang Tranh Chấp', en: 'In Dispute' },
 }
 

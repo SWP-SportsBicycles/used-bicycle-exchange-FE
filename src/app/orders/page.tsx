@@ -234,7 +234,7 @@ export default function OrdersPage() {
                           className={cn('gap-1.5', statusColors[effectiveStatus])}
                         >
                           <StatusIcon className="h-3 w-3" />
-                          {ORDER_STATUS_LABELS[effectiveStatus][language]}
+                          {(ORDER_STATUS_LABELS as Record<string, { vi: string; en: string }>)[effectiveStatus]?.[language] || effectiveStatus.replace(/_/g, ' ')}
                         </Badge>
                         {order.status === 'pending_confirmation' && effectiveStatus === 'completed' && (
                           <Badge variant="outline" className="ml-2 text-xs border-emerald-500/40 text-emerald-600">

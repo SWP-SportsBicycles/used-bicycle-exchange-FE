@@ -1,10 +1,10 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useCreateListing, useSubmitListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,11 +26,147 @@ const steps = [
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
 
-export default function SellerCreateListingScreen() {
+interface SellerUpdateListingScreenProps {
+  listingId: string
+  initialData: Record<string, unknown>
+}
+
+type MediaSeed = {
+  imageUrls: string[]
+  videoUrl: string | null
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  return value as Record<string, unknown>
+}
+
+function collectNestedRecords(root: unknown, maxDepth = 4): Record<string, unknown>[] {
+  const records: Record<string, unknown>[] = []
+  const visited = new WeakSet<object>()
+
+  const walk = (node: unknown, depth: number) => {
+    if (!node || depth > maxDepth) return
+
+    if (Array.isArray(node)) {
+      node.forEach((entry) => walk(entry, depth + 1))
+      return
+    }
+
+    const record = toRecord(node)
+    if (!record) return
+    if (visited.has(record)) return
+
+    visited.add(record)
+    records.push(record)
+
+    Object.values(record).forEach((entry) => walk(entry, depth + 1))
+  }
+
+  walk(root, 0)
+  return records
+}
+
+function getValueByKey(source: Record<string, unknown>, key: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(source, key)) {
+    return source[key]
+  }
+
+  const lowered = key.toLowerCase()
+  const matched = Object.keys(source).find((candidate) => candidate.toLowerCase() === lowered)
+  return matched ? source[matched] : undefined
+}
+
+function pickString(records: Record<string, unknown>[], keys: string[]): string {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = getValueByKey(record, key)
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value
+      }
+    }
+  }
+  return ''
+}
+
+function isVideoUrl(url: string): boolean {
+  const normalized = url.toLowerCase()
+  return (
+    normalized.includes('/video/upload/') ||
+    normalized.endsWith('.mp4') ||
+    normalized.endsWith('.webm') ||
+    normalized.endsWith('.ogg') ||
+    normalized.endsWith('.mov') ||
+    normalized.startsWith('data:video/')
+  )
+}
+
+function extractMediaSeed(initialData: unknown): MediaSeed {
+  const records = collectNestedRecords(initialData)
+  const mediaKeys = ['mediaFiles', 'medias', 'media', 'images']
+  const entries: unknown[] = []
+
+  for (const record of records) {
+    for (const key of mediaKeys) {
+      const value = getValueByKey(record, key)
+      if (Array.isArray(value)) {
+        entries.push(...value)
+      }
+    }
+  }
+
+  const imageUrls: string[] = []
+  const videoUrls: string[] = []
+
+  entries.forEach((entry) => {
+    if (typeof entry === 'string') {
+      if (isVideoUrl(entry)) {
+        videoUrls.push(entry)
+      } else {
+        imageUrls.push(entry)
+      }
+      return
+    }
+
+    const mediaRecord = toRecord(entry)
+    if (!mediaRecord) return
+
+    const url = pickString([mediaRecord], ['url', 'image', 'videoUrl', 'path', 'thumbnail'])
+    if (!url) return
+
+    const typeHint = pickString([mediaRecord], ['type', 'mediaType', 'resourceType', 'mimeType']).toLowerCase()
+    if (typeHint.includes('video') || typeHint === '1' || isVideoUrl(url)) {
+      videoUrls.push(url)
+    } else {
+      imageUrls.push(url)
+    }
+  })
+
+  const thumbnail = pickString(records, ['thumbnail'])
+  if (thumbnail && !isVideoUrl(thumbnail)) {
+    imageUrls.unshift(thumbnail)
+  }
+
+  const dedupImages = Array.from(new Set(imageUrls))
+  const dedupVideos = Array.from(new Set(videoUrls))
+
+  return {
+    imageUrls: dedupImages,
+    videoUrl: dedupVideos[0] ?? null,
+  }
+}
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v != null ? String(v) : ''
+}
+
+export default function SellerUpdateListingScreen({ listingId, initialData }: SellerUpdateListingScreenProps) {
   const { language } = useLanguage()
-  const createListingMutation = useCreateListing()
-  const submitListingMutation = useSubmitListing()
+  const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
+  const mediaSeed = useMemo(() => extractMediaSeed(initialData), [initialData])
   
   const [currentStep, setCurrentStep] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -38,33 +174,34 @@ export default function SellerCreateListingScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [formData, setFormData] = useState({
-    title: '',
-    category: '',
-    brand: '',
-    model: '',
-    condition: '',
-    description: '',
-    frameSize: '',
-    frameMaterial: '',
-    groupset: '',
-    wheelSize: '',
-    usageHistory: '',
-    serial: '',
-    city: '',
-    price: '',
-    paint: '',
-    brakeType: '',
-    overall: '',
+    title: str(initialData?.title),
+    category: str(initialData?.category),
+    brand: str(initialData?.brand),
+    model: str(initialData?.model),
+    condition: str(initialData?.condition),
+    description: str(initialData?.description),
+    frameSize: str(initialData?.frameSize),
+    frameMaterial: str(initialData?.frameMaterial),
+    groupset: str(initialData?.groupset),
+    wheelSize: str(initialData?.wheelSize) || str(initialData?.tireRim),
+    usageHistory: str(initialData?.usageHistory) || str(initialData?.operating),
+    serial: str(initialData?.serialNumber) || str(initialData?.serial),
+    city: str(initialData?.city),
+    price: str(initialData?.price),
+    paint: str(initialData?.paint),
+    brakeType: str(initialData?.brakeType),
+    overall: str(initialData?.overall),
   })
 
   // State for files
   const [images, setImages] = useState<File[]>([])
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>(mediaSeed.imageUrls)
   const [video, setVideo] = useState<File | null>(null)
   const [groupsetPhoto, setGroupsetPhoto] = useState<File | null>(null)
 
   // Object URLs for preview
   const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(mediaSeed.videoUrl)
   const [groupsetPhotoUrl, setGroupsetPhotoUrl] = useState<string | null>(null)
 
   // File input refs
@@ -75,11 +212,15 @@ export default function SellerCreateListingScreen() {
   // Clean up object URLs on unmount
   useEffect(() => {
     return () => {
-      imageUrls.forEach(URL.revokeObjectURL)
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
-      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
+      imageUrls
+        .filter((url) => url.startsWith('blob:'))
+        .forEach(URL.revokeObjectURL)
+      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
+      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
     }
   }, [imageUrls, videoUrl, groupsetPhotoUrl])
+
+  const displayImageUrls = [...existingImageUrls, ...imageUrls]
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -93,18 +234,22 @@ export default function SellerCreateListingScreen() {
     if (files.length === 0) return
 
     if (type === 'images') {
-      const newImages = [...images, ...files].slice(0, 10 - images.length)
+      const remainingSlots = Math.max(0, 10 - displayImageUrls.length)
+      const accepted = files.slice(0, remainingSlots)
+      if (accepted.length === 0) return
+
+      const newImages = [...images, ...accepted]
       setImages(newImages)
-      setImageUrls(newImages.map(file => URL.createObjectURL(file)))
+      setImageUrls((prev) => [...prev, ...accepted.map((file) => URL.createObjectURL(file))])
     } else if (type === 'video') {
       const file = files[0]
       setVideo(file)
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
       setVideoUrl(URL.createObjectURL(file))
     } else if (type === 'groupset') {
       const file = files[0]
       setGroupsetPhoto(file)
-      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
+      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
       setGroupsetPhotoUrl(URL.createObjectURL(file))
     }
     
@@ -113,11 +258,19 @@ export default function SellerCreateListingScreen() {
   }
 
   const removeImage = (index: number) => {
-    const newImages = images.filter((_, i) => i !== index)
-    const newUrls = imageUrls.filter((_, i) => i !== index)
-    URL.revokeObjectURL(imageUrls[index])
-    setImages(newImages)
-    setImageUrls(newUrls)
+    if (index < existingImageUrls.length) {
+      setExistingImageUrls((prev) => prev.filter((_, i) => i !== index))
+      return
+    }
+
+    const localIndex = index - existingImageUrls.length
+    const targetUrl = imageUrls[localIndex]
+    if (targetUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(targetUrl)
+    }
+
+    setImages((prev) => prev.filter((_, i) => i !== localIndex))
+    setImageUrls((prev) => prev.filter((_, i) => i !== localIndex))
   }
 
   const nextStep = () => {
@@ -145,7 +298,7 @@ export default function SellerCreateListingScreen() {
       return
     }
 
-    if (images.length === 0) {
+    if (displayImageUrls.length === 0) {
       setSubmitError(language === 'vi' ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.')
       return
     }
@@ -174,34 +327,26 @@ export default function SellerCreateListingScreen() {
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      const createRes = await createListingMutation.mutateAsync(payload)
-      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
-      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
-      const rawId = nested.id ?? nested.listingId
-      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
-      
-      if (!listingId) {
-        throw new Error('Failed to retrieve listingId from response')
-      }
+      // 1. Update listing
+      await updateListingMutation.mutateAsync({
+        listingId,
+        data: payload
+      })
 
-      // 2. Upload media
-      const allMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
-      if (allMediaFiles.length > 0) {
-        await uploadMediaMutation.mutateAsync({ listingId, files: allMediaFiles })
+      const newMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
+      if (newMediaFiles.length > 0) {
+        await uploadMediaMutation.mutateAsync({ listingId, files: newMediaFiles })
       }
-
-      // 3. Gửi duyệt (submit)
-      await submitListingMutation.mutateAsync(listingId)
 
       setSubmitSuccess(
         language === 'vi'
-          ? 'Đã gửi tin đăng lên hệ thống, vui lòng chờ admin duyệt.'
-          : 'Listing submitted successfully and is awaiting admin review.'
+          ? 'Cập nhật tin đăng thành công!'
+          : 'Listing updated successfully!'
       )
       
-      // Reset form on success
+      // Navigate back after success
       setTimeout(() => {
-        window.location.href = '/seller/listings'
+        window.location.href = `/seller/listings/${listingId}`
       }, 2000)
 
     } catch (error) {
@@ -209,8 +354,8 @@ export default function SellerCreateListingScreen() {
         error instanceof Error
           ? error.message
           : language === 'vi'
-            ? 'Không thể gửi tin lúc này. Vui lòng thử lại.'
-            : 'Unable to submit listing right now. Please try again.'
+            ? 'Không thể cập nhật tin lúc này. Vui lòng thử lại.'
+            : 'Unable to update listing right now. Please try again.'
       )
     } finally {
       setIsSubmitting(false)
@@ -221,10 +366,10 @@ export default function SellerCreateListingScreen() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">
-          {language === 'vi' ? 'Tạo Tin Đăng Mới' : 'Create New Listing'}
+          {language === 'vi' ? 'Cập Nhật Tin Đăng' : 'Update Listing'}
         </h1>
         <p className="text-muted-foreground">
-          {language === 'vi' ? 'Điền thông tin chi tiết về xe đạp của bạn' : 'Fill in the details about your bicycle'}
+          {language === 'vi' ? 'Chỉnh sửa thông tin xe đạp của bạn' : 'Edit details for your bicycle'}
         </p>
       </div>
 
@@ -587,24 +732,30 @@ export default function SellerCreateListingScreen() {
                   />
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {imageUrls.map((url, index) => (
+                    {displayImageUrls.map((url, index) => (
                       <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
                         <Image src={url} alt={`Bike ${index + 1}`} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6"
-                          onClick={() => removeImage(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {index < existingImageUrls.length ? (
+                          <Badge className="absolute top-2 right-2 bg-emerald-600 text-white">
+                            {language === 'vi' ? 'Đang giữ' : 'Kept'}
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2 h-6 w-6"
+                            onClick={() => removeImage(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                         {index === 0 && (
                           <Badge className="absolute bottom-2 left-2">{language === 'vi' ? 'Ảnh chính' : 'Main'}</Badge>
                         )}
                       </div>
                     ))}
 
-                    {images.length < 10 && (
+                    {displayImageUrls.length < 10 && (
                       <button
                         type="button"
                         onClick={() => imagesInputRef.current?.click()}
@@ -630,9 +781,15 @@ export default function SellerCreateListingScreen() {
                   {videoUrl ? (
                     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
                       <video src={videoUrl} controls className="w-full h-full object-contain" />
-                      <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => { setVideo(null); setVideoUrl(null); }}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                      {video ? (
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => { setVideo(null); if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl); setVideoUrl(mediaSeed.videoUrl); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Badge className="absolute top-2 right-2 bg-emerald-600 text-white">
+                          {language === 'vi' ? 'Đang giữ' : 'Kept'}
+                        </Badge>
+                      )}
                     </div>
                   ) : (
                     <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-[21/9] sm:aspect-[21/6] rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
@@ -714,7 +871,7 @@ export default function SellerCreateListingScreen() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{language === 'vi' ? 'Files đính kèm' : 'Attachments'}</span>
-                      <span className="font-medium">{[...images, video, groupsetPhoto].filter(Boolean).length}</span>
+                      <span className="font-medium">{displayImageUrls.length + (videoUrl ? 1 : 0) + (groupsetPhotoUrl ? 1 : 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{language === 'vi' ? 'Thành phố' : 'City'}</span>
@@ -723,15 +880,19 @@ export default function SellerCreateListingScreen() {
                   </CardContent>
                 </Card>
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium text-primary">{language === 'vi' ? 'Lưu ý quan trọng' : 'Important Notice'}</p>
-                    <p className="text-muted-foreground mt-1">
-                      {language === 'vi'
-                        ? 'Tin đăng của bạn sẽ được gửi tới Admin để duyệt trước khi xuất bản.'
-                        : 'Your listing will be reviewed by an Admin before being published.'}
-                    </p>
+                <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border mb-6">
+                  <div className="flex gap-3">
+                    <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-sm">
+                        {language === 'vi' ? 'Lưu ý khi cập nhật' : 'Update Note'}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {language === 'vi'
+                          ? 'Cập nhật tin sẽ thay đổi các thông tin hiển thị ngay lập tức (nếu là nháp).'
+                          : 'Updating listing will change details immediately (if draft).'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

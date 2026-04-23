@@ -41,7 +41,7 @@ export interface BuyerListing {
   isVeloSafeVerified: boolean;
   isLocked: boolean;
   serial: string;
-  status: "draft" | "pending_review" | "published" | "reserved" | "sold" | "withdrawn";
+  status: "draft" | "pending_review" | "published" | "sold" | "withdrawn";
   seller: {
     id: string;
     name: string;
