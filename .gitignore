@@ -31,3 +31,5 @@ pnpm-debug.log*
 dist/
 out/
 build/
+
+next-env.d.ts
