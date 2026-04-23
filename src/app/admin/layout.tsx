@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   ClipboardList,
+  ReceiptText,
   AlertOctagon,
   UserPlus,
   ChevronRight,
@@ -50,6 +51,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       label: { vi: "Duyệt Tin Đăng", en: "Listing Approval" },
       badge: pendingApprovalsCount,
       badgeTone: "alert",
+    },
+    {
+      href: "/admin/order",
+      icon: ReceiptText,
+      label: { vi: "Kiểm Duyệt Đơn Hàng", en: "Order Review" },
     },
     {
       href: "/admin/disputes",

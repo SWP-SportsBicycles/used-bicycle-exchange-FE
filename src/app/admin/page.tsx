@@ -213,12 +213,19 @@ export default function AdminDashboardPage() {
                   {pendingApprovals.length} {language === 'vi' ? 'tin đăng chờ xét duyệt' : 'listings awaiting review'}
                 </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/admin/approvals" className="gap-1">
-                  {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin/approvals" className="gap-1">
+                    {language === 'vi' ? 'Xem tất cả' : 'View all'}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/admin/order" className="gap-1">
+                    {language === 'vi' ? 'Kiểm duyệt đơn hàng' : 'Order review'}
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
