@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 const PROTECTED_PATHS = ['/buyer', '/seller', '/inspector', '/admin']
-const AUTHENTICATED_PATHS = ['/orders', '/wishlist', '/profile']
-const BUYER_ONLY_PATHS = ['/orders', '/wishlist']
+const AUTHENTICATED_PATHS = ['/orders', '/wishlist', '/cart', '/profile']
+const BUYER_ONLY_PATHS = ['/orders', '/wishlist', '/cart']
 const AUTH_PATHS = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password', '/auth/reset-password']
 
 const ROLE_PREFIX: Record<string, string> = {
@@ -69,6 +69,7 @@ export const config = {
     '/admin/:path*',
     '/orders/:path*',
     '/wishlist/:path*',
+    '/cart/:path*',
     '/profile/:path*',
     '/auth/:path*',
   ],

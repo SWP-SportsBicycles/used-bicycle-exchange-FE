@@ -10,6 +10,7 @@ export const translations = {
   'nav.marketplace': { vi: 'Sàn xe đạp', en: 'Marketplace' },
   'nav.howItWorks': { vi: 'Cách Hoạt Động', en: 'How It Works' },
   'nav.wishlist': { vi: 'Yêu Thích', en: 'Wishlist' },
+  'nav.cart': { vi: 'Giỏ Hàng', en: 'Cart' },
   'nav.login': { vi: 'Đăng Nhập', en: 'Login' },
   'nav.register': { vi: 'Đăng Ký', en: 'Register' },
   'nav.postListing': { vi: 'Đăng Tin', en: 'Post Listing' },

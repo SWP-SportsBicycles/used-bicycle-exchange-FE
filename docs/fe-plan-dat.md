@@ -40,9 +40,9 @@
 | # | Công việc | Kết quả đầu ra | Ước tính | Phụ thuộc |
 |---|-----------|----------------|----------|-----------|
 | D7 | Listing Detail Page (PDP) | Gallery ảnh, specs table, **Giá niêm yết hiển thị**, seller info **PII ẨN** (chỉ quận/huyện), nút "Mua ngay", nút "Thêm Wishlist" | 4h | D3 |
-| D8 | **Checkout — Bước 1: Review & Địa chỉ** | Sau khi bấm "Mua ngay" → Backend khóa listing 5 phút. Render **Timer đếm ngược 5:00**. Form nhập: `receiverName`, `receiverPhone`, `receiverAddress`. Dropdown Tỉnh/Quận/Phường load **trực tiếp từ GHN Open API** (`https://online-gateway.ghn.vn/shiip/public-api/master-data/`). | 5h | D3 |
-| D9 | **Checkout — Bước 2: Xác nhận & PayOS QR** | Sau khi điền xong address → gọi BE nhận lại `payos_qr_url` + `shippingFee`. Hiển thị: Giá niêm yết + Phí ship = **Tổng thanh toán**. Render QR Code PayOS (iframe hoặc image). Timer vẫn đếm ngược. Lắng nghe BE (Polling mỗi 3s hoặc WebSocket) biết thanh toán thành công → redirect Order Detail. | 5h | D8 |
-| D10 | **Checkout — Timeout & Hủy** | Nếu Timer hết 5:00 mà chưa thanh toán → hiển thị modal "Hết thời gian, đơn hàng đã hủy" → redirect Marketplace. Nút "Hủy đơn" (trước khi quét QR) → xả lock listing, quay về PDP. | 2h | D9 |
+| D8 | **Checkout — Bước 1: Khởi tạo & Địa chỉ** | Khi bấm "Mua ngay" → **FE gọi ngầm API `POST /api/buyer-cart/add`** và redirect sang trang Checkout. Form nhập địa chỉ bắt buộc sử dụng Dropdown Tỉnh/Quận/Phường (load từ GHN API) để lấy được `toDistrictId` (int) và `toWardCode` (string) truyền xuống Backend. | 5h | D3 |
+| D9 | **Checkout — Bước 2: Thanh toán PayOS** | Gọi API `POST /api/buyer-cart/checkout` với payload `CreateOrderFromCartDTO` (kèm ID quận/phường). BE trả về order, FE tiếp tục gọi `/api/payment/{orderId}` để lấy PayOS QR. Hiển thị QR Code đếm ngược. Lắng nghe BE biết thanh toán thành công → redirect Order Detail. | 5h | D8 |
+| D10 | **Checkout — Timeout & Hủy** | Nếu Timer hết hạn mà chưa thanh toán → redirect về Marketplace. (Note: Logic lock listing 5 phút sẽ do BE tự động xử lý khi tạo cart/order, FE chỉ quản lý UI timer). | 2h | D9 |
 | D11 | Wishlist Page + Toggle Button | Route `(buyer)/buyer/wishlist/page.tsx` → Grid listing đã lưu. Component `WishlistButton.tsx` dùng chung trên PDP và Marketplace card. Optimistic update. | 2h | D3 |
 
 ### Sprint 3 — Order Management + Dispute (3 ngày)

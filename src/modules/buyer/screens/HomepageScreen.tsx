@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, useInView, useScroll, useTransform } from 'framer-motion'
 import {
-  Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike, ArrowRight,
+  MapPin, ShieldCheck, Truck, Search, Bike, ArrowRight,
   Lock, Scale, CheckCircle2, Star, Quote, Mountain, Zap, Users, Baby,
-  CircleDollarSign, Package, ChevronRight, Facebook, Instagram, Youtube
+  CircleDollarSign, Package, ChevronRight
 } from 'lucide-react'
 import { Header } from '@/components/header'
-import { ListingCard } from '@/components/listing-card'
+import { Footer } from '@/components/footer'
+import { ListingCard } from '@/modules/buyer/components/ListingCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -44,12 +45,12 @@ const bikeTypeOptions = [
 ] as const
 
 const categories = [
-  { value: 'road', label: 'Road Bike', icon: Bike, count: 67 },
-  { value: 'mtb', label: 'Mountain Bike', icon: Mountain, count: 45 },
-  { value: 'gravel', label: 'Gravel', icon: Truck, count: 32 },
-  { value: 'ebike', label: 'E-Bike', icon: Zap, count: 18 },
-  { value: 'urban', label: 'City / Touring', icon: Users, count: 28 },
-  { value: 'kids', label: 'Kids', icon: Baby, count: 15 },
+  { value: 'road', label: 'Road Bike', icon: Bike },
+  { value: 'mtb', label: 'Mountain Bike', icon: Mountain },
+  { value: 'gravel', label: 'Gravel', icon: Truck },
+  { value: 'ebike', label: 'E-Bike', icon: Zap },
+  { value: 'urban', label: 'City / Touring', icon: Users },
+  { value: 'kids', label: 'Kids', icon: Baby },
 ]
 
 const trustFeatures = [
@@ -94,7 +95,7 @@ const howItWorksSteps = [
     step: 2,
     icon: CircleDollarSign,
     title: 'Thanh Toán An Toàn',
-    description: 'Đặt cọc hoặc thanh toán toàn bộ qua escrow. Tiền chỉ giải ngân khi bạn xác nhận nhận xe.',
+    description: 'Bấm Mua Ngay → Xe khóa 5 phút → Quét QR PayOS thanh toán 100%.',
   },
   {
     step: 3,
@@ -109,21 +110,21 @@ const testimonials = [
     quote: 'Mua xe trên VeloTrust rất yên tâm. Xe đúng như mô tả, được kiểm định kỹ và giao hàng nhanh. Tiết kiệm được 15 triệu so với mua mới.',
     name: 'Trần Minh Tuấn',
     role: 'Người Mua',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=minh-tuan',
+    avatar: 'https://i.pravatar.cc/150?u=minh-tuan',
     rating: 5,
   },
   {
     quote: 'Đã bán 3 xe trên VeloTrust. Quy trình đơn giản, có hỗ trợ giá bán hợp lý và thanh toán rất nhanh sau khi hoàn tất.',
     name: 'Nguyễn Hương Ly',
     role: 'Người Bán',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=huong-ly',
+    avatar: 'https://i.pravatar.cc/150?u=huong-ly',
     rating: 5,
   },
   {
     quote: 'Đội ngũ kiểm định rất chuyên nghiệp. Phát hiện 2 vấn đề mà mình không nhận ra, giúp thương lượng giá tốt hơn.',
     name: 'Lê Đức Anh',
     role: 'Người Mua',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=duc-anh',
+    avatar: 'https://i.pravatar.cc/150?u=duc-anh',
     rating: 5,
   },
 ]
@@ -151,6 +152,43 @@ const staggerItem = {
 }
 
 /* ────────────────────────────────────────────
+   Components
+   ──────────────────────────────────────────── */
+function AnimatedNumber({ value, suffix = '', prefix = '', isFloat = false }: { value: number, suffix?: string, prefix?: string, isFloat?: boolean }) {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: '-40px' })
+  const [displayValue, setDisplayValue] = useState(0)
+
+  useEffect(() => {
+    if (isInView) {
+      const duration = 2000
+      const startTime = performance.now()
+      
+      const updateNumber = (currentTime: number) => {
+        const elapsed = currentTime - startTime
+        const progress = Math.min(elapsed / duration, 1)
+        const easeProgress = 1 - Math.pow(1 - progress, 4)
+        setDisplayValue(easeProgress * value)
+        
+        if (progress < 1) {
+          requestAnimationFrame(updateNumber)
+        } else {
+          setDisplayValue(value)
+        }
+      }
+      
+      requestAnimationFrame(updateNumber)
+    }
+  }, [isInView, value])
+
+  return (
+    <span ref={ref}>
+      {prefix}{isFloat ? displayValue.toFixed(1) : Math.floor(displayValue).toLocaleString('vi-VN')}{suffix}
+    </span>
+  )
+}
+
+/* ────────────────────────────────────────────
    Page Component
    ──────────────────────────────────────────── */
 export default function HomePage() {
@@ -175,6 +213,11 @@ export default function HomePage() {
     router.push(query ? `/marketplace?${query}` : '/marketplace')
   }
 
+  const { scrollY } = useScroll()
+  const heroBgY = useTransform(scrollY, [0, 800], ['0%', '30%'])
+  const heroContentOpacity = useTransform(scrollY, [0, 400], [1, 0])
+  const heroContentY = useTransform(scrollY, [0, 400], [0, 50])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -182,16 +225,18 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════
           SECTION 1 — HERO (Premium Redesign)
           ═══════════════════════════════════════ */}
-      <section id="hero" className="relative min-h-[92vh] overflow-hidden flex items-center">
+      <section id="hero" className="relative min-h-[80vh] overflow-hidden flex items-center">
         {/* ── Background ── */}
-        <div className="absolute inset-0">
-          <Image
-            src="/hero-v2.png"
-            alt="VeloTrust – Premium used bicycle marketplace"
-            fill
-            className="object-cover object-center"
-            priority
-          />
+        <div className="absolute inset-0 overflow-hidden bg-[#0d1a08]">
+          <motion.div className="absolute inset-x-0 -top-[20%] bottom-0 h-[140%]" style={{ y: heroBgY }}>
+            <Image
+              src="/hero-v2.png"
+              alt="VeloTrust – Premium used bicycle marketplace"
+              fill
+              className="object-cover object-center"
+              priority
+            />
+          </motion.div>
         </div>
         {/* Multi-layer gradient for depth */}
         <div className="absolute inset-0 bg-linear-to-r from-[#0d1a08]/95 via-[#0d1a08]/70 to-[#0d1a08]/30" />
@@ -199,7 +244,10 @@ export default function HomePage() {
         {/* Subtle green radial glow */}
         <div className="absolute left-0 top-1/3 h-[500px] w-[500px] -translate-x-1/4 rounded-full bg-primary/10 blur-[120px]" />
 
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-24 lg:px-8 lg:py-0">
+        <motion.div 
+          className="relative z-10 mx-auto w-full max-w-7xl px-4 py-24 lg:px-8"
+          style={{ opacity: heroContentOpacity, y: heroContentY }}
+        >
           <motion.div
             initial="hidden"
             animate="visible"
@@ -219,16 +267,12 @@ export default function HomePage() {
             {/* ── Headline ── */}
             <motion.h1
               variants={staggerItem}
-              className="max-w-4xl text-[2.8rem] font-extrabold leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl"
+              className="max-w-4xl text-[3rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-6xl lg:text-7xl"
               style={{ fontFamily: 'var(--font-archivo)' }}
             >
-              Xe chuẩn kiểm,
-              <br />
-              <span className="relative inline-block">
-                <span className="relative z-10 bg-linear-to-r from-[#aee86c] via-[#d9f59d] to-[#bff06e] bg-clip-text text-transparent">
-                  chốt chuẩn tin
-                </span>
-                <span className="absolute -bottom-2 left-0 h-1.5 w-full rounded-full bg-linear-to-r from-primary/70 via-primary/35 to-transparent" />
+              Xe chuẩn kiểm, <br />
+              <span className="text-primary">
+                chốt chuẩn tin
               </span>
             </motion.h1>
 
@@ -239,18 +283,16 @@ export default function HomePage() {
             >
               Mỗi chiếc xe trải qua{' '}
               <strong className="font-semibold text-white">50+ điểm kiểm tra VeloSafe™</strong>.
-              Tiền thanh toán được giữ trong{' '}
-              <strong className="font-semibold text-white">escrow an toàn</strong>{' '}
-              đến khi bạn nhận xe đúng ý và xác nhận hài lòng.
+              Bấm <strong className="font-semibold text-white">Mua Ngay</strong>, xe được khóa 5 phút cho bạn thanh toán QR. Tiền giữ an toàn đến khi nhận xe.
             </motion.p>
 
             {/* ── Search bar ── */}
             <motion.div
               variants={staggerItem}
-              className="mt-10 w-full max-w-2xl"
+              className="mt-10 w-full max-w-3xl"
             >
               {/* Main search input row */}
-              <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white p-2 shadow-2xl">
+              <div className="flex flex-col sm:flex-row items-center gap-2 rounded-2xl border border-white/20 bg-white/95 p-2 shadow-2xl backdrop-blur-xl">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#407F3E]" />
                   <input
@@ -317,14 +359,14 @@ export default function HomePage() {
             </motion.div>
 
             {/* ── Dual CTA ── */}
-            <motion.div variants={staggerItem} className="mt-8 flex flex-wrap items-center gap-3">
+            <motion.div variants={staggerItem} className="mt-8 flex flex-wrap items-center gap-4">
               <Button
                 id="hero-buy-cta"
                 onClick={applyHeroSearch}
                 size="lg"
-                className="rounded-xl bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg hover:bg-[#90cb4f] hover:shadow-[0_0_24px_rgba(174,232,108,0.4)] transition-all duration-300"
+                className="h-12 rounded-xl bg-primary px-8 text-base font-bold text-primary-foreground shadow-lg hover:bg-primary/90 transition-all duration-300"
               >
-                Tìm xe ngay
+                Khám phá bộ sưu tập
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button
@@ -332,41 +374,17 @@ export default function HomePage() {
                 asChild
                 size="lg"
                 variant="outline"
-                className="rounded-xl border-white/30 bg-white/10 px-8 text-base font-bold text-white backdrop-blur-sm hover:bg-white/20 hover:border-white/50 transition-all duration-300"
+                className="h-12 rounded-xl border-white/30 bg-black/20 px-8 text-base font-bold text-white backdrop-blur-md hover:bg-white/20 hover:border-white/50 transition-all duration-300"
               >
                 <Link href={sellerCtaHref}>
-                  Bán xe của bạn
+                  Đăng bán xe của bạn
                 </Link>
               </Button>
             </motion.div>
-
-            {/* ── Trust strip ── */}
-            <motion.div
-              variants={staggerItem}
-              className="mt-12 grid max-w-3xl grid-cols-1 gap-3 rounded-3xl border border-white/10 bg-black/20 p-4 backdrop-blur-md sm:grid-cols-3"
-            >
-              {[
-                { icon: ShieldCheck, label: 'Kiểm định 50+ điểm', sub: 'VeloSafe™' },
-                { icon: Lock, label: 'Escrow an toàn', sub: 'Tiền giữ đến khi nhận xe' },
-                { icon: Truck, label: 'Giao hàng toàn quốc', sub: 'Theo dõi realtime' },
-              ].map(({ icon: Icon, label, sub }) => (
-                <div key={label} className="rounded-2xl border border-white/8 bg-white/6 p-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 backdrop-blur-sm">
-                      <Icon className="h-4.5 w-4.5 text-[#aee86c]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{label}</p>
-                      <p className="text-xs text-slate-300">{sub}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
 
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent via-[#1a2810]/35 to-[#eff6e5]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-32 bg-linear-to-b from-transparent via-[#eff6e5]/10 to-[#eff6e5]" />
       </section>
 
       {/* ═══════════════════════════════════════
@@ -401,7 +419,13 @@ export default function HomePage() {
           {categories.map((cat) => (
             <motion.div key={cat.value} variants={staggerItem}>
               <Link href={`/marketplace?type=${cat.value}`}>
-                <div className="category-card" id={`category-${cat.value}`}>
+                <motion.div 
+                  whileHover={{ y: -8, scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  className="category-card" 
+                  id={`category-${cat.value}`}
+                >
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-[#407F3E] transition-colors group-hover:bg-primary/20">
                     <cat.icon className="h-7.5 w-7.5" />
                   </div>
@@ -414,10 +438,7 @@ export default function HomePage() {
                     {cat.value === 'urban' && 'Đi phố êm, đi tour gọn'}
                     {cat.value === 'kids' && 'An toàn và vừa tầm trẻ nhỏ'}
                   </p>
-                  <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-                    {cat.count} xe
-                  </span>
-                </div>
+                </motion.div>
               </Link>
             </motion.div>
           ))}
@@ -517,9 +538,11 @@ export default function HomePage() {
         </motion.div>
 
         {featuredListings.length > 0 ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-6 lg:grid lg:grid-cols-3 lg:overflow-visible lg:snap-none lg:pb-0 scrollbar-hide">
             {featuredListings.map((listing, index) => (
-              <ListingCard key={listing.id} listing={listing} index={index} />
+              <div key={listing.id} className="min-w-[85vw] sm:min-w-[45vw] lg:min-w-0 snap-center">
+                <ListingCard listing={listing} index={index} />
+              </div>
             ))}
           </div>
         ) : (
@@ -599,7 +622,11 @@ export default function HomePage() {
               transition={{ duration: 0.6 }}
               className="hidden lg:flex items-center justify-center"
             >
-              <div className="relative">
+              <motion.div 
+                animate={{ y: [0, -15, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
+              >
                 <div className="absolute -inset-4 rounded-3xl bg-linear-to-br from-primary/20 to-transparent blur-2xl" />
                 <div className="relative rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
                   <div className="space-y-4">
@@ -626,7 +653,7 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           </div>
         </div>
@@ -750,13 +777,15 @@ export default function HomePage() {
             className="mt-14 grid grid-cols-2 gap-6 lg:grid-cols-4"
           >
             {[
-              { number: '1,200+', label: 'Người dùng tin tưởng' },
-              { number: '500+', label: 'Giao dịch thành công' },
-              { number: '98%', label: 'Hài lòng' },
-              { number: '2.5 tỷ+', label: 'Giá trị giao dịch (VNĐ)' },
+              { value: 1200, suffix: '+', label: 'Người dùng tin tưởng' },
+              { value: 500, suffix: '+', label: 'Giao dịch thành công' },
+              { value: 98, suffix: '%', label: 'Hài lòng' },
+              { value: 2.5, suffix: ' tỷ+', label: 'Giá trị giao dịch (VNĐ)', isFloat: true },
             ].map((stat) => (
               <motion.div key={stat.label} variants={staggerItem} className="text-center">
-                <p className="stat-number">{stat.number}</p>
+                <p className="stat-number">
+                  <AnimatedNumber value={stat.value} suffix={stat.suffix} isFloat={stat.isFloat} />
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
               </motion.div>
             ))}
@@ -767,110 +796,7 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════
           SECTION 8 — FOOTER
           ═══════════════════════════════════════ */}
-      <footer id="footer" className="border-t border-border/70 bg-[#253218] text-slate-200">
-        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-6">
-          {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary shadow-athletic">
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-primary-foreground" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="5.5" cy="17.5" r="3.5" />
-                  <circle cx="18.5" cy="17.5" r="3.5" />
-                  <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-                </svg>
-              </div>
-              <span className="text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-archivo)' }}>
-                VeloTrust
-              </span>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-300">
-              Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định VeloSafe.
-            </p>
-            <div className="mt-4 flex items-center gap-2 text-sm text-lime-200">
-              <ShieldCheck className="h-4 w-4" />
-              Cam kết xe rõ nguồn gốc - giao dịch an toàn
-            </div>
-            {/* Social icons */}
-            <div className="mt-5 flex gap-3">
-              {[Facebook, Instagram, Youtube].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-slate-300 transition-colors hover:bg-primary/30 hover:text-white"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick links */}
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Truy cập nhanh</h4>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
-              {[
-                { href: '/marketplace', label: 'Marketplace' },
-                { href: '#how-it-works', label: 'Cách hoạt động' },
-                { href: '#why-velotrust', label: 'Tại sao VeloTrust' },
-                { href: sellerCtaHref, label: 'Đăng bán xe' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="transition-colors hover:text-lime-200">{link.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Policies */}
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Chính sách</h4>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
-              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-lime-200" /> Giao hàng toàn quốc</li>
-              <li>Chính sách kiểm định VeloSafe</li>
-              <li>Đổi trả và hoàn tiền</li>
-              <li>Bảo mật dữ liệu</li>
-              <li>Điều khoản sử dụng</li>
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div className="flex flex-col">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Liên hệ</h4>
-            <ul className="mt-4 space-y-3 text-sm text-slate-300">
-              <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-lime-200 shrink-0" />
-                Hotline: 028.9996.5775
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-lime-200 shrink-0" />
-                support@velotrust.vn
-              </li>
-              <li className="flex items-start gap-2">
-                <MapPin className="mt-1 h-4 w-4 text-lime-200 shrink-0" />
-                <span className="leading-snug">7 Đ. D1, Long Thạnh Mỹ, Tăng Nhơn Phú, Hồ Chí Minh 700000, Việt Nam</span>
-              </li>
-            </ul>
-            <div className="mt-5 h-[150px] w-full overflow-hidden rounded-xl border border-white/10 bg-white/5">
-              <iframe
-                src="https://www.google.com/maps?q=7+%C4%90.+D1,+Long+Th%E1%BA%A1nh+M%E1%BB%B9,+T%C3%A2ng+Nh%C6%A1n+Ph%C3%BA,+H%E1%BB%93+Ch%C3%AD+Minh+700000,+Vi%E1%BB%87t+Nam&output=embed"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen={true}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                className="h-full w-full opacity-80 grayscale mix-blend-luminosity brightness-110 contrast-125 transition-all duration-500 hover:opacity-100 hover:grayscale-0 hover:mix-blend-normal"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-700/70 py-5 text-center text-xs text-slate-400">
-          <div className="mx-auto max-w-7xl px-4 lg:px-6">
-            Copyright {new Date().getFullYear()} VeloTrust. All rights reserved.
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

@@ -312,6 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsInitializing(false)
         }
         return
+
       }
 
       try {
