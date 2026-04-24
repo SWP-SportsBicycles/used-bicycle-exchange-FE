@@ -10,6 +10,12 @@ import SellerUpdateListingScreen from '@/modules/seller/screens/SellerUpdateList
 import { useLanguage } from '@/lib/language-context'
 import { Button } from '@/components/ui/button'
 
+function extractListingPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw
+  const maybe = raw as { data?: unknown }
+  return maybe.data ?? raw
+}
+
 export default function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const listingId = resolvedParams.id
@@ -23,7 +29,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     enabled: Boolean(listingId)
   })
 
-  const listing = (rawData as any)?.data || rawData
+  const listing = extractListingPayload(rawData)
 
   if (isLoading) {
     return (

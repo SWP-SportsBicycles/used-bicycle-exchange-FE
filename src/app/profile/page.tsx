@@ -13,7 +13,6 @@ import {
   Edit,
   Save,
   X,
-  Star,
   Package,
   Clock,
   Building,
