@@ -42,20 +42,59 @@ export interface CreateInspectorPayload {
   password: string;
 }
 
-export type UserRole = 'Buyer' | 'Seller' | 'Admin' | 'Inspector';
-export type UserStatus = 'Active' | 'InActive' | 'Banned';
+export type AdminOrderStatus = "Locked" | "Confirmed" | "Completed" | string;
+
+export interface AdminOrder {
+  orderId: string;
+  status: AdminOrderStatus;
+  totalAmount: number;
+  bikeTitle: string;
+  sellerName: string;
+  completedAt: string | null;
+  paidOutAt: string | null;
+}
+
+export interface AdminDashboardSummary {
+  totalUsers: number;
+  totalSellers: number;
+  totalBuyers: number;
+  totalListings: number;
+  pendingListings: number;
+  totalOrders: number;
+  completedOrders: number;
+  lockedOrders: number;
+  confirmedOrders: number;
+  totalRevenue: number;
+  pendingPayoutAmount: number;
+  openDisputes: number;
+}
+
+export type UserRole = "BUYER" | "SELLER" | "ADMIN" | "INSPECTOR";
+export type UserStatus = "Active" | "InActive" | "Banned";
 
 export interface AdminUser {
   id: string;
   email: string;
   fullName: string;
-  phoneNumber: string;
-  password: string;
+  role: UserRole;
+  isActive?: boolean;
+  createdAt?: string;
+  phoneNumber?: string;
   avtUrl?: string;
   firebaseUID?: string;
-  role: UserRole;
-  walletBalance: number;
-  status: UserStatus;
+  walletBalance?: number;
+  status?: UserStatus;
+  totalOrders?: number;
+  completedOrders?: number;
+  totalListings?: number;
+  totalRevenue?: number;
+  totalSpent?: number | null;
+  senderName?: string | null;
+  senderPhone?: string | null;
+  senderAddress?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
   pickupAddress?: string;
   pickupDistrictId?: number;
   pickupWardCode?: string;
@@ -212,91 +251,97 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
   };
 }
 
-// Mock data for users until API is ready
-const MOCK_USERS: AdminUser[] = [
-  {
-    id: "1",
-    email: "buyer1@example.com",
-    fullName: "Nguyễn Văn A",
-    phoneNumber: "0901234567",
-    password: "password123",
-    avtUrl: "https://i.pravatar.cc/150?u=1",
-    role: "Buyer",
-    walletBalance: 1500000,
-    status: "Active",
-    pickupAddress: "123 Đường Lê Lợi",
-    pickupDistrictId: 1,
-    pickupWardCode: "W001",
-    pickupWardName: "Phường Bến Nghé",
-    pickupDistrictName: "Quận 1",
-    pickupProvinceName: "TP.HCM",
-  },
-  {
-    id: "2",
-    email: "seller1@example.com",
-    fullName: "Trần Thị B",
-    phoneNumber: "0912345678",
-    password: "sellerpass456",
-    avtUrl: "https://i.pravatar.cc/150?u=2",
-    role: "Seller",
-    walletBalance: 5000000,
-    status: "Active",
-    pickupAddress: "456 Đường Nguyễn Huệ",
-    pickupDistrictId: 2,
-    pickupWardCode: "W002",
-    pickupWardName: "Phường Bến Thành",
-    pickupDistrictName: "Quận 1",
-    pickupProvinceName: "TP.HCM",
-  },
-  {
-    id: "3",
-    email: "buyer2@example.com",
-    fullName: "Lê Văn C",
-    phoneNumber: "0923456789",
-    password: "buyerpass789",
-    role: "Buyer",
-    walletBalance: 0,
-    status: "InActive",
-  },
-  {
-    id: "4",
-    email: "seller2@example.com",
-    fullName: "Phạm Thị D",
-    phoneNumber: "0934567890",
-    password: "sellerpass012",
-    avtUrl: "https://i.pravatar.cc/150?u=4",
-    role: "Seller",
-    walletBalance: 2500000,
-    status: "Active",
-    pickupAddress: "789 Đường Trần Hưng Đạo",
-    pickupDistrictId: 3,
-    pickupWardCode: "W003",
-    pickupWardName: "Phường Cầu Ông Lãnh",
-    pickupDistrictName: "Quận 1",
-    pickupProvinceName: "TP.HCM",
-  },
-  {
-    id: "5",
-    email: "inspector1@example.com",
-    fullName: "Hoàng Văn E",
-    phoneNumber: "0945678901",
-    password: "inspectorpass",
-    avtUrl: "https://i.pravatar.cc/150?u=5",
-    role: "Inspector",
-    walletBalance: 3000000,
-    status: "Active",
-  },
-  {
-    id: "6",
-    email: "admin@example.com",
-    fullName: "Admin User",
-    phoneNumber: "0956789012",
-    password: "adminpass",
-    role: "Admin",
-    walletBalance: 10000000,
-    status: "Active",
-  },
-];
+function normalizeUserRole(value: unknown): UserRole {
+  const role = typeof value === "string" ? value.toUpperCase() : "";
+  if (role === "SELLER" || role === "ADMIN" || role === "INSPECTOR") return role;
+  return "BUYER";
+}
+
+function normalizeUser(raw: unknown): AdminUser {
+  const source = extractPayloadObject(raw);
+  const role = normalizeUserRole(source.role);
+  const isActive = typeof source.isActive === "boolean" ? source.isActive : undefined;
+
+  return {
+    id: pickString(source, ["id", "userId"]) || crypto.randomUUID(),
+    fullName: pickString(source, ["fullName", "name"]) || "",
+    email: pickString(source, ["email"]) || "",
+    role,
+    isActive,
+    createdAt: pickString(source, ["createdAt"]) || undefined,
+    phoneNumber: pickString(source, ["phoneNumber"]) || undefined,
+    avtUrl: pickString(source, ["avtUrl", "avatar", "avatarUrl", "image"]) || undefined,
+    firebaseUID: pickString(source, ["firebaseUID", "firebase_uid", "firebaseId"]) || undefined,
+    walletBalance:
+      typeof source.walletBalance === "number" ? source.walletBalance : Number(source.walletBalance) || undefined,
+    status: isActive === undefined ? undefined : isActive ? "Active" : "InActive",
+    totalOrders: typeof source.totalOrders === "number" ? source.totalOrders : undefined,
+    completedOrders: typeof source.completedOrders === "number" ? source.completedOrders : undefined,
+    totalListings: typeof source.totalListings === "number" ? source.totalListings : undefined,
+    totalRevenue: typeof source.totalRevenue === "number" ? source.totalRevenue : undefined,
+    totalSpent: typeof source.totalSpent === "number" ? source.totalSpent : null,
+    senderName: typeof source.senderName === "string" ? source.senderName : null,
+    senderPhone: typeof source.senderPhone === "string" ? source.senderPhone : null,
+    senderAddress: typeof source.senderAddress === "string" ? source.senderAddress : null,
+    bankName: typeof source.bankName === "string" ? source.bankName : null,
+    bankAccountNumber: typeof source.bankAccountNumber === "string" ? source.bankAccountNumber : null,
+    bankAccountName: typeof source.bankAccountName === "string" ? source.bankAccountName : null,
+    pickupAddress: pickString(source, ["pickupAddress", "pickup_address", "address"]) || undefined,
+    pickupDistrictId: typeof source.pickupDistrictId === "number" ? source.pickupDistrictId : undefined,
+    pickupWardCode: pickString(source, ["pickupWardCode", "pickup_ward_code"]) || undefined,
+    pickupWardName: pickString(source, ["pickupWardName", "pickup_ward_name"]) || undefined,
+    pickupDistrictName: pickString(source, ["pickupDistrictName", "pickup_district_name"]) || undefined,
+    pickupProvinceName: pickString(source, ["pickupProvinceName", "pickup_province_name"]) || undefined,
+  };
+}
+
+function normalizeOrder(raw: unknown): AdminOrder {
+  const source = extractPayloadObject(raw);
+  return {
+    orderId: pickString(source, ["orderId", "id"]) || crypto.randomUUID(),
+    status: pickString(source, ["status"]) || "Locked",
+    totalAmount:
+      typeof source.totalAmount === "number" ? source.totalAmount : Number(source.totalAmount) || 0,
+    bikeTitle: pickString(source, ["bikeTitle", "title"]),
+    sellerName: pickString(source, ["sellerName", "seller"]),
+    completedAt: pickString(source, ["completedAt"]) || null,
+    paidOutAt: pickString(source, ["paidOutAt"]) || null,
+  };
+}
+
+function extractTotalItems(payload: unknown): number {
+  const source = extractPayloadObject(payload);
+  if (typeof source.totalItems === "number") return source.totalItems;
+  return extractArray(payload).length;
+}
+
+function pickNumber(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number") return value;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function normalizeAdminDashboardSummary(raw: unknown): AdminDashboardSummary {
+  const source = extractPayloadObject(raw);
+  return {
+    totalUsers: pickNumber(source, ["totalUsers", "userCount"]),
+    totalSellers: pickNumber(source, ["totalSellers", "sellerCount"]),
+    totalBuyers: pickNumber(source, ["totalBuyers", "buyerCount"]),
+    totalListings: pickNumber(source, ["totalListings", "listingCount"]),
+    pendingListings: pickNumber(source, ["pendingListings", "pendingListingCount"]),
+    totalOrders: pickNumber(source, ["totalOrders", "orderCount"]),
+    completedOrders: pickNumber(source, ["completedOrders", "completedOrderCount"]),
+    lockedOrders: pickNumber(source, ["lockedOrders", "lockedOrderCount"]),
+    confirmedOrders: pickNumber(source, ["confirmedOrders", "confirmedOrderCount"]),
+    totalRevenue: pickNumber(source, ["totalRevenue", "revenue"]),
+    pendingPayoutAmount: pickNumber(source, ["pendingPayoutAmount", "pendingPayout"]),
+    openDisputes: pickNumber(source, ["openDisputes", "disputeCount"]),
+  };
+}
 
 export const adminApi = {
   async getAllListings() {
@@ -326,26 +371,68 @@ export const adminApi = {
     return http.post<unknown>("/api/AdminAccount/admin/create-inspector", payload);
   },
 
-  // User management - using mock data for now, will switch to real API later
   async getUsers(): Promise<AdminUser[]> {
-    // TODO: Replace with real API call when backend is ready
-    // const response = await http.get<unknown>("/api/admin/users");
-    // return extractArray(response).map(normalizeUser);
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(MOCK_USERS), 300);
-    });
+    const response = await http.get<unknown>("/api/AdminUser");
+    return extractArray(response).map(normalizeUser);
+  },
+
+  async getSellerUsers(): Promise<AdminUser[]> {
+    const response = await http.get<unknown>("/api/AdminUser/sellers");
+    return extractArray(response).map(normalizeUser);
+  },
+
+  async getBuyerUsers(): Promise<AdminUser[]> {
+    const response = await http.get<unknown>("/api/AdminUser/buyers");
+    return extractArray(response).map(normalizeUser);
+  },
+
+  async getUsersTotalCount(): Promise<number> {
+    const response = await http.get<unknown>("/api/AdminUser");
+    return extractTotalItems(response);
+  },
+
+  async getSellerUsersTotalCount(): Promise<number> {
+    const response = await http.get<unknown>("/api/AdminUser/sellers");
+    return extractTotalItems(response);
+  },
+
+  async getBuyerUsersTotalCount(): Promise<number> {
+    const response = await http.get<unknown>("/api/AdminUser/buyers");
+    return extractTotalItems(response);
   },
 
   async getUserById(userId: string): Promise<AdminUser | null> {
-    // TODO: Replace with real API call when backend is ready
-    // const response = await http.get<unknown>(`/api/admin/users/${userId}`);
-    // const normalized = normalizeUser(response);
-    // return normalized.id ? normalized : null;
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = MOCK_USERS.find(u => u.id === userId) || null;
-        resolve(user);
-      }, 300);
-    });
+    const response = await http.get<unknown>(`/api/AdminUser/${userId}`);
+    const normalized = normalizeUser(response);
+    return normalized.id ? normalized : null;
+  },
+
+  async getOrders(params?: { page?: number; size?: number; status?: number }): Promise<AdminOrder[]> {
+    const search = new URLSearchParams();
+    search.set("page", String(params?.page ?? 1));
+    search.set("size", String(params?.size ?? 10));
+    if (typeof params?.status === "number") {
+      search.set("status", String(params.status));
+    }
+    const response = await http.get<unknown>(`/api/AdminOrder?${search.toString()}`);
+    return extractArray(response).map(normalizeOrder);
+  },
+
+  async getOrderById(orderId: string): Promise<AdminOrder | null> {
+    const orders = await this.getOrders({ page: 1, size: 100 });
+    return orders.find((order) => order.orderId === orderId) ?? null;
+  },
+
+  notifySeller(orderId: string) {
+    return http.post<unknown>(`/api/AdminOrder/${orderId}/notify-seller`);
+  },
+
+  confirmPayout(orderId: string) {
+    return http.post<unknown>(`/api/AdminOrder/${orderId}/confirm-payout`);
+  },
+
+  async getDashboardSummary(): Promise<AdminDashboardSummary> {
+    const response = await http.get<unknown>("/api/AdminDashboard");
+    return normalizeAdminDashboardSummary(response);
   },
 };
