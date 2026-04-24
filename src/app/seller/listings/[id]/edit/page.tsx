@@ -10,10 +10,12 @@ import SellerUpdateListingScreen from '@/modules/seller/screens/SellerUpdateList
 import { useLanguage } from '@/lib/language-context'
 import { Button } from '@/components/ui/button'
 
-function extractListingPayload(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object') return raw
+function extractListingPayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null
   const maybe = raw as { data?: unknown }
-  return maybe.data ?? raw
+  const payload = maybe.data ?? raw
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  return payload as Record<string, unknown>
 }
 
 export default function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
