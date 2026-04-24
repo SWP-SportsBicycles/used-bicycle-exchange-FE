@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Loader2, MailCheck, ReceiptText, WalletCards } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,6 +39,8 @@ export default function AdminOrderDetailPage() {
   const { toast } = useToast()
   const params = useParams<{ id: string }>()
   const orderId = params.id
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const orderQuery = useQuery({
     queryKey: ['admin-order', orderId],
@@ -47,6 +51,12 @@ export default function AdminOrderDetailPage() {
   const notifyMutation = useMutation({
     mutationFn: () => adminApi.notifySeller(orderId),
     onSuccess: () => {
+      setActionFeedback(
+        language === 'vi'
+          ? 'Đã gửi thông báo đơn hàng thành công cho người bán (notify-seller).'
+          : 'Successful-order notification sent to seller (notify-seller).',
+      )
+      setActionError(null)
       toast({
         title: language === 'vi' ? 'Thành công' : 'Success',
         description: language === 'vi' ? 'Đã gửi email thông báo cho người bán.' : 'Seller notification email sent.',
@@ -54,6 +64,11 @@ export default function AdminOrderDetailPage() {
       orderQuery.refetch()
     },
     onError: () => {
+      setActionError(
+        language === 'vi'
+          ? 'Không thể gửi thông báo đơn hàng thành công cho người bán.'
+          : 'Unable to send successful-order notification to seller.',
+      )
       toast({
         variant: 'destructive',
         title: language === 'vi' ? 'Đã duyệt rồi' : 'Already processed',
@@ -65,6 +80,12 @@ export default function AdminOrderDetailPage() {
   const payoutMutation = useMutation({
     mutationFn: () => adminApi.confirmPayout(orderId),
     onSuccess: () => {
+      setActionFeedback(
+        language === 'vi'
+          ? 'Đã xác nhận giải ngân thành công cho đơn hàng (confirm-payout).'
+          : 'Payout confirmed successfully for this order (confirm-payout).',
+      )
+      setActionError(null)
       toast({
         title: language === 'vi' ? 'Thành công' : 'Success',
         description: language === 'vi' ? 'Đã xác nhận giải ngân thành công.' : 'Payout confirmed successfully.',
@@ -72,6 +93,11 @@ export default function AdminOrderDetailPage() {
       orderQuery.refetch()
     },
     onError: () => {
+      setActionError(
+        language === 'vi'
+          ? 'Không thể xác nhận giải ngân cho đơn hàng này.'
+          : 'Unable to confirm payout for this order.',
+      )
       toast({
         variant: 'destructive',
         title: language === 'vi' ? 'Đã duyệt rồi' : 'Already processed',
@@ -153,7 +179,18 @@ export default function AdminOrderDetailPage() {
               <CardHeader>
                 <CardTitle>{language === 'vi' ? 'Xử lý đơn hàng thành công' : 'Completed order actions'}</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-3">
+              <CardContent className="space-y-3">
+                {actionFeedback ? (
+                  <Alert className="border-success/40 bg-success/10">
+                    <AlertDescription className="text-success">{actionFeedback}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {actionError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{actionError}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={() => notifyMutation.mutate()}
                   disabled={notifyMutation.isPending}
@@ -178,6 +215,7 @@ export default function AdminOrderDetailPage() {
                       ? 'Giải ngân'
                       : 'Confirm payout'}
                 </Button>
+                </div>
               </CardContent>
             </Card>
           ) : (

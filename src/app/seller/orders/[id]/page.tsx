@@ -1,10 +1,10 @@
 'use client'
 
-import React, { use, useState, useEffect } from 'react'
+import React, { use, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Clock, AlertTriangle, PackageSearch, CheckCircle2, XCircle, Package, Phone, MapPin, User, RefreshCw, EyeOff } from 'lucide-react'
-import { format, differenceInSeconds } from 'date-fns'
+import { ArrowLeft, AlertTriangle, PackageSearch, CheckCircle2, EyeOff } from 'lucide-react'
+import { format } from 'date-fns'
 import { vi, enUS } from 'date-fns/locale'
 
 import { useSellerOrderDetail, useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
@@ -25,7 +25,12 @@ import {
 } from '@/components/ui/dialog'
 import { useLanguage } from '@/lib/language-context'
 import { ORDER_STATUS_LABELS, formatVND } from '@/lib/mock-data'
-import { cn } from '@/lib/utils'
+
+function pickWaybillCode(order: unknown): string {
+  if (!order || typeof order !== 'object') return ''
+  const candidate = (order as Record<string, unknown>).waybillCode
+  return typeof candidate === 'string' ? candidate : ''
+}
 
 
 export default function SellerOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +48,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
 
   const order = normalizeOrderDetail(rawData, orderId)
+  const waybillCode = pickWaybillCode(order)
 
   // Fallback: nếu detail API không trả về listingId, lấy từ list cache
   const { data: ordersListData } = useSellerOrders({ size: 50 })
@@ -279,7 +285,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{language === 'vi' ? 'Mã vận đơn' : 'Waybill Code'}</span>
-                    <span className="font-medium text-blue-700">{(order as any).waybillCode || 'Đang cập nhật...'}</span>
+                    <span className="font-medium text-blue-700">{waybillCode || 'Đang cập nhật...'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>

@@ -27,8 +27,6 @@ import { useLanguage } from '@/lib/language-context'
 import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
 import { useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
 import { 
-  MOCK_LISTINGS, 
-  MOCK_SELLER_ORDERS, 
   MOCK_WALLET_TRANSACTIONS,
   formatVND,
   ORDER_STATUS_LABELS
@@ -57,16 +55,17 @@ export default function SellerDashboardPage() {
   const { user } = useAuth()
   const { language } = useLanguage()
 
-  const { data: listingsData, isLoading: isLoadingListings, isError: isListingsError } = useSellerListings({ pageSize: 100 })
-  const { data: ordersData, isLoading: isLoadingOrders, isError: isOrdersError } = useSellerOrders({ size: 100 })
+  const { data: listingsData, isLoading: isLoadingListings } = useSellerListings({ pageSize: 100 })
+  const { data: ordersData, isLoading: isLoadingOrders } = useSellerOrders({ size: 100 })
 
   // Data for this seller
-  const myListings = useMemo(() => normalizeListingsPayload(listingsData).slice(0, 3), [listingsData])
+  const normalizedListings = useMemo(() => normalizeListingsPayload(listingsData), [listingsData])
+  const myListings = useMemo(() => normalizedListings.slice(0, 3), [normalizedListings])
   const myOrders = useMemo(() => normalizeOrdersPayload(ordersData).slice(0, 3), [ordersData])
   const recentTransactions = MOCK_WALLET_TRANSACTIONS.slice(0, 3)
 
   const stats = {
-    totalListings: (listingsData as any)?.totalCount || myListings.length,
+    totalListings: normalizedListings.length,
     activeListings: myListings.filter(l => l.status === 'published').length,
     pendingOrders: normalizeOrdersPayload(ordersData).filter(o => 
       !['completed', 'cancelled', 'delivered'].includes(o.status)
@@ -306,10 +305,12 @@ export default function SellerDashboardPage() {
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                     >
                       <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0 relative">
-                        <img 
-                          src={listing.images[0] || '/placeholder.svg'} 
+                        <Image
+                          src={listing.images[0] || '/placeholder.svg'}
                           alt={listing.title}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="48px"
+                          className="object-cover"
                         />
                       </div>
                       <div className="flex-1 min-w-0">

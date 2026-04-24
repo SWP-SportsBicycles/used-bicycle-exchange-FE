@@ -62,9 +62,13 @@ export default function SellerShippingProfilePage() {
   const [provinces, setProvinces] = useState<Province[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [wards, setWards] = useState<Ward[]>([])
-  const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null)
 
   const redirectTarget = useMemo(() => searchParams.get('redirect') ?? '/seller', [searchParams])
+  const selectedProvinceId = useMemo(() => {
+    if (!form.fromProvinceName) return null
+    const matchedProvince = provinces.find((province) => province.provinceName === form.fromProvinceName)
+    return matchedProvince?.provinceId ?? null
+  }, [form.fromProvinceName, provinces])
 
   // Load provinces on mount
   useEffect(() => {
@@ -111,33 +115,17 @@ export default function SellerShippingProfilePage() {
     }
   }, [language])
 
-  // Auto-deduce province ID if we only have the name from profile loading
-  useEffect(() => {
-    if (provinces.length > 0 && form.fromProvinceName && !selectedProvinceId) {
-      const p = provinces.find(x => x.provinceName === form.fromProvinceName)
-      if (p) {
-        setSelectedProvinceId(p.provinceId)
-      }
-    }
-  }, [provinces, form.fromProvinceName, selectedProvinceId])
-
   // Fetch districts when province changes
   useEffect(() => {
-    if (selectedProvinceId) {
-      locationApi.getDistricts(selectedProvinceId).then(setDistricts).catch(console.error)
-    } else {
-      setDistricts([])
-    }
+    if (!selectedProvinceId) return
+    locationApi.getDistricts(selectedProvinceId).then(setDistricts).catch(console.error)
   }, [selectedProvinceId])
 
   // Fetch wards when district changes
   useEffect(() => {
     const dId = Number(form.fromDistrictId)
-    if (dId > 0) {
-      locationApi.getWards(dId).then(setWards).catch(console.error)
-    } else {
-      setWards([])
-    }
+    if (dId <= 0) return
+    locationApi.getWards(dId).then(setWards).catch(console.error)
   }, [form.fromDistrictId])
 
   const updateField = (field: keyof ShippingProfileForm, value: string) => {
@@ -146,8 +134,9 @@ export default function SellerShippingProfilePage() {
 
   const handleProvinceChange = (provinceIdStr: string) => {
     const id = Number(provinceIdStr)
-    setSelectedProvinceId(id)
     const pname = provinces.find(p => p.provinceId === id)?.provinceName || ''
+    setDistricts([])
+    setWards([])
     
     setForm(prev => ({
       ...prev,
@@ -162,6 +151,7 @@ export default function SellerShippingProfilePage() {
   const handleDistrictChange = (districtIdStr: string) => {
     const id = Number(districtIdStr)
     const dname = districts.find(d => d.districtId === id)?.districtName || ''
+    setWards([])
     setForm(prev => ({
       ...prev,
       fromDistrictId: districtIdStr,

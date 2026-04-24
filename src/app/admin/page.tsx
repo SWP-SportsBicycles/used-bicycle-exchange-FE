@@ -11,6 +11,8 @@ import { useLanguage } from '@/lib/language-context'
 import { formatVND } from '@/lib/mock-data'
 import { adminApi } from '@/lib/api/admin-api'
 
+const ADMIN_COMMISSION_RATE = 0.05
+
 export default function AdminDashboardPage() {
   const { language } = useLanguage()
   const dashboardQuery = useQuery({
@@ -106,13 +108,17 @@ export default function AdminDashboardPage() {
     rejected: { label: language === 'vi' ? 'Từ chối' : 'Rejected', color: '#ef4444' },
   } satisfies ChartConfig
 
+  const payoutCompletedOrders = orders.filter((order) => order.status === 'Completed' && Boolean(order.paidOutAt))
   const revenueByMonthMap = new Map<number, number>()
   orders.forEach((order) => {
-    if (!order.completedAt || order.status !== 'Completed') return
+    if (!order.completedAt || order.status !== 'Completed' || !order.paidOutAt) return
     const date = new Date(order.completedAt)
     if (Number.isNaN(date.getTime())) return
     const month = date.getMonth()
-    revenueByMonthMap.set(month, (revenueByMonthMap.get(month) ?? 0) + order.totalAmount)
+    revenueByMonthMap.set(
+      month,
+      (revenueByMonthMap.get(month) ?? 0) + order.totalAmount * ADMIN_COMMISSION_RATE,
+    )
   })
   const revenueLineData = Array.from({ length: 12 }, (_, monthIndex) => ({
     month:
@@ -206,7 +212,9 @@ export default function AdminDashboardPage() {
             <CardContent>
               <div className="text-3xl font-extrabold text-success" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(totalRevenueFromLine)}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {language === 'vi' ? 'Từ đơn Completed (AdminOrder)' : 'From completed orders (AdminOrder)'}
+                {language === 'vi'
+                  ? `${payoutCompletedOrders.length} đơn đã giải ngân x 5% hoa hồng`
+                  : `${payoutCompletedOrders.length} paid-out orders x 5% commission`}
               </p>
             </CardContent>
           </Card>
@@ -238,8 +246,8 @@ export default function AdminDashboardPage() {
             <CardTitle>{language === 'vi' ? 'Doanh Thu Theo Tháng' : 'Monthly Revenue Trend'}</CardTitle>
             <CardDescription>
               {language === 'vi'
-                ? 'Biểu đồ line tăng/giảm doanh thu theo đơn '
-                : 'Line chart of monthly revenue growth/decline from completed AdminOrder'}
+                ? 'Biểu đồ line doanh thu hoa hồng 5% từ đơn đã giải ngân'
+                : 'Line chart of 5% commission revenue from paid-out completed orders'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -304,9 +312,7 @@ export default function AdminDashboardPage() {
                   <ClipboardList className="h-5 w-5" />
                   {language === 'vi' ? 'Tổng Quan Tin Đăng' : 'Listing Overview'}
                 </CardTitle>
-                <CardDescription>
-                  {language === 'vi' ? 'Dữ liệu từ AdminListing' : 'Data from AdminListing'}
-                </CardDescription>
+               
               </div>
             </CardHeader>
             <CardContent>
