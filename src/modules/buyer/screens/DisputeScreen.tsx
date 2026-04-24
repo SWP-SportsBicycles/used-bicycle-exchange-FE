@@ -3,14 +3,14 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { ArrowLeft, UploadCloud, AlertTriangle, ShieldCheck, PlayCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Header } from '@/components/header'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
@@ -18,6 +18,7 @@ import { useOrderDetail } from '../hooks/useOrders'
 import { useDisputeMutation, useUploadMedia } from '../hooks/useDispute'
 
 const disputeSchema = z.object({
+  type: z.string().min(1, 'Vui long chon loai khieu nai'),
   reason: z.string().min(20, "Vui lòng mô tả chi tiết ít nhất 20 ký tự"),
   mediaUrls: z.array(z.string()).min(1, "Bắt buộc phải tải lên ít nhất 1 video unbox"),
 })
@@ -29,6 +30,14 @@ interface PageProps {
 }
 
 export default function DisputeScreen({ params }: PageProps) {
+  const reportTypeOptions = [
+    { value: '1', label: 'Không đúng mô tả' },
+    { value: '2', label: 'Hư hỏng / Lỗi sản phẩm' },
+    { value: '3', label: 'Thiếu phụ kiện / Sai hàng' },
+    { value: '4', label: 'Vấn đề vận chuyển' },
+    { value: '5', label: 'Khác' },
+  ]
+
   const { id } = use(params)
   const router = useRouter()
   const { data: order, isLoading: isOrderLoading } = useOrderDetail(id)
@@ -36,12 +45,12 @@ export default function DisputeScreen({ params }: PageProps) {
   const disputeMutation = useDisputeMutation()
   const uploadMutation = useUploadMedia()
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<DisputeFormValues>({
+  const { control, register, handleSubmit, setValue, formState: { errors } } = useForm<DisputeFormValues>({
     resolver: zodResolver(disputeSchema),
-    defaultValues: { reason: '', mediaUrls: [] }
+    defaultValues: { type: '1', reason: '', mediaUrls: [] }
   })
 
-  const mediaUrls = watch('mediaUrls')
+  const mediaUrls = useWatch({ control, name: 'mediaUrls' }) ?? []
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -57,14 +66,14 @@ export default function DisputeScreen({ params }: PageProps) {
       const res = await uploadMutation.mutateAsync(file)
       setValue('mediaUrls', [...mediaUrls, res.url], { shouldValidate: true })
       toast.success('Đã tải lên video thành công')
-    } catch (error) {
+    } catch {
       toast.error('Lỗi khi tải video lên')
     }
   }
 
   const onSubmit = (data: DisputeFormValues) => {
     if (!order) return
-    disputeMutation.mutate({ orderId: order.id, data }, {
+    disputeMutation.mutate({ orderId: order.id, data: { type: data.type, reason: data.reason, mediaUrls: data.mediaUrls } }, {
       onSuccess: () => {
         toast.success('Đã gửi yêu cầu khiếu nại thành công. VeloTrust sẽ phản hồi trong 24h.')
         router.push(`/buyer/orders/${order.id}`)
@@ -90,24 +99,44 @@ export default function DisputeScreen({ params }: PageProps) {
           </Link>
         </nav>
 
-        <Card className="border-rose-200 overflow-hidden shadow-md">
-          <div className="bg-rose-50 border-b border-rose-100 px-6 py-4 flex items-start gap-3 text-rose-800">
-            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+        <div className="rounded-3xl bg-card border border-rose-200 shadow-sm overflow-hidden mt-2">
+          <div className="bg-rose-50/80 px-6 py-5 flex items-start gap-4 border-b border-rose-100/60">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
             <div>
-              <h2 className="font-bold">Yêu cầu khiếu nại / Hoàn tiền</h2>
-              <p className="text-sm mt-1 opacity-90">
+              <h2 className="text-lg font-bold text-rose-900">Yêu cầu khiếu nại / Hoàn tiền</h2>
+              <p className="text-sm mt-1.5 text-rose-800/80 leading-relaxed max-w-2xl">
                 Theo chính sách Escrow, bạn phải cung cấp video mở hộp (unbox) rõ ràng, không cắt ghép làm bằng chứng. Hạn chót gửi khiếu nại là 24h kể từ khi GHN báo giao thành công.
               </p>
             </div>
           </div>
           
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
+          <div className="p-6 md:p-8">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+              <div className="space-y-4">
+                <Label className="text-base font-bold flex items-center gap-1.5">
+                  Loại khiếu nại <span className="text-destructive">*</span>
+                </Label>
+                <Select defaultValue="1" onValueChange={(value) => setValue('type', value, { shouldValidate: true })}>
+                  <SelectTrigger className="h-12 rounded-2xl bg-secondary/10">
+                    <SelectValue placeholder="Chọn loại khiếu nại" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.type && <p className="text-sm text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/> {errors.type.message}</p>}
+              </div>
+              <div className="space-y-4">
+                <Label className="text-base font-bold flex items-center gap-1.5">
                   Video bằng chứng mở hộp (Unbox Video) <span className="text-destructive">*</span>
                 </Label>
-                <div className="rounded-xl border-2 border-dashed border-border p-8 text-center bg-secondary/20 hover:bg-secondary/40 transition-colors">
+                <div className="rounded-2xl border-2 border-dashed border-border p-10 text-center bg-secondary/20 hover:bg-secondary/40 transition-all cursor-pointer group">
                   <input
                     type="file"
                     accept="video/*"
@@ -119,64 +148,70 @@ export default function DisputeScreen({ params }: PageProps) {
                   <Label htmlFor="video-upload" className="cursor-pointer flex flex-col items-center">
                     {uploadMutation.isPending ? (
                       <>
-                        <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
-                        <span className="font-medium">Đang tải lên...</span>
+                        <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+                        <span className="font-semibold text-lg">Đang tải lên...</span>
+                        <span className="text-sm text-muted-foreground mt-2">Vui lòng không đóng trang</span>
                       </>
                     ) : (
                       <>
-                        <UploadCloud className="h-10 w-10 text-muted-foreground mb-3" />
-                        <span className="font-medium text-primary">Nhấn để tải video lên</span>
-                        <span className="text-xs text-muted-foreground mt-1">Hỗ trợ MP4, MOV (Tối đa 50MB)</span>
+                        <div className="h-16 w-16 rounded-full bg-background flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+                          <UploadCloud className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <span className="font-bold text-lg text-primary">Nhấn để tải video lên</span>
+                        <span className="text-sm text-muted-foreground mt-2">Hỗ trợ MP4, MOV (Tối đa 50MB)</span>
                       </>
                     )}
                   </Label>
                 </div>
-                {errors.mediaUrls && <p className="text-sm text-destructive font-medium">{errors.mediaUrls.message}</p>}
+                {errors.mediaUrls && <p className="text-sm text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/> {errors.mediaUrls.message}</p>}
 
                 {/* Display uploaded videos */}
                 {mediaUrls.length > 0 && (
-                  <div className="flex gap-3 mt-4 overflow-x-auto">
+                  <div className="flex gap-4 mt-6 overflow-x-auto pb-2">
                     {mediaUrls.map((url, i) => (
-                      <div key={i} className="relative h-24 w-32 bg-black rounded-lg flex items-center justify-center shrink-0">
-                        <PlayCircle className="h-8 w-8 text-white/70" />
-                        <div className="absolute bottom-1 left-2 text-[10px] text-white">Video {i+1}</div>
+                      <div key={i} className="relative h-28 w-40 bg-black rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-md group">
+                        <PlayCircle className="h-10 w-10 text-white/70 group-hover:text-white transition-colors" />
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-xs font-medium text-white">
+                          Video {i+1}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="reason" className="text-base font-semibold">
+              <div className="space-y-4">
+                <Label htmlFor="reason" className="text-base font-bold flex items-center gap-1.5">
                   Mô tả chi tiết vấn đề <span className="text-destructive">*</span>
                 </Label>
                 <Textarea 
                   id="reason" 
                   placeholder="Ví dụ: Xe bị móp khung ở sườn trái, không giống như mô tả ban đầu..." 
-                  className="min-h-[120px] resize-none"
+                  className="min-h-[160px] resize-none rounded-2xl bg-secondary/10 p-4 border-border/60 focus:border-primary/50 text-base"
                   {...register('reason')}
                 />
-                {errors.reason && <p className="text-sm text-destructive font-medium">{errors.reason.message}</p>}
+                {errors.reason && <p className="text-sm text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/> {errors.reason.message}</p>}
               </div>
 
-              <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 flex gap-3 text-sm text-blue-800">
-                <ShieldCheck className="h-5 w-5 shrink-0 text-blue-600" />
-                <p>
-                  VeloTrust sẽ đóng băng khoản tiền trong Escrow và đại diện xử lý công bằng dựa trên video unbox của bạn và báo cáo kiểm định ban đầu (nếu có).
+              <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-2xl p-5 flex gap-4 text-sm text-blue-800 dark:text-blue-300">
+                <ShieldCheck className="h-6 w-6 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <p className="leading-relaxed">
+                  <strong className="block mb-1">Bảo vệ bởi Escrow</strong>
+                  VeloTrust sẽ đóng băng khoản tiền và đại diện xử lý công bằng dựa trên video unbox của bạn cùng báo cáo kiểm định ban đầu (nếu có).
                 </p>
               </div>
 
-              <div className="pt-4 border-t border-border flex justify-end gap-3">
-                <Button variant="outline" type="button" onClick={() => router.back()}>
-                  Hủy
+              <div className="pt-6 border-t border-border/50 flex justify-end gap-4">
+                <Button variant="outline" type="button" onClick={() => router.back()} className="rounded-xl h-12 px-6 font-semibold">
+                  Hủy bỏ
                 </Button>
-                <Button type="submit" variant="destructive" disabled={disputeMutation.isPending || uploadMutation.isPending}>
+                <Button type="submit" variant="destructive" disabled={disputeMutation.isPending || uploadMutation.isPending} className="rounded-xl h-12 px-8 font-bold shadow-lg shadow-rose-500/20">
                   {disputeMutation.isPending ? 'Đang gửi...' : 'Gửi yêu cầu khiếu nại'}
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </main>
     </div>
   )

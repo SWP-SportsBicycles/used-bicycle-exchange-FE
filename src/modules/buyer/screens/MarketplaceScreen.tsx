@@ -1,17 +1,16 @@
 'use client'
 
-import { Suspense, useState, useMemo } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Grid3X3, List, Sparkles, Phone, Mail, MapPin, ShieldCheck, Truck, Search, Bike } from 'lucide-react'
-import Image from 'next/image'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
+import { Grid3X3, List, ShieldCheck, Search } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
+import { Breadcrumb } from '@/modules/buyer/components/Breadcrumb'
 import { FilterSidebar, MobileFilterSheet, type FilterState } from '@/modules/buyer/components/ListingFilters'
 import { ListingCard } from '@/modules/buyer/components/ListingCard'
+import { ListingCardSkeleton } from '@/modules/buyer/components/skeletons/ListingCardSkeleton'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -51,6 +50,7 @@ const categorySections = [
     image: 'https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=1200&q=80',
   },
 ]
+void categorySections
 
 const cityOptions = [
   { value: 'all', label: 'Toàn quốc' },
@@ -67,24 +67,39 @@ const bikeTypeOptions = [
   { value: 'urban', label: 'Xe đạp touring' },
 ] as const
 
-function MarketplacePageContent() {
+interface MarketplacePageContentProps {
+  initialQuery: string
+  initialCity: (typeof cityOptions)[number]['value']
+  initialBikeType: (typeof bikeTypeOptions)[number]['value']
+}
+
+function MarketplacePageContent({
+  initialQuery,
+  initialCity,
+  initialBikeType,
+}: MarketplacePageContentProps) {
   const router = useRouter()
-  const { user } = useAuth()
-  const [filters, setFilters] = useState<FilterState>(initialFilters)
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...initialFilters,
+    cities: initialCity === 'all' ? [] : [initialCity],
+    categories: initialBikeType === 'all' ? [] : [initialBikeType],
+  }))
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [searchInput, setSearchInput] = useState('')
-  const [appliedSearch, setAppliedSearch] = useState('')
+  const [searchInput, setSearchInput] = useState(initialQuery)
+  const [appliedSearch, setAppliedSearch] = useState(initialQuery)
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedCity, setSelectedCity] = useState<(typeof cityOptions)[number]['value']>('all')
-  const [selectedBikeType, setSelectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>('all')
-  const sellerCtaHref =
-    user.role === 'seller' ? '/seller/create' : '/auth/register?role=2&redirect=/seller/create'
+  const [selectedCity] = useState<(typeof cityOptions)[number]['value']>(initialCity)
+  const [selectedBikeType] = useState<(typeof bikeTypeOptions)[number]['value']>(initialBikeType)
 
-  const { data: listingPage } = useMarketplaceListings({
+  const activeCity = filters.cities[0] || (selectedCity !== 'all' ? selectedCity : undefined)
+  const activeCategory =
+    filters.categories[0] || (selectedBikeType !== 'all' ? selectedBikeType : undefined)
+
+  const { data: listingPage, isLoading } = useMarketplaceListings({
     keyword: appliedSearch || undefined,
-    city: selectedCity !== 'all' ? selectedCity : undefined,
-    category: selectedBikeType !== 'all' ? selectedBikeType : undefined,
+    city: activeCity,
+    category: activeCategory,
     brand: filters.brands[0] || undefined,
     condition: filters.conditions[0] || undefined,
     frameSize: filters.frameSizes[0] || undefined,
@@ -139,134 +154,70 @@ function MarketplacePageContent() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-border/60">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/hero-bike-art.png')",
-          }}
-        />
-        <div className="absolute left-0 top-0 h-full w-[22%] bg-[#aee86c]/95 [clip-path:polygon(0_0,100%_0,56%_100%,0_100%)]" />
-        <div className="absolute inset-0 bg-linear-to-r from-[#1d2a14]/70 via-[#1d2a14]/45 to-[#1d2a14]/65" />
-        <div className="absolute inset-0 opacity-25 [background:radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_42%),radial-gradient(circle_at_80%_15%,rgba(255,255,255,0.25),transparent_38%)]" />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 lg:py-24 lg:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center"
-          >
-            <Badge variant="secondary" className="mb-5 gap-1.5 px-4 py-1.5 text-sm font-medium bg-white/20 text-white border-white/30">
-              <Sparkles className="h-3.5 w-3.5 text-lime-100" />
-              Marketplace Xe Đạp Uy Tín #1 Việt Nam
-            </Badge>
-            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl text-balance" style={{ fontFamily: 'var(--font-archivo)' }}>
-              Tìm Xe Đạp Thể Thao
-              <br />
-              <span className="text-lime-200">Đã Qua Sử Dụng</span> Chất Lượng
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-100/95 text-pretty">
-              Mua bán xe đạp thể thao đã qua sử dụng tại Hà Nội, TP.HCM và Đà Nẵng. 
-              Mỗi xe đều có thể được kiểm định bởi đội ngũ VeloSafe chuyên nghiệp.
-            </p>
-
-            {/* Hero Search Bar */}
-            <div className="mx-auto mt-10 w-full max-w-6xl rounded-3xl border border-white/75 bg-white p-3 shadow-2xl">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-                  <input
-                    type="text"
-                    placeholder="Tìm xe đạp theo tên, thương hiệu..."
-                    className="h-14 w-full rounded-xl border border-transparent bg-slate-50 pl-11 pr-4 text-base text-foreground outline-none transition-colors focus:border-primary/40 focus:bg-white"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') applyHeroSearch()
-                    }}
-                  />
-                </div>
-
-                <Select value={selectedCity} onValueChange={(value) => setSelectedCity(value as typeof selectedCity)}>
-                  <SelectTrigger className="h-14 rounded-xl border-primary/25 bg-slate-50 text-[#253218] font-semibold">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cityOptions.map((city) => (
-                      <SelectItem key={city.value} value={city.value}>
-                        {city.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedBikeType} onValueChange={(value) => setSelectedBikeType(value as typeof selectedBikeType)}>
-                  <SelectTrigger className="h-14 rounded-xl border-primary/25 bg-slate-50 text-[#253218] font-semibold">
-                    <div className="flex items-center gap-2">
-                      <Bike className="h-4 w-4 text-primary" />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bikeTypeOptions.map((bikeType) => (
-                      <SelectItem key={bikeType.value} value={bikeType.value}>
-                        {bikeType.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  onClick={applyHeroSearch}
-                  className="h-14 rounded-xl bg-primary px-8 text-base font-semibold text-primary-foreground hover:bg-[#90cb4f]"
-                >
-                  Tìm xe
-                </Button>
-
-                <Button asChild className="h-14 rounded-xl bg-[#407F3E] px-8 text-base font-semibold text-white hover:bg-[#346734]">
-                  <Link href={sellerCtaHref}>Bán ngay</Link>
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Category Headings */}
-      <section className="border-b border-border/60 bg-linear-to-b from-background to-slate-50/70">
-        <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
-          <div className="mb-6 flex items-end justify-between gap-3">
+      {/* Premium Page Header */}
+      <section className="border-b border-border/40 bg-card/50 pt-8 pb-6">
+        <div className="mx-auto max-w-7xl px-4 lg:px-6">
+          <Breadcrumb items={[{ label: 'Marketplace' }]} />
+          
+          <div className="mt-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <p className="mt-2 text-2xl font-bold text-foreground uppercase tracking-wide" style={{ fontFamily: 'var(--font-archivo)' }}>
-                Danh mục sản phẩm
+              <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl" style={{ fontFamily: 'var(--font-archivo)' }}>
+                SBE Marketplace
+              </h1>
+              <p className="mt-2 text-muted-foreground max-w-2xl text-sm sm:text-base">
+                Khám phá bộ sưu tập xe đạp thể thao cao cấp đã qua sử dụng. Mọi giao dịch đều được bảo vệ bởi <span className="font-semibold text-primary">VeloSafe™</span> và công nghệ thanh toán an toàn.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="hidden md:inline-flex">
-              Xem tất cả danh mục
-            </Button>
+            
+            {/* Quick Search */}
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Tìm xe đạp (vd: Trek Madone)..."
+                className="h-11 w-full rounded-full border border-border/60 bg-background/50 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary/50 focus:bg-background focus:ring-1 focus:ring-primary/50"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyHeroSearch()
+                }}
+              />
+            </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {categorySections.map((section) => (
-              <article
-                key={section.title}
-                className="group overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-athletic"
+          
+          {/* Quick Filter Pills */}
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilters(p => ({ ...p, veloSafeOnly: !p.veloSafeOnly }))}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                filters.veloSafeOnly 
+                  ? "border-primary bg-primary/10 text-primary" 
+                  : "border-border/60 bg-background hover:border-primary/50"
+              )}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              VeloSafe Certified
+            </button>
+            {['Road', 'MTB', 'Gravel', 'Urban'].map(type => (
+              <button
+                key={type}
+                onClick={() => {
+                  const val = type.toLowerCase()
+                  setFilters(p => ({
+                    ...p,
+                    categories: p.categories.includes(val) ? [] : [val]
+                  }))
+                }}
+                className={cn(
+                  "rounded-full border px-4 py-1.5 text-xs font-medium transition-colors",
+                  filters.categories.includes(type.toLowerCase())
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border/60 bg-background hover:border-foreground/30 text-muted-foreground"
+                )}
               >
-                <div className="relative aspect-16/10 w-full bg-slate-100">
-                  <Image
-                    src={section.image}
-                    alt={section.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 768px) 50vw, 25vw"
-                  />
-                </div>
-                <h3 className="px-3 py-2 text-center text-base font-bold text-foreground">{section.title}</h3>
-              </article>
+                {type}
+              </button>
             ))}
           </div>
         </div>
@@ -274,7 +225,7 @@ function MarketplacePageContent() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
-        <div className="flex gap-6">
+        <div className="flex gap-6 mt-4">
           {/* Desktop Sidebar */}
           <FilterSidebar 
             filters={filters} 
@@ -284,20 +235,20 @@ function MarketplacePageContent() {
           {/* Listings Grid */}
           <div className="flex-1 min-w-0">
             {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="sticky top-20 z-30 mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-background/85 px-4 py-3 backdrop-blur-xl shadow-sm supports-[backdrop-filter]:bg-background/60">
               <div className="flex items-center gap-3">
                 <MobileFilterSheet 
                   filters={filters} 
                   onFilterChange={setFilters}
                 />
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{listingPage?.totalCount ?? filteredListings.length}</span> xe được tìm thấy
+                <p className="text-sm font-medium text-muted-foreground">
+                  Hiển thị <span className="text-foreground font-bold">{listingPage?.totalCount ?? filteredListings.length}</span> xe
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-45 bg-card">
+                  <SelectTrigger className="h-9 w-[180px] rounded-lg bg-background/50 text-sm font-medium border-border/60">
                     <SelectValue placeholder="Sắp xếp theo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -308,11 +259,11 @@ function MarketplacePageContent() {
                   </SelectContent>
                 </Select>
 
-                <div className="hidden sm:flex items-center border border-border/60 rounded-lg p-1 bg-card shadow-sm">
+                <div className="hidden sm:flex items-center rounded-lg border border-border/60 bg-background/50 p-0.5 shadow-sm">
                   <Button
                     variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-8 w-8 rounded-md"
                     onClick={() => setViewMode('grid')}
                   >
                     <Grid3X3 className="h-4 w-4" />
@@ -321,7 +272,7 @@ function MarketplacePageContent() {
                   <Button
                     variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-8 w-8 rounded-md"
                     onClick={() => setViewMode('list')}
                   >
                     <List className="h-4 w-4" />
@@ -332,7 +283,18 @@ function MarketplacePageContent() {
             </div>
 
             {/* Listings */}
-            {filteredListings.length > 0 ? (
+            {isLoading ? (
+              <div className={cn(
+                "grid gap-4",
+                viewMode === 'grid' 
+                  ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" 
+                  : "grid-cols-1"
+              )}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ListingCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : filteredListings.length > 0 ? (
               <div className={cn(
                 "grid gap-4",
                 viewMode === 'grid' 
@@ -413,55 +375,31 @@ function MarketplacePageContent() {
         </div>
       </main>
 
-      <footer className="mt-6 border-t border-border/70 bg-[#253218] text-slate-200">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-3 lg:px-6">
-          <div>
-            <h3 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-archivo)' }}>
-              VeloTrust
-            </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định VeloSafe.
-            </p>
-            <div className="mt-4 flex items-center gap-2 text-sm text-lime-200">
-              <ShieldCheck className="h-4 w-4" />
-              Cam kết xe rõ nguồn gốc - giao dịch an toàn
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Thông tin chính sách</h4>
-            <ul className="mt-4 space-y-2 text-sm text-slate-300">
-              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-lime-200" /> Chính sách giao hàng toàn quốc</li>
-              <li>Chính sách kiểm định VeloSafe</li>
-              <li>Chính sách đổi trả và hoàn tiền</li>
-              <li>Chính sách bảo mật dữ liệu</li>
-              <li>Điều khoản sử dụng nền tảng</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Liên hệ</h4>
-            <ul className="mt-4 space-y-3 text-sm text-slate-300">
-              <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-lime-200" />
-                Hotline: 028.9996.5775
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-lime-200" />
-                Email: support@velotrust.vn
-              </li>
-              <li className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-lime-200" />
-                330 Hùng Vương, Châu Đức, BR-VT
-              </li>
-            </ul>
-          </div>
-        </div>
-        <div className="border-t border-slate-700/70 py-4 text-center text-xs text-slate-400">
-          Copyright {new Date().getFullYear()} VeloTrust. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </div>
+  )
+}
+
+function MarketplacePageRoute() {
+  const searchParams = useSearchParams()
+  const initialQuery = searchParams.get('q') ?? searchParams.get('keyword') ?? ''
+  const cityParam = searchParams.get('city')
+  const typeParam = searchParams.get('type') ?? searchParams.get('category')
+
+  const initialCity = cityOptions.some((option) => option.value === cityParam)
+    ? (cityParam as (typeof cityOptions)[number]['value'])
+    : 'all'
+  const initialBikeType = bikeTypeOptions.some((option) => option.value === typeParam)
+    ? (typeParam as (typeof bikeTypeOptions)[number]['value'])
+    : 'all'
+
+  return (
+    <MarketplacePageContent
+      key={searchParams.toString()}
+      initialQuery={initialQuery}
+      initialCity={initialCity}
+      initialBikeType={initialBikeType}
+    />
   )
 }
 
@@ -477,7 +415,7 @@ export default function MarketplacePage() {
         </div>
       }
     >
-      <MarketplacePageContent />
+      <MarketplacePageRoute />
     </Suspense>
   )
 }

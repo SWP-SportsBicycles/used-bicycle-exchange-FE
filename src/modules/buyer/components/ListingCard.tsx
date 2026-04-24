@@ -4,9 +4,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles, BadgeCheck } from 'lucide-react'
+import { MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles, Lock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { type BuyerListing } from '@/lib/api/buyer-api'
 import { formatVND } from '@/lib/utils'
@@ -69,6 +68,8 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
     savingPct >= 16 ? 'Giá cạnh tranh' :
     'Giá hợp lý'
 
+  void pricingSignal
+
   // Auto-assign promoTag from listing data if caller didn't supply one
   const resolvedTag = promoTag ?? getAutoPromoTag(listing, savingPct)
 
@@ -84,9 +85,9 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
       <Link href={`/marketplace/${listing.id}`} className="block group">
         <div
           className={cn(
-            'relative flex flex-col overflow-hidden rounded-2xl bg-card border border-border/60',
-            'shadow-sm transition-all duration-300',
-            'hover:shadow-[0_8px_30px_-8px_rgba(174,232,108,0.25)] hover:-translate-y-1 hover:border-primary/40',
+            'relative flex flex-col overflow-hidden rounded-3xl bg-card',
+            'shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] transition-all duration-300',
+            'hover:shadow-athletic hover:-translate-y-1',
             listing.isLocked && 'opacity-70',
           )}
         >
@@ -98,8 +99,8 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
               alt={listing.title}
               fill
               className={cn(
-                'object-cover transition-all duration-500 group-hover:scale-[1.04]',
-                !imageLoaded && 'blur-sm scale-105',
+                'object-cover transition-all duration-700 ease-out group-hover:scale-105',
+                !imageLoaded && 'blur-sm scale-110',
               )}
               onLoad={() => setImageLoaded(true)}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -111,7 +112,10 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             {/* ── Locked overlay */}
             {listing.isLocked && (
               <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] flex items-center justify-center">
-                <Badge className="bg-slate-700 text-white text-sm px-4 py-1.5">Đang có người đặt cọc</Badge>
+                <Badge className="bg-slate-700 text-white text-sm px-4 py-1.5 flex items-center gap-1.5 rounded-xl">
+                  <Lock className="h-3.5 w-3.5" />
+                  Đang giao dịch (Locked)
+                </Badge>
               </div>
             )}
 
@@ -120,7 +124,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-[#aee86c] px-2.5 py-1 shadow-lg">
+                    <div className="absolute left-3 top-3 flex items-center gap-1 rounded-xl bg-[#aee86c] px-3 py-1.5 shadow-lg">
                       <ShieldCheck className="h-3.5 w-3.5 text-[#1f2c12]" />
                       <span className="text-[11px] font-bold text-[#1f2c12]">VeloSafe</span>
                     </div>
@@ -139,7 +143,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             {resolvedTag && PromoIcon && !listing.isLocked && (
               <div
                 className={cn(
-                  'absolute right-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 shadow-lg text-[11px] font-bold',
+                  'absolute right-3 top-3 flex items-center gap-1 rounded-xl px-3 py-1.5 shadow-lg text-[11px] font-bold',
                   PROMO_TAG_CONFIG[resolvedTag].className,
                 )}
               >
@@ -151,9 +155,11 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             {/* ── Wishlist button */}
             <div className="absolute bottom-3 right-3 z-10">
               <WishlistButton
-                listingId={listing.id}
+                key={`${listing.bikeId ?? listing.id}-${listing.isWishlisted ? '1' : '0'}`}
+                listingId={listing.bikeId ?? listing.id}
+                initialIsWishlisted={Boolean(listing.isWishlisted)}
                 variant="ghost"
-                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-md hover:bg-background hover:scale-110"
+                className="h-9 w-9 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white shadow-md hover:bg-black/40 hover:scale-110"
               />
             </div>
 
@@ -161,7 +167,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             <div className="absolute bottom-3 left-3">
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm',
+                  'inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/50 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md',
                 )}
               >
                 <span className={cn('h-1.5 w-1.5 rounded-full', condition.dot)} />
@@ -171,75 +177,69 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
           </div>
 
           {/* ── BODY ──────────────────────────────── */}
-          <div className="flex flex-col gap-0 p-4">
-
-            {/* Price row */}
-            <div className="flex items-baseline justify-between">
-              <span
-                className="text-2xl font-extrabold text-[#2d6b2b] dark:text-[#aee86c]"
-                style={{ fontFamily: 'var(--font-archivo)' }}
-              >
-                {formatVND(listing.price)}
-              </span>
-              {/* Seller rating — compact */}
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Star className="h-3.5 w-3.5 fill-primary text-primary" />
-                <span className="font-semibold text-foreground">{listing.seller.rating}</span>
-                <span>({listing.seller.totalSales} bán)</span>
-              </span>
+          <div className="flex flex-col gap-0 p-5">
+            
+            {/* Brand (Optional) & Title */}
+            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              {listing.brand}
             </div>
-
-            {/* Price intelligence */}
-            <div className="mt-2 rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-xs">
-                  <TrendingDown className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                  <span className="text-muted-foreground">Giá tham chiếu:</span>
-                  <span className="text-muted-foreground line-through">{formatVND(marketPrice)}</span>
-                </div>
-                <Badge className="border-0 bg-emerald-600/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-600/10 dark:text-emerald-300">
-                  {pricingSignal}
-                </Badge>
-              </div>
-              <p className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Tiết kiệm khoảng {formatVND(saving)} ({savingPct}%)
-              </p>
-            </div>
-
-            {/* Bike name */}
             <h3
-              className="mt-3 line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors duration-200 group-hover:text-[#407F3E]"
+              className="line-clamp-2 text-[17px] font-bold leading-snug text-foreground transition-colors duration-200 group-hover:text-primary"
             >
               {listing.title}
             </h3>
 
-            {/* Spec tags */}
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {[listing.brand, `Size ${listing.frameSize}`, listing.groupset].map((spec) => (
-                <span
-                  key={spec}
-                  className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground"
-                >
-                  {spec}
-                </span>
-              ))}
+            {/* Spec tags (Dot separated) */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[13px] text-muted-foreground">
+              <span>Size {listing.frameSize}</span>
+              <span>•</span>
+              <span className="truncate">{listing.groupset}</span>
+              {listing.isVeloSafeVerified && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 font-medium text-primary">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    VeloSafe
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Divider */}
-            <div className="my-3 h-px bg-border/60" />
+            <div className="my-4 h-[1px] w-full bg-gradient-to-r from-transparent via-border/50 to-transparent" />
 
-            {/* Footer row: location + verified seller */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                <span>{CITY_LABELS[listing.city] ?? listing.city}</span>
+            {/* Price & Savings */}
+            <div className="flex items-end justify-between">
+              <div>
+                <span
+                  className="text-2xl sm:text-[28px] font-extrabold text-foreground tracking-tighter"
+                  style={{ fontFamily: 'var(--font-archivo)' }}
+                >
+                  {formatVND(listing.price)}
+                </span>
+                {savingPct >= 15 && (
+                  <div className="mt-1 flex items-center gap-1.5 text-xs">
+                    <span className="text-muted-foreground line-through decoration-muted-foreground/50">
+                      {formatVND(marketPrice)}
+                    </span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      Giảm {savingPct}%
+                    </span>
+                  </div>
+                )}
               </div>
-              {listing.isVeloSafeVerified && (
-                <div className="flex items-center gap-1 text-[#407F3E] dark:text-[#aee86c]">
-                  <BadgeCheck className="h-3.5 w-3.5 shrink-0" />
-                  <span className="font-medium">Đã kiểm định</span>
+              
+              {/* Location */}
+              <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span>{CITY_LABELS[listing.city] ?? listing.city}</span>
                 </div>
-              )}
+                <div className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  <span className="font-medium text-foreground">{listing.seller.rating}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -3,27 +3,28 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Header } from '@/components/header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Package, ExternalLink, ChevronRight } from 'lucide-react'
+import { Package, ChevronRight } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { formatVND } from '@/lib/mock-data'
 import { BuyerOrder } from '@/lib/api/buyer-api'
+import { OrderCardSkeleton } from '../components/skeletons/OrderCardSkeleton'
+import { CancelOrderDialog } from '../components/CancelOrderDialog'
 
 const statusColorMap: Record<BuyerOrder['status'], string> = {
-  timer_draft: 'bg-slate-500',
-  payos_paid: 'bg-amber-500',
-  shipping: 'bg-blue-500',
-  delivered: 'bg-teal-500',
-  completed: 'bg-success',
-  cancelled: 'bg-destructive',
-  disputed: 'bg-rose-600',
+  pending: 'bg-status-draft',
+  paid: 'bg-status-paid',
+  shipping: 'bg-status-shipping',
+  delivered: 'bg-status-delivered',
+  completed: 'bg-status-completed',
+  cancelled: 'bg-status-cancelled',
+  disputed: 'bg-status-disputed',
 }
 
 const statusLabelMap: Record<BuyerOrder['status'], string> = {
-  timer_draft: 'Đang khóa (Chưa TT)',
-  payos_paid: 'Đã thanh toán',
+  pending: 'Đang chờ TT',
+  paid: 'Đã thanh toán',
   shipping: 'Đang vận chuyển',
   delivered: 'Đã giao hàng',
   completed: 'Hoàn tất',
@@ -35,7 +36,8 @@ import { useState } from 'react'
 
 export default function OrderListScreen() {
   const [statusFilter, setStatusFilter] = useState<BuyerOrder['status'] | 'all'>('all')
-  const { data: orderPage, isLoading } = useOrders(1, 100) // Using a larger page size to demo filtering simply
+  const [page, setPage] = useState(1)
+  const { data: orderPage, isLoading } = useOrders(page, 10)
 
   const filteredItems = orderPage?.items?.filter(order => 
     statusFilter === 'all' ? true : order.status === statusFilter
@@ -77,42 +79,42 @@ export default function OrderListScreen() {
         </div>
 
         {isLoading ? (
-          <div className="space-y-4 animate-pulse">
-            {[1, 2, 3].map(i => <div key={i} className="h-40 bg-muted rounded-xl" />)}
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => <OrderCardSkeleton key={i} />)}
           </div>
         ) : filteredItems.length === 0 ? (
-          <Card className="py-12">
-            <CardContent className="flex flex-col items-center text-center">
-              <Package className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-bold text-foreground">Bạn chưa có đơn hàng nào</h3>
-              <p className="text-muted-foreground mt-2 max-w-md">Khám phá các mẫu xe đạp chất lượng đang được bán trên Marketplace.</p>
-              <Button asChild className="mt-6">
-                <Link href="/marketplace">Mua sắm ngay</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-3xl border border-border/50 bg-card p-12 shadow-sm text-center flex flex-col items-center">
+            <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center mb-6">
+              <Package className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-2xl font-bold text-foreground mb-3" style={{ fontFamily: 'var(--font-archivo)' }}>Bạn chưa có đơn hàng nào</h3>
+            <p className="text-muted-foreground max-w-md mx-auto mb-8 text-base">Khám phá các mẫu xe đạp chất lượng đang được bán trên Marketplace với chế độ bảo vệ Escrow 100%.</p>
+            <Button asChild className="rounded-xl h-12 px-8 font-bold shadow-athletic">
+              <Link href="/marketplace">Mua sắm ngay</Link>
+            </Button>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {filteredItems.map((order) => (
-              <Card key={order.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <div className="bg-secondary/30 px-5 py-3 border-b border-border flex flex-wrap items-center justify-between gap-4">
+              <div key={order.id} className="rounded-3xl bg-card border border-border/40 shadow-sm overflow-hidden hover:shadow-athletic transition-all duration-300 group">
+                <div className="bg-secondary/30 px-6 py-4 border-b border-border/40 flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="font-semibold text-foreground uppercase">
-                      Mã ĐH: {order.id.split('-')[0]}
+                    <span className="font-bold text-foreground uppercase tracking-wider">
+                      Mã ĐH: {(order.id || 'N/A').split('-')[0]}
                     </span>
-                    <span className="text-muted-foreground">
+                    <span className="text-muted-foreground font-medium hidden sm:inline-block">
                       {new Date(order.createdAt).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
-                  <Badge className={`${statusColorMap[order.status]} hover:${statusColorMap[order.status]} text-white border-0`}>
+                  <Badge className={`${statusColorMap[order.status]} hover:${statusColorMap[order.status]} text-white border-0 px-3 py-1 rounded-full font-semibold shadow-sm`}>
                     {statusLabelMap[order.status]}
                   </Badge>
                 </div>
                 
-                <CardContent className="p-0">
-                  <div className="p-5 flex flex-wrap lg:flex-nowrap gap-6 items-center">
+                <div className="p-6">
+                  <div className="flex flex-wrap lg:flex-nowrap gap-6 items-center">
                     {/* Image */}
-                    <div className="relative h-24 w-24 rounded-lg overflow-hidden bg-secondary shrink-0 border border-border">
+                    <div className="relative h-28 w-28 rounded-2xl overflow-hidden bg-secondary shrink-0 border border-border/50 shadow-inner group-hover:border-primary/30 transition-colors">
                       <Image 
                         src={order.listing.images[0] || '/placeholder.png'} 
                         alt={order.listing.title}
@@ -123,27 +125,68 @@ export default function OrderListScreen() {
 
                     {/* Details */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-lg text-foreground line-clamp-1 mb-1">
+                      <h3 className="font-bold text-xl text-foreground line-clamp-1 mb-2">
                         {order.listing.title}
                       </h3>
-                      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                        <p>Tổng thanh toán: <strong className="text-primary">{formatVND(order.totalPrice)}</strong></p>
-                        <p>Người nhận: {order.receiverName} - {order.receiverPhone}</p>
+                      <div className="flex flex-col gap-1.5 text-sm">
+                        <p className="text-muted-foreground">Thanh toán: <strong className="text-primary text-base ml-1" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(order.totalPrice)}</strong></p>
+                        <p className="text-muted-foreground">Người nhận: <span className="text-foreground font-medium">{order.receiverName} - {order.receiverPhone}</span></p>
                       </div>
                     </div>
 
+                    {/* Receipt separator */}
+                    <div className="hidden lg:block w-px h-20 border-l-2 border-dashed border-border/60 mx-4"></div>
+                    <div className="lg:hidden w-full h-px border-t-2 border-dashed border-border/60 my-2"></div>
+
                     {/* Actions */}
-                    <div className="w-full lg:w-auto flex lg:flex-col gap-3 justify-end shrink-0 border-t lg:border-t-0 pt-4 lg:pt-0">
-                      <Button asChild variant="default" className="flex-1 lg:flex-none">
+                    <div className="w-full lg:w-48 flex flex-col gap-3 justify-center shrink-0">
+                      {order.status === 'pending' && (
+                        <>
+                          <Button asChild variant="destructive" className="w-full h-11 rounded-xl font-bold shadow-lg shadow-destructive/20 animate-pulse-glow">
+                            <Link href={`/buyer/checkout?orderId=${order.id}`}>
+                              Thanh toán ngay
+                            </Link>
+                          </Button>
+                          <CancelOrderDialog order={order} />
+                        </>
+                      )}
+                      <Button asChild variant={order.status === 'pending' ? 'ghost' : 'default'} className="w-full h-11 rounded-xl font-semibold">
                         <Link href={`/buyer/orders/${order.id}`}>
                           Xem chi tiết <ChevronRight className="h-4 w-4 ml-1" />
                         </Link>
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {orderPage && orderPage.totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              disabled={page <= 1 || isLoading}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Trang trước
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Trang {page} / {orderPage.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              disabled={page >= orderPage.totalPages || isLoading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Trang sau
+            </Button>
           </div>
         )}
       </main>

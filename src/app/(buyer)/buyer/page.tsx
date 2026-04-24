@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation'
+import BuyerDashboardScreen from '@/modules/buyer/screens/BuyerDashboardScreen'
 
-/** /buyer → redirect tới trang quản lý đơn hàng */
+export const metadata = {
+  title: 'Tổng quan | VeloTrust',
+  description: 'Quản lý đơn hàng, wishlist và hoạt động mua sắm xe đạp của bạn trên VeloTrust.',
+}
+
 export default function BuyerIndexPage() {
-  redirect('/buyer/orders')
+  return <BuyerDashboardScreen />
 }

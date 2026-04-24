@@ -11,7 +11,7 @@ interface OrderStatusStepperProps {
 export function OrderStatusStepper({ status }: OrderStatusStepperProps) {
   const getStepStatus = (stepIndex: number) => {
     // Basic progression logic based on standard e-commerce flow
-    const statuses = ['timer_draft', 'payos_paid', 'shipping', 'delivered', 'completed']
+    const statuses = ['pending', 'paid', 'shipping', 'delivered', 'completed']
     const currentIndex = statuses.indexOf(status)
     
     if (status === 'cancelled' || status === 'disputed') {
@@ -40,44 +40,44 @@ export function OrderStatusStepper({ status }: OrderStatusStepperProps) {
   }
 
   return (
-    <div className="w-full py-6">
-      <div className="flex items-center justify-between relative">
+    <div className="w-full py-8">
+      <div className="flex items-center justify-between relative px-2 sm:px-6">
         {/* Progress Bar Background */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-border rounded-full" />
-        
-        {/* Active Progress Bar */}
-        <div 
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full transition-all duration-500"
-          style={{ 
-            width: status === 'timer_draft' ? '0%' : 
-                   status === 'payos_paid' ? '33%' : 
-                   status === 'shipping' ? '66%' : 
-                   status === 'completed' ? '100%' : '100%' 
-          }}
-        />
+        <div className="absolute left-[10%] right-[10%] top-1/2 -translate-y-1/2 h-1.5 bg-secondary/50 rounded-full overflow-hidden">
+          {/* Active Progress Bar */}
+          <div 
+            className="absolute left-0 top-0 bottom-0 bg-primary transition-all duration-700 ease-out rounded-full"
+            style={{ 
+              width: status === 'pending' ? '0%' : 
+                     status === 'paid' ? '33%' : 
+                     status === 'shipping' ? '66%' : 
+                     ['delivered', 'completed', 'disputed'].includes(status) ? '100%' : '100%' 
+            }}
+          />
+        </div>
 
         {steps.map((step, index) => {
           const stepStatus = getStepStatus(index)
           const Icon = step.icon
 
           return (
-            <div key={index} className="relative z-10 flex flex-col items-center gap-2 bg-background px-2">
+            <div key={index} className="relative z-10 flex flex-col items-center gap-3">
               <div 
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors duration-300",
-                  stepStatus === 'completed' && "bg-primary border-primary text-primary-foreground",
-                  stepStatus === 'current' && "bg-background border-primary text-primary animate-pulse",
-                  stepStatus === 'error' && "bg-destructive border-destructive text-destructive-foreground",
-                  stepStatus === 'upcoming' && "bg-background border-border text-muted-foreground"
+                  "flex h-12 w-12 items-center justify-center rounded-full transition-all duration-500 shadow-sm ring-4 ring-card",
+                  stepStatus === 'completed' && "bg-primary text-primary-foreground shadow-primary/30",
+                  stepStatus === 'current' && "bg-card border-2 border-primary text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]",
+                  stepStatus === 'error' && "bg-destructive text-destructive-foreground shadow-destructive/30",
+                  stepStatus === 'upcoming' && "bg-secondary text-muted-foreground border border-border"
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className={cn("h-5 w-5", stepStatus === 'current' && "animate-pulse")} />
               </div>
               <span 
                 className={cn(
-                  "text-xs font-semibold whitespace-nowrap",
-                  stepStatus === 'upcoming' ? "text-muted-foreground" : "text-foreground",
-                  stepStatus === 'error' && "text-destructive"
+                  "text-xs sm:text-sm font-bold whitespace-nowrap px-2 py-1 rounded-md",
+                  stepStatus === 'upcoming' ? "text-muted-foreground" : "text-foreground bg-secondary/30",
+                  stepStatus === 'error' && "text-destructive bg-destructive/10"
                 )}
               >
                 {step.label}

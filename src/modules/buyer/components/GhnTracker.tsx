@@ -1,7 +1,6 @@
 'use client'
 
 import { ShipmentInfo } from '@/lib/api/buyer-api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Truck, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,52 +19,57 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
   }
 
   return (
-    <Card>
-      <CardHeader className="bg-secondary/30 pb-4">
-        <CardTitle className="text-base flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary" />
-            Lịch sử giao hàng (GHN)
-          </div>
-          <span className="text-sm font-normal text-muted-foreground">
-            Mã vận đơn: <span className="font-bold text-foreground">{shipment.waybillCode}</span>
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <div className="space-y-6">
+    <div className="rounded-3xl bg-card border border-border/40 shadow-sm overflow-hidden">
+      <div className="bg-secondary/30 px-6 py-4 flex items-center justify-between border-b border-border/40">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Truck className="h-5 w-5 text-primary" />
+          Lịch trình giao hàng (GHN)
+        </h2>
+        <span className="text-sm font-medium text-muted-foreground bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full border border-primary/10">
+          Mã vận đơn: <span className="font-bold text-foreground">{shipment.waybillCode}</span>
+        </span>
+      </div>
+      <div className="p-6 md:p-8">
+        <div className="space-y-6 relative">
+          {/* Main vertical line */}
+          {shipment.events.length > 1 && (
+            <div className="absolute left-[15px] top-4 bottom-8 w-0.5 bg-border/50" />
+          )}
+
           {shipment.events.map((event, index) => (
-            <div key={index} className="flex gap-4 relative">
-              {/* Timeline Connector */}
-              {index !== shipment.events.length - 1 && (
-                <div className="absolute left-[11px] top-6 bottom-[-24px] w-0.5 bg-border" />
-              )}
-              
-              <div className="flex flex-col items-center mt-1 z-10">
+            <div key={index} className="flex gap-5 relative group">
+              <div className="flex flex-col items-center z-10 mt-0.5">
                 <div className={cn(
-                  "h-6 w-6 rounded-full flex items-center justify-center shrink-0",
-                  index === 0 ? "bg-primary text-primary-foreground" : "bg-secondary border border-border"
+                  "h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ring-4 ring-card transition-colors",
+                  index === 0 
+                    ? "bg-primary text-primary-foreground shadow-primary/20" 
+                    : "bg-secondary border border-border text-muted-foreground group-hover:border-primary/50 group-hover:text-primary"
                 )}>
-                  {index === 0 ? <CheckCircle2 className="h-4 w-4" /> : <div className="h-2 w-2 rounded-full bg-muted-foreground" />}
+                  {index === 0 ? <CheckCircle2 className="h-4 w-4" /> : <div className="h-2.5 w-2.5 rounded-full bg-current" />}
                 </div>
               </div>
               
-              <div className="flex-1 pb-2">
+              <div className={cn(
+                "flex-1 pb-4",
+                index !== shipment.events.length - 1 && "border-b border-border/40"
+              )}>
                 <p className={cn(
-                  "text-sm font-semibold",
+                  "text-base font-bold",
                   index === 0 ? "text-foreground" : "text-muted-foreground"
                 )}>
                   {event.status}
                 </p>
-                <p className="text-sm text-foreground mt-1">{event.description}</p>
-                <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{new Date(event.time).toLocaleString('vi-VN')}</span>
+                <p className="text-sm text-foreground mt-1.5 leading-relaxed">{event.description}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs font-medium text-muted-foreground">
+                  <div className="flex items-center gap-1 bg-secondary/50 px-2 py-1 rounded-md">
+                    <Clock className="h-3 w-3" />
+                    <span>{new Date(event.time).toLocaleString('vi-VN')}</span>
+                  </div>
                   {event.location && (
-                    <>
-                      <span>•</span>
+                    <div className="flex items-center gap-1 bg-secondary/50 px-2 py-1 rounded-md">
+                      <span className="text-primary">•</span>
                       <span>{event.location}</span>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -73,12 +77,15 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
           ))}
 
           {shipment.events.length === 0 && (
-            <div className="text-center text-muted-foreground py-4 text-sm">
-              Chưa có thông tin cập nhật từ GHN.
+            <div className="text-center text-muted-foreground py-8 text-sm flex flex-col items-center justify-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p>Chưa có thông tin cập nhật từ đối tác vận chuyển.</p>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

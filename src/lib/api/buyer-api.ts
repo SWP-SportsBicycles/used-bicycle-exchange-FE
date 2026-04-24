@@ -56,6 +56,7 @@ export interface BuyerListing {
   wheelSize: string;
   description: string;
   images: string[];
+  videoUrls?: string[];
   thumbnail?: string;         // BE có thể trả thumbnail thay vì images[]
   city: string;
   isVeloSafeVerified: boolean;
@@ -94,8 +95,8 @@ export interface BuyerOrder {
   listingId: string;
   listing: Pick<BuyerListing, "id" | "title" | "images" | "price">;
   status:
-    | "timer_draft"
-    | "payos_paid"
+    | "pending"
+    | "paid"
     | "shipping"
     | "delivered"
     | "completed"
@@ -144,6 +145,30 @@ export interface CheckoutResponse {
   expiresAt: string;
 }
 
+export interface CheckoutPreview {
+  shippingFee: number;
+  totalPrice: number;
+  subtotal: number;
+  selectedItemCount: number;
+}
+
+export interface BuyerCartItem {
+  id: string;
+  bikeId: string;
+  listingId: string;
+  isSelected: boolean;
+  listing: BuyerListing;
+  addedAt?: string;
+  updatedAt?: string;
+}
+
+export interface BuyerCart {
+  items: BuyerCartItem[];
+  totalCount: number;
+  selectedCount: number;
+  subtotal: number;
+}
+
 export interface OrderStatusResponse {
   orderId: string;
   status: BuyerOrder["status"];
@@ -153,6 +178,7 @@ export interface OrderStatusResponse {
 export interface DisputePayload {
   type: string;               // BE expects ReportTypeEnum
   reason: string;
+  mediaUrls?: string[];       // Video evidence URLs (uploaded via /api/Upload/video)
 }
 
 export interface WishlistPage {
@@ -194,35 +220,176 @@ export interface SearchListingsParams {
 // ===== NORMALIZERS =====
 
 /**
- * Backend trả totalItems, FE dùng totalCount.
- * Backend có thể trả listing với listingId thay vì id.
- * Backend có thể trả thumbnail thay vì images[].
- * Normalize tất cả ở đây.
+ * Normalize listing từ BE — xử lý 2 dạng response:
+ *
+ * 1. Listing list  (GET /api/buyer-listing):
+ *    Fields phẳng: { listingId, title, brand, price, thumbnail, ... }
+ *
+ * 2. Listing detail (GET /api/buyer-listing/{id}):
+ *    Fields xe nằm trong nested array:
+ *    { listingId, title, bikes: [{ brand, price, category, ... }] }
+ *
+ * Chiến lược: merge bikes[0] LÊN TRÊN item, nhưng với các field quan trọng
+ * (price, brand, city, ...) phải ưu tiên bikes[0] vì root-level có thể null/undefined.
  */
 function normalizeListing(raw: Record<string, unknown>): BuyerListing {
   const item = raw as Record<string, unknown>;
-  const listing = {
-    ...item,
-    // Ensure id is always set
-    id: (item.listingId || item.id || "") as string,
-    // Ensure images[] always exists
-    images: (item.images as string[]) ??
-      (item.thumbnail ? [item.thumbnail as string] : []),
-    // Ensure seller object exists
-    seller: (item.seller as BuyerListing["seller"]) ?? {
+
+  // ── Extract bikes[0] if present (detail endpoint) ───────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bikesArr = item.bikes as any[] | undefined;
+  const bike0 = Array.isArray(bikesArr) && bikesArr.length > 0 ? bikesArr[0] as Record<string, unknown> : null;
+
+  // Merge strategy: bike0 first (fields from nested bikes[]), then item overrides
+  // BUT we must NOT let undefined root-level values override bike0 values.
+  // So we merge manually for key fields.
+  const merged: Record<string, unknown> = bike0
+    ? { ...bike0, ...item }
+    : { ...item };
+
+  // ── id ───────────────────────────────────────────────────────────────────
+  const id = (merged.listingId || merged.id || "") as string;
+  const bikeId = (merged.bikeId || bike0?.bikeId || "") as string;
+
+  // ── price: must come from bikes[0].price if root is missing ─────────────
+  // item.price is undefined in detail response; bike0.price has the value
+  const rawPrice = merged.price ?? bike0?.price ?? 0;
+  const price = typeof rawPrice === "number" ? rawPrice : parseFloat(String(rawPrice)) || 0;
+
+  const sanitizeUrl = (value: unknown) =>
+    typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  const isVideoUrl = (url: string) => /\.(mp4|mov|webm|m3u8)(\?|$)/i.test(url) || url.includes("/video/");
+
+  const mediaItems: unknown[] = [
+    ...(Array.isArray(merged.medias) ? merged.medias : []),
+    ...(Array.isArray(bike0?.medias) ? bike0.medias : []),
+    ...(Array.isArray(merged.media) ? merged.media : []),
+    ...(Array.isArray(bike0?.media) ? bike0.media : []),
+  ];
+
+  const mediaImageUrls: string[] = [];
+  const mediaVideoUrls: string[] = [];
+  for (const media of mediaItems) {
+    if (typeof media === "string") {
+      const url = sanitizeUrl(media);
+      if (!url) continue;
+      if (isVideoUrl(url)) mediaVideoUrls.push(url);
+      else mediaImageUrls.push(url);
+      continue;
+    }
+
+    if (!media || typeof media !== "object") continue;
+
+    const record = media as Record<string, unknown>;
+    const url = sanitizeUrl(record.url);
+    const image = sanitizeUrl(record.image) ?? sanitizeUrl(record.imageUrl) ?? sanitizeUrl(record.thumbnail);
+    const video = sanitizeUrl(record.videoUrl) ?? sanitizeUrl(record.video);
+    const mediaType = sanitizeUrl(record.mediaType)?.toLowerCase() ?? "";
+    const type = record.type;
+    const isVideoType = type === 1 || mediaType === "video";
+
+    if (image) mediaImageUrls.push(image);
+    if (video) mediaVideoUrls.push(video);
+    if (url) {
+      if (isVideoType || isVideoUrl(url)) mediaVideoUrls.push(url);
+      else mediaImageUrls.push(url);
+    }
+  }
+
+  const directVideoUrls = [
+    ...(Array.isArray(merged.videoUrls) ? merged.videoUrls : []),
+    ...(Array.isArray(merged.mediaUrls) ? merged.mediaUrls : []),
+    ...(Array.isArray(bike0?.videoUrls) ? bike0.videoUrls : []),
+    ...(Array.isArray(bike0?.mediaUrls) ? bike0.mediaUrls : []),
+  ]
+    .map(sanitizeUrl)
+    .filter((url): url is string => Boolean(url));
+
+  const uniqueMediaImages = [...new Set(mediaImageUrls)];
+  const uniqueVideoUrls = [...new Set([...mediaVideoUrls, ...directVideoUrls])];
+
+  // ── images ───────────────────────────────────────────────────────────────
+  const PLACEHOLDER = "https://placehold.co/800x600/1a1a1a/aee86c?text=No+Image";
+  const images: string[] =
+    Array.isArray(merged.images) && (merged.images as string[]).length > 0
+      ? merged.images as string[]
+      : merged.thumbnail
+        ? [merged.thumbnail as string]
+        : uniqueMediaImages.length > 0
+          ? uniqueMediaImages
+        : [PLACEHOLDER];
+
+  // ── city: BE detail may return "TP.HCM", list returns slug ──────────────
+  const rawCity = ((merged.city ?? bike0?.city) as string) || "";
+  const cityMap: Record<string, string> = {
+    "TP.HCM": "hcm", "tp.hcm": "hcm", "hồ chí minh": "hcm", "ho chi minh": "hcm",
+    "Hà Nội": "hanoi", "hà nội": "hanoi",
+    "Đà Nẵng": "danang", "đà nẵng": "danang",
+  };
+  const city = cityMap[rawCity] ?? (rawCity || "");
+
+  // ── serial: "serialNumber" (detail) vs "serial" (list) ──────────────────
+  const serial = ((merged.serial ?? merged.serialNumber ?? bike0?.serialNumber) as string) || "";
+
+  // ── condition ────────────────────────────────────────────────────────────
+  const condition = ((merged.condition ?? bike0?.condition) as string) || "good";
+
+  // ── wheelSize: "tireRim" in detail ──────────────────────────────────────
+  const wheelSize = ((merged.wheelSize ?? merged.tireRim ?? bike0?.tireRim) as string) || "";
+
+  // ── VeloSafe: "Checked" overall → true ──────────────────────────────────
+  const overall = ((merged.overall ?? bike0?.overall) as string) || "";
+  const isVeloSafeVerified =
+    (merged.isVeloSafeVerified as boolean | undefined) ??
+    (merged.isInspected as boolean | undefined) ??
+    overall.toLowerCase() === "checked";
+
+  // ── createdAt: fallback to now if missing ────────────────────────────────
+  const createdAt = (merged.createdAt as string) || "";
+  const rawTitle = ((merged.title ?? bike0?.title) as string | undefined)?.trim() || "";
+  const fallbackTitle = [
+    ((merged.brand ?? bike0?.brand) as string | undefined)?.trim() || "",
+    ((merged.model ?? bike0?.model) as string | undefined)?.trim() || "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const title = rawTitle || fallbackTitle || "Xe dap da qua su dung";
+  const category = ((merged.category ?? bike0?.category) as string) || "road";
+  const updatedAt = ((merged.updatedAt ?? merged.createdAt) as string) || createdAt;
+
+  const listing: BuyerListing = {
+    ...merged,
+    id,
+    bikeId,
+    price,
+    images,
+    videoUrls: uniqueVideoUrls,
+    city,
+    serial,
+    condition: condition as BuyerListing["condition"],
+    wheelSize,
+    isVeloSafeVerified,
+    createdAt,
+    status: normalizeListingStatus(merged.status ?? bike0?.status),
+    isLocked: parseBoolean(merged.isLocked ?? bike0?.isLocked),
+    // Bike spec fields — prefer bike0 values when root-level is missing
+    brand: ((merged.brand ?? bike0?.brand) as string) || "",
+    model: ((merged.model ?? bike0?.model) as string) || "",
+    frameSize: ((merged.frameSize ?? bike0?.frameSize) as string) || "",
+    frameMaterial: ((merged.frameMaterial ?? bike0?.frameMaterial) as string) || "",
+    groupset: ((merged.groupset ?? bike0?.groupset) as string) || "",
+    description: (merged.description as string) || "",
+    seller: (merged.seller as BuyerListing["seller"]) ?? {
       id: "",
-      name: (item.sellerName as string) || "Người bán",
-      rating: (item.sellerRating as number) || 4.5,
-      totalSales: (item.sellerTotalSales as number) || 0,
-      memberSince: (item.sellerMemberSince as string) || "",
+      name: (merged.sellerName as string) || "Người bán",
+      rating: (merged.sellerRating as number) || 4.5,
+      totalSales: (merged.sellerTotalSales as number) || 0,
+      memberSince: (merged.sellerMemberSince as string) || "",
     },
-    // Default status
-    status: (item.status as string) || "published",
-    // Default lock
-    isLocked: (item.isLocked as boolean) ?? false,
-    isVeloSafeVerified: (item.isVeloSafeVerified as boolean) ??
-      (item.isInspected as boolean) ?? false,
-  } as BuyerListing;
+    title,
+    category,
+    updatedAt,
+  };
 
   return listing;
 }
@@ -245,11 +412,245 @@ function normalizeOrderPage(raw: unknown): BuyerOrderPage {
   const page = raw as any;
   const items = page?.items ?? [];
   return {
-    items: Array.isArray(items) ? items : [],
+    items: Array.isArray(items)
+      ? (items as Record<string, unknown>[]).map((item) => normalizeOrder(item))
+      : [],
     totalCount: page?.totalCount ?? page?.totalItems ?? items.length,
     pageNumber: page?.pageNumber ?? 1,
     pageSize: page?.pageSize ?? 10,
     totalPages: page?.totalPages ?? 1,
+  };
+}
+
+function parseNumber(value: unknown) {
+  return typeof value === "number" ? value : parseFloat(String(value ?? "")) || 0;
+}
+
+function parseOptionalString(value: unknown) {
+  if (typeof value !== "string") return undefined;
+
+  const normalized = value.trim();
+  if (!normalized || normalized === "undefined" || normalized === "null") {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+function parseBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "locked";
+}
+
+function normalizeListingStatus(value: unknown): BuyerListing["status"] {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  const allowedStatuses: BuyerListing["status"][] = [
+    "draft",
+    "pending_review",
+    "published",
+    "reserved",
+    "sold",
+    "withdrawn",
+  ];
+
+  if (allowedStatuses.includes(normalized as BuyerListing["status"])) {
+    return normalized as BuyerListing["status"];
+  }
+
+  if (normalized === "pending" || normalized.includes("review")) return "pending_review";
+  if (normalized === "approved" || normalized === "active" || normalized === "available") return "published";
+  if (normalized.includes("publish")) return "published";
+  if (normalized.includes("reserve") || normalized.includes("lock")) return "reserved";
+  if (normalized.includes("sold")) return "sold";
+  if (normalized.includes("withdraw")) return "withdrawn";
+
+  return "published";
+}
+
+function normalizeOrderStatus(value: unknown): BuyerOrder["status"] {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  const allowedStatuses: BuyerOrder["status"][] = [
+    "pending",
+    "paid",
+    "shipping",
+    "delivered",
+    "completed",
+    "cancelled",
+    "disputed",
+  ];
+
+  if (allowedStatuses.includes(normalized as BuyerOrder["status"])) {
+    return normalized as BuyerOrder["status"];
+  }
+
+  // Backend trả "Locked" cho đơn vừa tạo (chờ thanh toán) → map về pending
+  if (normalized === "locked") return "pending";
+  if (normalized.includes("cancel")) return "cancelled";
+  if (normalized.includes("disput")) return "disputed";
+  if (normalized.includes("deliver")) return "delivered";
+  if (normalized.includes("ship")) return "shipping";
+  if (normalized.includes("paid") || normalized.includes("payment_success")) return "paid";
+
+  return "pending";
+}
+
+function normalizeCartItem(raw: Record<string, unknown>): BuyerCartItem {
+  const listingSource =
+    raw.listing && typeof raw.listing === "object"
+      ? (raw.listing as Record<string, unknown>)
+      : raw.bike && typeof raw.bike === "object"
+        ? (raw.bike as Record<string, unknown>)
+        : raw;
+
+  const listing = normalizeListing(listingSource);
+
+  return {
+    id: ((raw.id ?? raw.cartItemId) as string) || listing.id,
+    bikeId: ((raw.bikeId ?? listing.bikeId) as string) || "",
+    listingId: ((raw.listingId ?? listing.id) as string) || listing.id,
+    isSelected: (raw.isSelected as boolean | undefined) ?? true,
+    listing,
+    addedAt: (raw.createdAt as string) || undefined,
+    updatedAt: (raw.updatedAt as string) || undefined,
+  };
+}
+
+function normalizeCart(raw: unknown): BuyerCart {
+  const data =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  const rawItems =
+    (Array.isArray(data.items) ? data.items :
+      Array.isArray(data.cartItems) ? data.cartItems :
+      Array.isArray(raw) ? raw : []) as Record<string, unknown>[];
+
+  const items = rawItems.map((item) => normalizeCartItem(item));
+  const selectedItems = items.filter((item) => item.isSelected);
+  const subtotal = selectedItems.reduce((sum, item) => sum + parseNumber(item.listing.price), 0);
+
+  return {
+    items,
+    totalCount: Number(data.totalCount ?? data.totalItems ?? items.length) || items.length,
+    selectedCount: Number(data.selectedCount ?? selectedItems.length) || selectedItems.length,
+    subtotal: parseNumber(data.subtotal ?? data.totalPrice ?? subtotal),
+  };
+}
+
+function normalizeCheckoutPreview(raw: unknown): CheckoutPreview {
+  const data =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  return {
+    shippingFee: parseNumber(data.shippingFee ?? data.shipFee),
+    totalPrice: parseNumber(data.totalPrice ?? data.amount),
+    subtotal: parseNumber(data.subtotal ?? data.itemTotal ?? data.bikePrice),
+    selectedItemCount:
+      Number(data.selectedItemCount ?? data.itemCount ?? data.totalItems) || 1,
+  };
+}
+
+function normalizeCheckoutResponse(raw: unknown): CheckoutResponse {
+  const data =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  const paymentObj = data.payment as Record<string, unknown> | undefined;
+  const paymentLink = parseOptionalString(
+    paymentObj?.paymentLink ?? paymentObj?.checkoutUrl ?? paymentObj?.qrCode
+  );
+
+  return {
+    orderId: String(data.orderId ?? data.id ?? ""),
+    payosQrUrl:
+      parseOptionalString(paymentLink ?? data.checkoutUrl ?? data.payosQrUrl ?? data.qrCode) ?? "",
+    shippingFee: parseNumber(data.shippingFee ?? data.shipFee),
+    // Phase B: BE trả "totalAmount", không phải "totalPrice"
+    totalPrice: parseNumber(data.totalPrice ?? data.totalAmount ?? data.amount ?? data.finalAmount ?? data.subtotal),
+    expiresAt: String(data.expiresAt ?? data.expiredAt ?? ""),
+  };
+}
+
+function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
+  const src = raw as Record<string, unknown>;
+  const id = ((src.id ?? src.orderId) as string) || "";
+
+  // Phase A1: BE trả items[] array — đọc listing data từ items[0]
+  const items0 =
+    Array.isArray(src.items) && src.items.length > 0
+      ? (src.items[0] as Record<string, unknown>)
+      : null;
+
+  // Ưu tiên src.listing (nếu có), fallback items[0], fallback {}
+  const listingSrc =
+    src.listing && typeof src.listing === "object"
+      ? (src.listing as Record<string, unknown>)
+      : items0 ?? {};
+
+  // Phase A6: bikeId từ items[0] làm listingId
+  const listingId =
+    ((src.listingId ?? listingSrc.id ?? listingSrc.listingId ?? items0?.bikeId ?? items0?.listingId) as string) || "";
+
+  // Phase A4: ảnh từ images[], imageUrl, hoặc thumbnail trong items[0]
+  const listingImagesRaw = (
+    Array.isArray(listingSrc.images) ? listingSrc.images
+    : Array.isArray(src.images) ? src.images
+    : items0?.imageUrl ? [items0.imageUrl]
+    : items0?.thumbnail ? [items0.thumbnail]
+    : []
+  ) as unknown[];
+  const listingImages = listingImagesRaw
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim());
+
+  const status = normalizeOrderStatus(src.status);
+  const paymentSource =
+    src.payment && typeof src.payment === "object"
+      ? (src.payment as Record<string, unknown>)
+      : undefined;
+
+  return {
+    ...src,
+    id,
+    listingId,
+    listing: {
+      id: ((listingSrc.id ?? listingId) as string) || listingId,
+      // Phase A3: bikeName / name / title fallback chain
+      title: ((listingSrc.title ?? listingSrc.bikeName ?? listingSrc.name
+             ?? items0?.bikeName ?? items0?.name ?? src.listingTitle) as string) || "Xe đạp",
+      images: listingImages,
+      // Phase A: price từ items[0].price / unitPrice
+      price: parseNumber(listingSrc.price ?? listingSrc.unitPrice ?? items0?.price ?? items0?.unitPrice ?? 0),
+    },
+    status,
+    receiverName: (src.receiverName as string) || "",
+    receiverPhone: (src.receiverPhone as string) || "",
+    receiverAddress: (src.receiverAddress as string) || "",
+    // Phase A5: shippingFee fallback chain
+    shippingFee: parseNumber(src.shippingFee ?? src.shipFee
+      ?? (src.shipment && typeof src.shipment === "object"
+          ? (src.shipment as Record<string, unknown>).fee
+          : undefined)),
+    // Phase A2: BE dùng totalAmount, không phải totalPrice
+    totalPrice: parseNumber(src.totalPrice ?? src.totalAmount ?? src.amount),
+    payosQrUrl: parseOptionalString(
+      paymentSource?.paymentLink ?? paymentSource?.checkoutUrl ?? src.checkoutUrl ?? src.payosQrUrl
+    ),
+    waybillCode: (src.waybillCode as string) || undefined,
+    expiresAt: (src.expiresAt as string) || undefined,
+    seller:
+      src.seller && typeof src.seller === "object"
+        ? (src.seller as BuyerOrder["seller"])
+        : undefined,
+    createdAt: (src.createdAt as string) || "",
+    updatedAt: (src.updatedAt as string) || "",
   };
 }
 
@@ -285,10 +686,31 @@ export const buyerApi = {
   /**
    * Bước 1: Thêm vào giỏ hàng.
    * Swagger AddToCartDTO: { bikeId: UUID }
-   * FE truyền listingId → cần map sang bikeId
    */
-  addToCart: (data: { listingId: string; quantity: number }) =>
-    http.post<unknown>("/api/buyer-cart/add", { bikeId: data.listingId }),
+  addToCart: (data: { bikeId: string; quantity: number }) =>
+    http.post<unknown>("/api/buyer-cart/add", { bikeId: data.bikeId }),
+
+  getCart: async () => {
+    const raw = await http.get<unknown>("/api/buyer-cart/my-cart");
+    return normalizeCart(unwrap(raw));
+  },
+
+  updateCartSelection: (cartItemId: string, isSelected: boolean) =>
+    http.put<unknown>("/api/buyer-cart/selection", { cartItemId, isSelected }),
+
+  removeCartItem: (cartItemId: string) =>
+    http.delete<unknown>(`/api/buyer-cart/items/${cartItemId}`),
+
+  previewCheckout: async (data: Omit<CheckoutPayload, "listingId">) => {
+    const raw = await http.post<unknown>("/api/buyer-cart/preview-checkout", {
+      receiverName: data.receiverName,
+      receiverPhone: data.receiverPhone,
+      receiverAddress: data.receiverAddress,
+      toDistrictId: data.toDistrictId,
+      toWardCode: data.toWardCode,
+    });
+    return normalizeCheckoutPreview(unwrap(raw));
+  },
 
   /**
    * Bước 2: Checkout từ giỏ hàng.
@@ -302,7 +724,7 @@ export const buyerApi = {
       toDistrictId: data.toDistrictId,
       toWardCode: data.toWardCode,
     });
-    return unwrap<CheckoutResponse>(raw);
+    return normalizeCheckoutResponse(unwrap(raw));
   },
 
   /**
@@ -319,19 +741,41 @@ export const buyerApi = {
       toWardCode: data.toWardCode,
       distanceKm: 0,
     });
-    return unwrap<CheckoutResponse>(raw);
+    return normalizeCheckoutResponse(unwrap(raw));
   },
 
   /** Bước 3: Lấy link/QR PayOS cho Order vừa tạo */
   getPaymentLink: async (orderId: string) => {
     const raw = await http.post<unknown>(`/api/payment/${orderId}`);
-    return unwrap<{ checkoutUrl: string; qrCode: string }>(raw);
+    const data = unwrap<Record<string, unknown>>(raw);
+    const paymentSource =
+      data.payment && typeof data.payment === "object"
+        ? (data.payment as Record<string, unknown>)
+        : undefined;
+
+    return {
+      checkoutUrl: parseOptionalString(
+        paymentSource?.paymentLink ?? data.checkoutUrl ?? data.paymentLink
+      ),
+      qrCode: parseOptionalString(data.qrCode ?? paymentSource?.qrCode),
+    };
   },
 
   /** Polling — kiểm tra trạng thái thanh toán PayOS */
   getOrderStatus: async (orderId: string) => {
     const raw = await http.get<unknown>(`/api/buyer-order/${orderId}`);
-    return unwrap<OrderStatusResponse>(raw);
+    const data = unwrap<Record<string, unknown>>(raw);
+    const order = normalizeOrder(data);
+    return {
+      orderId: order.id,
+      status: order.status,
+      payosStatus:
+        order.status === "paid"
+          ? "paid"
+          : order.status === "cancelled"
+            ? "failed"
+            : "pending",
+    } satisfies OrderStatusResponse;
   },
 
   // ---------- Orders ----------
@@ -345,7 +789,8 @@ export const buyerApi = {
 
   getOrderDetail: async (orderId: string) => {
     const raw = await http.get<unknown>(`/api/buyer-order/${orderId}`);
-    return unwrap<BuyerOrder>(raw);
+    const data = unwrap<Record<string, unknown>>(raw);
+    return normalizeOrder(data);
   },
 
   /**
@@ -369,6 +814,7 @@ export const buyerApi = {
     http.post<unknown>(`/api/buyer-report/${orderId}`, {
       type: data.type || "other",
       reason: data.reason,
+      ...(data.mediaUrls && data.mediaUrls.length > 0 ? { mediaUrls: data.mediaUrls } : {}),
     }),
 
   /** Lấy danh sách report của buyer */
@@ -384,17 +830,28 @@ export const buyerApi = {
       `/api/wishlist?pageNumber=${page}&pageSize=${size}`
     );
     const data = unwrap(raw);
+
+    // Normalize helper — đảm bảo listing.id luôn có giá trị (BE dùng listingId)
+    const normalizeItems = (items: unknown[]): BuyerListing[] =>
+      items.map((item) => normalizeListing(item as Record<string, unknown>));
+
     // BE may return array or paginated object
     if (Array.isArray(data)) {
       return {
-        items: data as BuyerListing[],
+        items: normalizeItems(data),
         totalCount: data.length,
         pageNumber: page,
         pageSize: size,
         totalPages: 1,
       } as WishlistPage;
     }
-    return data as WishlistPage;
+
+    const obj = data as Record<string, unknown>;
+    const rawItems = Array.isArray(obj?.items) ? (obj.items as unknown[]) : [];
+    return {
+      ...obj,
+      items: normalizeItems(rawItems),
+    } as WishlistPage;
   },
 
   addToWishlist: (bikeId: string) =>
@@ -419,8 +876,7 @@ export const buyerApi = {
     http.post<unknown>(`/api/buyer-shipment/confirm-received/${orderId}`),
 
   // ---------- Cancel Order ----------
-  // NOTE: Backend hiện KHÔNG có endpoint cancel order cho buyer.
-  // Nếu cần, hãy báo BE thêm endpoint POST /api/buyer-order/{orderId}/cancel
-  cancelOrder: (orderId: string) =>
-    http.post<unknown>(`/api/buyer-order/${orderId}/cancel`),
+  // Swagger: POST /api/payment/cancel/{orderId} — CancelOrderDTO { reason? }
+  cancelOrder: (orderId: string, reason?: string) =>
+    http.post<unknown>(`/api/payment/cancel/${orderId}`, reason ? { reason } : {}),
 };

@@ -41,14 +41,18 @@ export function WishlistButton({
     <Button
       variant={variant}
       size={size}
-      className={cn("transition-all duration-200", className)}
+      className={cn(
+        "transition-all duration-300 active:scale-90 hover:shadow-md",
+        isWishlisted && "border-destructive/30 bg-destructive/5 hover:bg-destructive/10",
+        className
+      )}
       onClick={handleToggle}
       disabled={isLoading}
     >
       <Heart
         className={cn(
-          "h-4 w-4",
-          isWishlisted && "fill-destructive text-destructive"
+          "h-4 w-4 transition-transform duration-300",
+          isWishlisted ? "fill-destructive text-destructive scale-110" : "text-muted-foreground group-hover:scale-110"
         )}
       />
       <span className="sr-only">

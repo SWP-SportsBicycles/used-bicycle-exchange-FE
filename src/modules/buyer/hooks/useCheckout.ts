@@ -1,17 +1,25 @@
 'use client'
 
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { buyerApi, type CheckoutPayload } from '@/lib/api/buyer-api'
 
 export function useAddToCartMutation() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: { listingId: string; quantity: number }) => buyerApi.addToCart(data),
+    mutationFn: (data: { bikeId: string; quantity: number }) => buyerApi.addToCart(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buyer-cart'] })
+    },
   })
 }
 
 export function useCheckoutMutation() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: Omit<CheckoutPayload, 'listingId'>) => buyerApi.checkout(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buyer-cart'] })
+    },
   })
 }
 
@@ -27,11 +35,12 @@ export function useOrderStatusPolling(orderId?: string) {
     queryFn: () => buyerApi.getOrderStatus(orderId!),
     enabled: !!orderId,
     refetchInterval: (query) => {
-      // Poll every 3 seconds if we have an orderId and the status is still pending payment
-      // Adjust condition based on your exact status enum
       const data = query.state.data
-      if (data?.status === 'payos_paid' || data?.status === 'cancelled' || data?.status === 'completed') {
-        return false // stop polling
+      if (!data) return 3000
+
+      const terminalStatuses = ['paid', 'cancelled', 'completed', 'shipping', 'delivered', 'disputed']
+      if (terminalStatuses.includes(data.status)) {
+        return false
       }
       return 3000
     },

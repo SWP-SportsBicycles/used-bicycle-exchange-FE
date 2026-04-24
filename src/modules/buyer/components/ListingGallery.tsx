@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,11 +10,12 @@ import { cn } from '@/lib/utils'
 
 interface ListingGalleryProps {
   images: string[]
+  videoUrls?: string[]
   title: string
   isVeloSafeVerified?: boolean
 }
 
-export function ListingGallery({ images, title, isVeloSafeVerified }: ListingGalleryProps) {
+export function ListingGallery({ images, videoUrls = [], title, isVeloSafeVerified }: ListingGalleryProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   if (!images || images.length === 0) return null
@@ -34,15 +35,26 @@ export function ListingGallery({ images, title, isVeloSafeVerified }: ListingGal
       className="space-y-4"
     >
       {/* Main Image */}
-      <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-secondary">
-        <Image
-          src={images[currentImageIndex]}
-          alt={title}
-          fill
-          className="object-cover transition-all duration-300"
-          priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
-        />
+      <div className="relative aspect-4/3 overflow-hidden rounded-3xl bg-secondary">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentImageIndex}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="absolute inset-0"
+          >
+            <Image
+              src={images[currentImageIndex]}
+              alt={title}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 1024px) 100vw, 50vw"
+            />
+          </motion.div>
+        </AnimatePresence>
 
         {/* Navigation Arrows */}
         {images.length > 1 && (
@@ -90,7 +102,7 @@ export function ListingGallery({ images, title, isVeloSafeVerified }: ListingGal
               key={index}
               onClick={() => setCurrentImageIndex(index)}
               className={cn(
-                "relative h-20 w-20 shrink-0 overflow-hidden rounded-lg transition-all",
+                "relative h-20 w-20 shrink-0 overflow-hidden rounded-xl transition-all",
                 index === currentImageIndex
                   ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                   : "opacity-60 hover:opacity-100"
@@ -105,6 +117,25 @@ export function ListingGallery({ images, title, isVeloSafeVerified }: ListingGal
               />
             </button>
           ))}
+        </div>
+      )}
+
+      {videoUrls.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-foreground">Video xe</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {videoUrls.map((videoUrl, index) => (
+              <video
+                key={`${videoUrl}-${index}`}
+                controls
+                preload="metadata"
+                className="w-full aspect-video rounded-xl border border-border/60 bg-black"
+              >
+                <source src={videoUrl} />
+                Trinh duyet khong ho tro phat video.
+              </video>
+            ))}
+          </div>
         </div>
       )}
     </motion.div>
