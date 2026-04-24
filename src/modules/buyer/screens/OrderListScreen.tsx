@@ -115,12 +115,22 @@ export default function OrderListScreen() {
                   <div className="flex flex-wrap lg:flex-nowrap gap-6 items-center">
                     {/* Image */}
                     <div className="relative h-28 w-28 rounded-2xl overflow-hidden bg-secondary shrink-0 border border-border/50 shadow-inner group-hover:border-primary/30 transition-colors">
-                      <Image 
-                        src={order.listing.images[0] || '/placeholder.png'} 
-                        alt={order.listing.title}
-                        fill
-                        className="object-cover"
-                      />
+                      {order.listing.images[0] ? (
+                        <Image 
+                          src={order.listing.images[0]} 
+                          alt={order.listing.title}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=No+Image'
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-secondary">
+                          <Package className="h-10 w-10 text-muted-foreground/40" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Details */}

@@ -13,6 +13,12 @@ export function useAddToCartMutation() {
   })
 }
 
+export function useCreateOrderDirectMutation() {
+  return useMutation({
+    mutationFn: (payload: CheckoutPayload) => buyerApi.createOrderDirect(payload),
+  })
+}
+
 export function useCheckoutMutation() {
   const queryClient = useQueryClient()
   return useMutation({

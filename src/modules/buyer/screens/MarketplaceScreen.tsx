@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Grid3X3, List, ShieldCheck, Search } from 'lucide-react'
+import { Grid3X3, List, Search } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
@@ -29,7 +29,6 @@ const initialFilters: FilterState = {
   conditions: [],
   cities: [],
   priceRange: [0, 100000000],
-  veloSafeOnly: false,
 }
 
 const categorySections = [
@@ -128,11 +127,7 @@ function MarketplacePageContent({
 
   // Client-side sort (server đã filter — chỉ sort local batch hiện tại)
   const filteredListings = useMemo(() => {
-    let result = listingPage?.items ?? []
-    if (filters.veloSafeOnly) {
-      result = result.filter(l => l.isVeloSafeVerified)
-    }
-    result = [...result]
+    let result = [...(listingPage?.items ?? [])]
     switch (sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.price - b.price)
@@ -148,7 +143,7 @@ function MarketplacePageContent({
         break
     }
     return result
-  }, [listingPage?.items, filters.veloSafeOnly, sortBy])
+  }, [listingPage?.items, sortBy])
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,18 +182,6 @@ function MarketplacePageContent({
           
           {/* Quick Filter Pills */}
           <div className="mt-6 flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilters(p => ({ ...p, veloSafeOnly: !p.veloSafeOnly }))}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                filters.veloSafeOnly 
-                  ? "border-primary bg-primary/10 text-primary" 
-                  : "border-border/60 bg-background hover:border-primary/50"
-              )}
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              VeloSafe Certified
-            </button>
             {['Road', 'MTB', 'Gravel', 'Urban'].map(type => (
               <button
                 key={type}

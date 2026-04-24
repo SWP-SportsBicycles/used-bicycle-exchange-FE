@@ -251,9 +251,10 @@ function normalizeListing(raw: Record<string, unknown>): BuyerListing {
   const id = (merged.listingId || merged.id || "") as string;
   const bikeId = (merged.bikeId || bike0?.bikeId || "") as string;
 
-  // ── price: must come from bikes[0].price if root is missing ─────────────
-  // item.price is undefined in detail response; bike0.price has the value
-  const rawPrice = merged.price ?? bike0?.price ?? 0;
+  // ── price: must come from bikes[0].salePrice / price / unitPrice if root is missing
+  // item.price is undefined in detail response; bike0.salePrice or bike0.price has the value
+  // merged.unitPrice may be injected from cart item root level
+  const rawPrice = merged.price ?? merged.unitPrice ?? bike0?.salePrice ?? bike0?.price ?? 0;
   const price = typeof rawPrice === "number" ? rawPrice : parseFloat(String(rawPrice)) || 0;
 
   const sanitizeUrl = (value: unknown) =>
@@ -498,12 +499,22 @@ function normalizeOrderStatus(value: unknown): BuyerOrder["status"] {
 }
 
 function normalizeCartItem(raw: Record<string, unknown>): BuyerCartItem {
-  const listingSource =
+  // BE cart item response shape:
+  // { cartItemId, bikeId, listingId, unitPrice, isSelected, bike: { salePrice, ... } }
+  // unitPrice lives at root level — inject it into listingSource so normalizeListing can pick it up.
+  const bikeSource =
     raw.listing && typeof raw.listing === "object"
       ? (raw.listing as Record<string, unknown>)
       : raw.bike && typeof raw.bike === "object"
         ? (raw.bike as Record<string, unknown>)
         : raw;
+
+  // Merge root-level unitPrice / price so normalizeListing's price chain picks them up.
+  const listingSource: Record<string, unknown> = {
+    ...bikeSource,
+    ...(raw.unitPrice != null ? { unitPrice: raw.unitPrice } : {}),
+    ...(raw.price != null ? { price: raw.price } : {}),
+  };
 
   const listing = normalizeListing(listingSource);
 
@@ -582,33 +593,86 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
   const src = raw as Record<string, unknown>;
   const id = ((src.id ?? src.orderId) as string) || "";
 
-  // Phase A1: BE trả items[] array — đọc listing data từ items[0]
+  // items[0]: BE order list thường trả bike info trong items[]
   const items0 =
     Array.isArray(src.items) && src.items.length > 0
       ? (src.items[0] as Record<string, unknown>)
       : null;
 
-  // Ưu tiên src.listing (nếu có), fallback items[0], fallback {}
-  const listingSrc =
+  // items[0].bike: BE có thể nest bike object bên trong item
+  const items0Bike =
+    items0 && items0.bike && typeof items0.bike === "object"
+      ? (items0.bike as Record<string, unknown>)
+      : items0 && items0.listing && typeof items0.listing === "object"
+        ? (items0.listing as Record<string, unknown>)
+        : null;
+
+  // Ưu tiên src.listing → items0.bike → items0 (flat) → {}
+  const listingSrc: Record<string, unknown> =
     src.listing && typeof src.listing === "object"
       ? (src.listing as Record<string, unknown>)
-      : items0 ?? {};
+      : (items0Bike ?? items0 ?? {});
 
-  // Phase A6: bikeId từ items[0] làm listingId
+  // listingId: dùng để fallback-fetch nếu thiếu ảnh/title
   const listingId =
-    ((src.listingId ?? listingSrc.id ?? listingSrc.listingId ?? items0?.bikeId ?? items0?.listingId) as string) || "";
+    ((src.listingId
+      ?? listingSrc.id ?? listingSrc.listingId
+      ?? (items0 ? items0.listingId : undefined) ?? (items0 ? items0.bikeId : undefined)
+      ?? (items0Bike ? items0Bike.id : undefined) ?? (items0Bike ? items0Bike.listingId : undefined)
+    ) as string) || "";
 
-  // Phase A4: ảnh từ images[], imageUrl, hoặc thumbnail trong items[0]
-  const listingImagesRaw = (
-    Array.isArray(listingSrc.images) ? listingSrc.images
-    : Array.isArray(src.images) ? src.images
-    : items0?.imageUrl ? [items0.imageUrl]
-    : items0?.thumbnail ? [items0.thumbnail]
-    : []
-  ) as unknown[];
-  const listingImages = listingImagesRaw
-    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    .map((item) => item.trim());
+  // title: dò từ nhiều nơi
+  const title = (
+    (listingSrc.title ?? listingSrc.bikeName ?? listingSrc.name
+     ?? (items0 ? items0.bikeName : undefined) ?? (items0 ? items0.title : undefined) ?? (items0 ? items0.name : undefined)
+     ?? (items0Bike ? items0Bike.title : undefined) ?? (items0Bike ? items0Bike.bikeName : undefined) ?? (items0Bike ? items0Bike.name : undefined)
+     ?? src.listingTitle
+    ) as string
+  ) || "";
+
+  // price
+  const listingPrice = parseNumber(
+    listingSrc.price ?? listingSrc.unitPrice ?? listingSrc.salePrice
+    ?? (items0 ? items0.unitPrice : undefined) ?? (items0 ? items0.price : undefined) ?? (items0 ? items0.salePrice : undefined)
+    ?? (items0Bike ? items0Bike.salePrice : undefined) ?? (items0Bike ? items0Bike.price : undefined)
+    ?? 0
+  );
+
+  // images: dò qua nhiều field name và cấu trúc lồng nhau
+  const collectImages = (obj: Record<string, unknown> | null | undefined): string[] => {
+    if (!obj) return [];
+    const sanitize = (v: unknown): string | null =>
+      typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+
+    if (Array.isArray(obj.images)) {
+      const urls = (obj.images as unknown[]).map(sanitize).filter(Boolean) as string[];
+      if (urls.length) return urls;
+    }
+    if (Array.isArray(obj.medias)) {
+      const urls: string[] = [];
+      for (const m of obj.medias as unknown[]) {
+        if (typeof m === "string") { const s = sanitize(m); if (s) urls.push(s); continue; }
+        if (m && typeof m === "object") {
+          const rec = m as Record<string, unknown>;
+          const u = sanitize(rec.url) ?? sanitize(rec.image) ?? sanitize(rec.imageUrl) ?? sanitize(rec.thumbnail);
+          if (u) urls.push(u);
+        }
+      }
+      if (urls.length) return urls;
+    }
+    const scalar = sanitize(obj.thumbnail) ?? sanitize(obj.imageUrl) ?? sanitize(obj.image) ?? sanitize(obj.avatarUrl);
+    if (scalar) return [scalar];
+    return [];
+  };
+
+  const fromListingSrc = collectImages(listingSrc);
+  const fromBike = collectImages(items0Bike ?? undefined);
+  const fromItems0 = collectImages(items0 ?? undefined);
+  const listingImages = (
+    fromListingSrc.length ? fromListingSrc
+    : fromBike.length ? fromBike
+    : fromItems0
+  ).filter((s) => s.length > 0);
 
   const status = normalizeOrderStatus(src.status);
   const paymentSource =
@@ -622,23 +686,18 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     listingId,
     listing: {
       id: ((listingSrc.id ?? listingId) as string) || listingId,
-      // Phase A3: bikeName / name / title fallback chain
-      title: ((listingSrc.title ?? listingSrc.bikeName ?? listingSrc.name
-             ?? items0?.bikeName ?? items0?.name ?? src.listingTitle) as string) || "Xe đạp",
+      title: title || "Xe đạp",
       images: listingImages,
-      // Phase A: price từ items[0].price / unitPrice
-      price: parseNumber(listingSrc.price ?? listingSrc.unitPrice ?? items0?.price ?? items0?.unitPrice ?? 0),
+      price: listingPrice,
     },
     status,
     receiverName: (src.receiverName as string) || "",
     receiverPhone: (src.receiverPhone as string) || "",
     receiverAddress: (src.receiverAddress as string) || "",
-    // Phase A5: shippingFee fallback chain
     shippingFee: parseNumber(src.shippingFee ?? src.shipFee
       ?? (src.shipment && typeof src.shipment === "object"
           ? (src.shipment as Record<string, unknown>).fee
           : undefined)),
-    // Phase A2: BE dùng totalAmount, không phải totalPrice
     totalPrice: parseNumber(src.totalPrice ?? src.totalAmount ?? src.amount),
     payosQrUrl: parseOptionalString(
       paymentSource?.paymentLink ?? paymentSource?.checkoutUrl ?? src.checkoutUrl ?? src.payosQrUrl
@@ -653,6 +712,7 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     updatedAt: (src.updatedAt as string) || "",
   };
 }
+
 
 // ===== BUYER API (qua BE) =====
 
@@ -878,5 +938,5 @@ export const buyerApi = {
   // ---------- Cancel Order ----------
   // Swagger: POST /api/payment/cancel/{orderId} — CancelOrderDTO { reason? }
   cancelOrder: (orderId: string, reason?: string) =>
-    http.post<unknown>(`/api/payment/cancel/${orderId}`, reason ? { reason } : {}),
+    http.post<unknown>(`/api/buyer-order/${orderId}/cancel`, reason ? { reason } : {}),
 };

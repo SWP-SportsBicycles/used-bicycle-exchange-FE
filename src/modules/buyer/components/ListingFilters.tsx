@@ -20,7 +20,6 @@ export interface FilterState {
   conditions: string[]
   cities: string[]
   priceRange: [number, number]
-  veloSafeOnly: boolean
 }
 
 interface FilterSidebarProps {
@@ -125,7 +124,7 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
     filters.groupsets,
     filters.conditions,
     filters.cities,
-  ].reduce((acc, arr) => acc + arr.length, 0) + (filters.veloSafeOnly ? 1 : 0)
+  ].reduce((acc, arr) => acc + arr.length, 0)
 
   const clearAllFilters = () => {
     onFilterChange({
@@ -136,7 +135,6 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
       conditions: [],
       cities: [],
       priceRange: [0, 100000000],
-      veloSafeOnly: false,
     })
   }
 
@@ -166,29 +164,6 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
       </div>
 
       <div className="flex flex-col gap-2 -mx-1 px-1">
-          {/* VeloSafe Verified Toggle */}
-          <div className="border-b border-border pb-4">
-            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-success/30 bg-success/5 p-3 hover:bg-success/10 transition-colors">
-              <Checkbox
-                checked={filters.veloSafeOnly}
-                onCheckedChange={(checked) => 
-                  onFilterChange({ ...filters, veloSafeOnly: checked === true })
-                }
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-success">VeloSafe Verified</span>
-                  <svg className="h-4 w-4 text-success" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Chỉ hiển thị xe đã qua kiểm định
-                </p>
-              </div>
-            </label>
-          </div>
-
           {/* Price Range */}
           <div className="border-b border-border pb-4">
             <div className="flex items-center justify-between py-2">
@@ -258,7 +233,7 @@ export function MobileFilterSheet({ filters, onFilterChange }: FilterSidebarProp
     filters.groupsets,
     filters.conditions,
     filters.cities,
-  ].reduce((acc, arr) => acc + arr.length, 0) + (filters.veloSafeOnly ? 1 : 0)
+  ].reduce((acc, arr) => acc + arr.length, 0)
 
   return (
     <Sheet>

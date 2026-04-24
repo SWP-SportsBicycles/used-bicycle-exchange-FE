@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { ArrowLeft, ShieldCheck, CreditCard, MapPin, Truck, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X, Clock } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
@@ -16,10 +16,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Footer } from '@/components/footer'
 import { AddressForm } from '../components/AddressForm'
-import { CheckoutTimer } from '../components/CheckoutTimer'
 import { PayosQrDisplay } from '../components/PayosQrDisplay'
 import { CheckoutSkeleton } from '../components/skeletons/CheckoutSkeleton'
-import { useCheckoutMutation, useOrderStatusPolling, usePaymentLinkMutation } from '../hooks/useCheckout'
+import { useCheckoutMutation, useOrderStatusPolling, usePaymentLinkMutation, useCreateOrderDirectMutation } from '../hooks/useCheckout'
 import { useCart } from '../hooks/useCart'
 import { useCancelOrder } from '../hooks/useCancelOrder'
 import { useListingDetail } from '../hooks/useListingDetail'
@@ -44,27 +43,39 @@ export default function CheckoutScreen() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const listingId = searchParams.get('listingId')
+  const bikeId = searchParams.get('bikeId')          // Direct buy-now flow
   const orderId = searchParams.get('orderId')
   const isOrderPaymentMode = Boolean(orderId)
+  const isDirectMode = Boolean(bikeId) && !orderId   // Mua Ngay → /api/buyer-order
 
-  const { data: listing, isLoading: isLoadingListing } = useListingDetail(listingId)
+  // Direct mode: dùng listingId để fetch thông tin hiển thị (listingId ưu tiên hơn bikeId)
+  const { data: listing, isLoading: isLoadingListing } = useListingDetail(listingId ?? bikeId)
   const { data: cart, isLoading: isLoadingCart } = useCart()
   const { data: existingOrder, isLoading: isLoadingOrder } = useOrderDetail(orderId)
   const checkoutMutation = useCheckoutMutation()
+  const createOrderDirectMutation = useCreateOrderDirectMutation()
   const paymentLinkMutation = usePaymentLinkMutation()
   const cancelOrderMutation = useCancelOrder()
 
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrSecondsLeft, setQrSecondsLeft] = useState(120) // 2 phút
+  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const selectedCartItems = cart?.items.filter((item) => item.isSelected) ?? []
   const primaryCartItem = selectedCartItems[0] ?? cart?.items[0]
   const summaryListing: Pick<BuyerListing, 'title' | 'images' | 'price'> | undefined =
     existingOrder?.listing ?? listing ?? primaryCartItem?.listing
-  const summaryPrice = existingOrder?.totalPrice ?? cart?.subtotal ?? summaryListing?.price ?? 0
-  const canSubmitCheckout = isOrderPaymentMode ? existingOrder?.status === 'pending' : selectedCartItems.length > 0
+  const summaryPrice = existingOrder?.totalPrice ?? (isDirectMode ? listing?.price : cart?.subtotal) ?? summaryListing?.price ?? 0
+  // Direct mode: always allow submit (no cart selection needed)
+  const canSubmitCheckout = isOrderPaymentMode
+    ? existingOrder?.status === 'pending'
+    : isDirectMode
+      ? Boolean(listing)
+      : selectedCartItems.length > 0
   const isLoadingScreen = isOrderPaymentMode
     ? isLoadingOrder
-    : (Boolean(listingId) && isLoadingListing) || isLoadingCart
+    : Boolean(listingId ?? bikeId) && isLoadingListing || (!isDirectMode && isLoadingCart)
   const isExistingOrderLocked = Boolean(existingOrder && existingOrder.status !== 'pending')
   // Chỉ hiện timer khi: có expiresAt VÀ đơn còn pending (không hết hạn redirect ngay)
   const timerExpiresAt = checkoutData?.expiresAt ?? (
@@ -79,6 +90,39 @@ export default function CheckoutScreen() {
   )
 
   const { data: orderStatusData } = useOrderStatusPolling(checkoutData?.orderId)
+
+  // ── QR Modal helpers ───────────────────────────────────────────────────────
+  const startQrCountdown = useCallback(() => {
+    setQrSecondsLeft(120)
+    if (qrTimerRef.current) clearInterval(qrTimerRef.current)
+    qrTimerRef.current = setInterval(() => {
+      setQrSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(qrTimerRef.current!)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+  }, [])
+
+  const openQrModal = useCallback((data: CheckoutResponse) => {
+    setCheckoutData(data)
+    setShowQrModal(true)
+    startQrCountdown()
+  }, [startQrCountdown])
+
+  // Khi countdown hết (0 giây) → redirect về /buyer/orders
+  useEffect(() => {
+    if (qrSecondsLeft === 0 && showQrModal) {
+      setShowQrModal(false)
+      toast.error('Hết thời gian thanh toán. Vui lòng thanh toán lại.')
+      router.push('/buyer/orders')
+    }
+  }, [qrSecondsLeft, showQrModal, router])
+
+  // Dọn timer khi unmount
+  useEffect(() => () => { if (qrTimerRef.current) clearInterval(qrTimerRef.current) }, [])
 
   const methods = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -98,7 +142,7 @@ export default function CheckoutScreen() {
     } else if (orderStatusData?.status === 'cancelled') {
       if (orderStatusData.orderId) removeExpiringOrder(orderStatusData.orderId)
       toast.error('Đơn hàng đã bị hủy.')
-      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : '/buyer/cart')
+      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
     }
   }, [isOrderPaymentMode, orderId, orderStatusData?.orderId, orderStatusData?.status, router])
 
@@ -108,10 +152,54 @@ export default function CheckoutScreen() {
     }
 
     if (!canSubmitCheckout) {
-      toast.error('Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng.')
+      toast.error(isDirectMode
+        ? 'Không tìm thấy thông tin sản phẩm. Vui lòng quay lại.'
+        : 'Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng.')
       return
     }
 
+    // ── Direct buy-now: gọi /api/buyer-order ──────────────────────────────
+    if (isDirectMode) {
+      if (!bikeId) {
+        toast.error('Thông tin sản phẩm không hợp lệ.')
+        return
+      }
+      createOrderDirectMutation.mutate(
+        {
+          listingId: bikeId,
+          receiverName: data.receiverName,
+          receiverPhone: data.receiverPhone,
+          receiverAddress: data.receiverAddress,
+          toDistrictId: data.toDistrictId,
+          toWardCode: data.toWardCode,
+        },
+        {
+          onSuccess: (res) => {
+            const expiresAt = res.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
+            if (res.payosQrUrl && res.payosQrUrl !== 'undefined' && res.payosQrUrl.startsWith('http')) {
+              saveExpiringOrder(res.orderId, expiresAt)
+              openQrModal(res)
+              return
+            }
+            paymentLinkMutation.mutate(res.orderId, {
+              onSuccess: (payRes) => {
+                const newData = { ...res, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || res.payosQrUrl || '' }
+                saveExpiringOrder(res.orderId, expiresAt)
+                openQrModal(newData)
+              },
+              onError: () => toast.error('Không thể tạo mã thanh toán PayOS.'),
+            })
+          },
+          onError: (err) => {
+            const msg = err instanceof Error ? err.message : ''
+            toast.error(msg || 'Có lỗi khi tạo đơn hàng trực tiếp.')
+          },
+        }
+      )
+      return
+    }
+
+    // ── Cart-based checkout (existing) ────────────────────────────────
     checkoutMutation.mutate(
       {
         receiverName: data.receiverName,
@@ -122,78 +210,46 @@ export default function CheckoutScreen() {
       },
       {
         onSuccess: (res) => {
-          const expiresAt = res.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000).toISOString()
-
+          const expiresAt = res.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
           if (res.payosQrUrl && res.payosQrUrl !== 'undefined' && res.payosQrUrl.startsWith('http')) {
-            setCheckoutData(res)
             saveExpiringOrder(res.orderId, expiresAt)
-            toast.success('Đã lên đơn. Vui lòng thanh toán trong vòng 5 phút.')
-            window.scrollTo({ top: 0, behavior: 'smooth' })
+            openQrModal(res)
             return
           }
-
           paymentLinkMutation.mutate(res.orderId, {
             onSuccess: (payRes) => {
-              const newCheckoutData = {
-                ...res,
-                payosQrUrl: payRes.checkoutUrl || payRes.qrCode || res.payosQrUrl || '',
-              }
-              setCheckoutData(newCheckoutData)
+              const newData = { ...res, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || res.payosQrUrl || '' }
               saveExpiringOrder(res.orderId, expiresAt)
-              toast.success('Đã lên đơn. Vui lòng thanh toán trong vòng 5 phút.')
-              window.scrollTo({ top: 0, behavior: 'smooth' })
+              openQrModal(newData)
             },
-            onError: () => {
-              toast.error('Không thể tạo mã thanh toán PayOS.')
-            },
+            onError: () => toast.error('Không thể tạo mã thanh toán PayOS.'),
           })
         },
-        onError: () => {
-          toast.error('Có lỗi khi tạo đơn hàng từ giỏ hàng.')
-        },
+        onError: () => toast.error('Có lỗi khi tạo đơn hàng từ giỏ hàng.'),
       },
     )
   }
 
-  // Task 1.3: tái dùng link PayOS đã có, tránh gọi API thừa
   const handleOpenPendingOrderPayment = () => {
     if (!existingOrder || existingOrder.status !== 'pending') {
       toast.error('Đơn hàng này không còn ở trạng thái chờ thanh toán.')
       return
     }
-
     if (existingOrder.payosQrUrl?.startsWith('http')) {
-      const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000).toISOString()
-      setCheckoutData({
-        orderId: existingOrder.id,
-        shippingFee: existingOrder.shippingFee,
-        totalPrice: existingOrder.totalPrice,
-        expiresAt,
-        payosQrUrl: existingOrder.payosQrUrl,
-      })
+      const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
+      const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt, payosQrUrl: existingOrder.payosQrUrl }
       saveExpiringOrder(existingOrder.id, expiresAt)
-      toast.success('Đã tải link thanh toán. Đang chuyển hướng...')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      openQrModal(data)
       return
     }
-
     paymentLinkMutation.mutate(existingOrder.id, {
       onSuccess: (payRes) => {
-        const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 5 * 60 * 1000).toISOString()
-        setCheckoutData({
-          orderId: existingOrder.id,
-          shippingFee: existingOrder.shippingFee,
-          totalPrice: existingOrder.totalPrice,
-          expiresAt,
-          payosQrUrl: payRes.checkoutUrl || payRes.qrCode || existingOrder.payosQrUrl || '',
-        })
+        const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
+        const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || existingOrder.payosQrUrl || '' }
         saveExpiringOrder(existingOrder.id, expiresAt)
-        toast.success('Đã tải lại mã thanh toán cho đơn hàng đang chờ.')
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+        openQrModal(data)
       },
-      onError: () => {
-        toast.error('Không thể tạo lại mã thanh toán cho đơn hàng này.')
-      },
+      onError: () => toast.error('Không thể tạo lại mã thanh toán cho đơn hàng này.'),
     })
   }
 
@@ -225,7 +281,7 @@ export default function CheckoutScreen() {
     removeExpiringOrder(activeOrderId)
     cancelOrderMutation.mutate(activeOrderId, {
       onSuccess: () => {
-        router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : '/buyer/cart')
+        router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
       },
     })
   }
@@ -305,7 +361,8 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <div className="bg-page flex min-h-screen flex-col">
+    <>
+      <div className="bg-page flex min-h-screen flex-col">
       <Header />
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 lg:px-6">
@@ -325,50 +382,6 @@ export default function CheckoutScreen() {
             <div className="w-24" />
           </div>
 
-          {/* Task 1.4: timer luôn hiện nếu có expiresAt, không cần checkoutData */}
-          {timerExpiresAt && (
-            <div className="mb-8">
-              <CheckoutTimer expiresAt={timerExpiresAt} onExpire={handleTimerExpire} />
-            </div>
-          )}
-
-          <div className="relative mx-auto flex w-full max-w-md items-center justify-center">
-            <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 rounded-full bg-border/50" />
-            <div
-              className={cn(
-                'absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-primary transition-all duration-700',
-                checkoutData ? 'w-full' : 'w-1/2',
-              )}
-            />
-
-            <div className="flex w-full justify-between px-4">
-              <div className="flex flex-col items-center gap-2 bg-page px-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-4 ring-page">
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-wider text-primary">Địa chỉ</span>
-              </div>
-
-              <div className="flex flex-col items-center gap-2 bg-page px-2">
-                <div
-                  className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full font-bold ring-4 ring-page transition-all duration-500',
-                    checkoutData ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  2
-                </div>
-                <span
-                  className={cn(
-                    'text-xs font-bold uppercase tracking-wider transition-colors duration-500',
-                    checkoutData ? 'text-primary' : 'text-muted-foreground',
-                  )}
-                >
-                  Thanh toán
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
@@ -406,42 +419,7 @@ export default function CheckoutScreen() {
               )}
             </div>
 
-            <AnimatePresence>
-              {checkoutData && (
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                >
-                  <div className="overflow-hidden rounded-3xl border border-primary/20 bg-card shadow-athletic-lg">
-                    <div className="border-b border-primary/10 bg-primary/5 px-8 py-5">
-                      <h2 className="flex items-center gap-3 text-xl font-bold text-primary">
-                        <CreditCard className="h-6 w-6" />
-                        Thanh toán qua PayOS
-                      </h2>
-                    </div>
-                    <div className="p-8">
-                      <PayosQrDisplay
-                        qrUrl={checkoutData.payosQrUrl}
-                        totalPrice={checkoutData.totalPrice}
-                        orderId={checkoutData.orderId}
-                      />
 
-                      <div className="mt-8 flex gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900/50">
-                        <ShieldCheck className="h-6 w-6 shrink-0 text-[#407F3E]" />
-                        <div className="space-y-1">
-                          <p className="font-bold text-foreground">Bảo vệ bởi Escrow VeloTrust</p>
-                          <p className="leading-relaxed">
-                            Tiền của bạn được hệ thống giữ an toàn. Người bán chỉ nhận được tiền sau khi bạn đã kiểm tra
-                            và xác nhận hài lòng với xe.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="lg:col-span-5 space-y-6">
@@ -524,9 +502,9 @@ export default function CheckoutScreen() {
                         type="submit"
                         form="checkout-form"
                         className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
-                        disabled={checkoutMutation.isPending || !canSubmitCheckout}
+                        disabled={checkoutMutation.isPending || createOrderDirectMutation.isPending || !canSubmitCheckout}
                       >
-                        {checkoutMutation.isPending ? 'Đang xử lý...' : 'Xác nhận và chuyển tới thanh toán'}
+                      {checkoutMutation.isPending || createOrderDirectMutation.isPending ? 'Đang xử lý...' : 'Xác nhận và chuyển tới thanh toán'}
                       </Button>
                     )}
 
@@ -560,5 +538,77 @@ export default function CheckoutScreen() {
 
       <Footer />
     </div>
+
+    {/* ── QR Payment Modal ─────────────────────────────────────────────── */}
+    <Dialog open={showQrModal} onOpenChange={(open) => {
+      if (!open) {
+        // Người dùng đóng modal thủ công → redirect về orders
+        if (qrTimerRef.current) clearInterval(qrTimerRef.current)
+        setShowQrModal(false)
+        router.push('/buyer/orders')
+      }
+    }}>
+      <DialogContent className="max-w-sm rounded-3xl p-0 overflow-hidden border-primary/20 shadow-2xl" showCloseButton={false}>
+        {/* Header */}
+        <div className="bg-primary/5 border-b border-primary/10 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <span className="font-bold text-foreground">Thanh toán qua PayOS</span>
+          </div>
+          <button
+            onClick={() => {
+              if (qrTimerRef.current) clearInterval(qrTimerRef.current)
+              setShowQrModal(false)
+              router.push('/buyer/orders')
+            }}
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Countdown bar */}
+        <div className="px-6 pt-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" /> Thời gian còn lại
+            </span>
+            <span className={`text-sm font-bold tabular-nums ${
+              qrSecondsLeft <= 30 ? 'text-destructive animate-pulse' : 'text-primary'
+            }`}>
+              {String(Math.floor(qrSecondsLeft / 60)).padStart(2, '0')}:{String(qrSecondsLeft % 60).padStart(2, '0')}
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                qrSecondsLeft <= 30 ? 'bg-destructive' : 'bg-primary'
+              }`}
+              style={{ width: `${(qrSecondsLeft / 120) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* QR */}
+        <div className="px-6 pb-4 pt-2">
+          {checkoutData && (
+            <PayosQrDisplay
+              qrUrl={checkoutData.payosQrUrl}
+              totalPrice={checkoutData.totalPrice}
+              orderId={checkoutData.orderId}
+            />
+          )}
+        </div>
+
+        {/* Escrow note */}
+        <div className="mx-6 mb-4 flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-900/60">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-[#407F3E] mt-0.5" />
+          <p className="leading-relaxed">
+            Tiền của bạn được giữ an toàn trong Escrow VeloTrust. Người bán nhận tiền sau khi bạn xác nhận hài lòng.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

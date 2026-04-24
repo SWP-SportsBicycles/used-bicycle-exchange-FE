@@ -14,7 +14,9 @@ import {
   Lock,
   ShoppingCart,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  Zap,
+  Plus
 } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
@@ -34,6 +36,7 @@ import { formatVND } from '@/lib/mock-data'
 import { toast } from 'sonner'
 import { useListingDetail } from '@/modules/buyer/hooks/useListingDetail'
 import { useAddToCartMutation } from '@/modules/buyer/hooks/useCheckout'
+import { useCart } from '@/modules/buyer/hooks/useCart'
 import { ListingGallery } from '@/modules/buyer/components/ListingGallery'
 import { WishlistButton } from '@/modules/buyer/components/WishlistButton'
 
@@ -46,6 +49,7 @@ export default function ListingDetailScreen({ params }: PageProps) {
   const router = useRouter()
   const { data: listing, isLoading, isError } = useListingDetail(id)
   const addToCartMutation = useAddToCartMutation()
+  const { data: cart } = useCart()
 
   if (isLoading) {
     return (
@@ -95,37 +99,69 @@ export default function ListingDetailScreen({ params }: PageProps) {
   ]
 
 
-  
-  const handleBuyNow = () => {
+  // ── Thêm vào giỏ hàng ─────────────────────────────────────────
+  const handleAddToCart = () => {
     if (!listing || !listing.bikeId) {
-      toast.error("Không tìm thấy thông tin xe hợp lệ. Vui lòng thử lại sau.")
+      toast.error('Không tìm thấy thông tin xe hợp lệ. Vui lòng thử lại sau.')
       return
     }
-    
+
+    // Kiểm tra giỏ hàng cache trước khi gọi API
+    const alreadyInCart = cart?.items.some(
+      (item) => item.bikeId === listing.bikeId || item.listingId === listing.bikeId
+    )
+    if (alreadyInCart) {
+      toast.info('Sản phẩm đã được thêm vào giỏ hàng', {
+        description: 'Bạn có thể tiếp tục checkout tại trang giỏ hàng.',
+        action: { label: 'Xem giỏ hàng', onClick: () => router.push('/buyer/cart') },
+      })
+      return
+    }
+
     addToCartMutation.mutate({ bikeId: listing.bikeId, quantity: 1 }, {
       onSuccess: () => {
-        router.push('/buyer/cart')
+        toast.success('Thêm vào giỏ hàng thành công!', {
+          description: listing.title,
+          action: { label: 'Xem giỏ hàng', onClick: () => router.push('/buyer/cart') },
+        })
       },
       onError: (err) => {
-        const message = err instanceof Error ? err.message : ""
-        const normalizedMessage = message
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-
-        const alreadyInCart =
-          normalizedMessage.includes('da co trong gio hang') ||
-          normalizedMessage.includes('already in cart')
-
-        if (alreadyInCart) {
-          toast.info('Xe đã có trong giỏ hàng. Chuyển thẳng tới bước checkout để tiếp tục thanh toán.')
-          router.push('/buyer/cart')
+        const message = err instanceof Error ? err.message : ''
+        const norm = message.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        const dup =
+          norm.includes('da co trong gio hang') ||
+          norm.includes('already in cart') ||
+          norm.includes('already exists') ||
+          norm.includes('duplicate')
+        if (dup) {
+          toast.info('Sản phẩm đã được thêm vào giỏ hàng', {
+            description: 'Bạn có thể tiếp tục checkout tại trang giỏ hàng.',
+            action: { label: 'Xem giỏ hàng', onClick: () => router.push('/buyer/cart') },
+          })
           return
         }
-
-        toast.error(message || "Không thể thêm vào giỏ hàng. Xe này có thể đã bị mua.")
-      }
+        toast.error(message || 'Không thể thêm vào giỏ hàng. Xe này có thể đã bị mua.')
+      },
     })
+  }
+
+  // ── Mua ngay → checkout trực tiếp qua /api/buyer-order ────────────
+  const handleBuyNow = () => {
+    if (!listing) {
+      toast.error('Không tìm thấy thông tin xe hợp lệ. Vui lòng thử lại sau.')
+      return
+    }
+    if (!listing.bikeId) {
+      toast.error('Xe này chưa có mã xe hợp lệ để đặt hàng.')
+      return
+    }
+    // listingId: để CheckoutScreen tải thông tin xe hiển thị
+    // bikeId: để gọi /api/buyer-order tạo đơn trực tiếp
+    const params = new URLSearchParams({
+      listingId: listing.id,
+      bikeId: listing.bikeId,
+    })
+    router.push(`/buyer/checkout?${params.toString()}`)
   }
 
   return (
@@ -239,25 +275,53 @@ export default function ListingDetailScreen({ params }: PageProps) {
                 )}
               </div>
               
-              <Button
-                className={cn(
-                  "w-full h-14 rounded-2xl text-lg font-bold shadow-lg transition-all", 
-                  !listing.isLocked && "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02]",
-                  listing.isLocked && "opacity-60 cursor-not-allowed"
-                )}
-                onClick={handleBuyNow}
-                disabled={!canBuyNow || addToCartMutation.isPending}
-              >
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                {listing.isLocked ? "Đang có người giao dịch" : "Mua Ngay (Cart Lock)"}
-              </Button>
-              
+              {/* ── 2 CTA Buttons ── */}
+              <div className="flex flex-col gap-3">
+                {/* Mua ngay — full width, primary */}
+                <Button
+                  className={cn(
+                    "w-full h-14 rounded-2xl text-lg font-bold shadow-lg transition-all",
+                    !listing.isLocked && "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02]",
+                    listing.isLocked && "opacity-60 cursor-not-allowed"
+                  )}
+                  onClick={handleBuyNow}
+                  disabled={!canBuyNow}
+                >
+                  <Zap className="mr-2 h-5 w-5" />
+                  {listing.isLocked ? 'Đang có người giao dịch' : 'Mua Ngay'}
+                </Button>
+
+                {/* Thêm vào giỏ hàng — outline, secondary */}
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full h-12 rounded-2xl text-base font-semibold transition-all",
+                    !listing.isLocked && "hover:scale-[1.01] border-primary/40 text-primary hover:bg-primary/5",
+                    listing.isLocked && "opacity-60 cursor-not-allowed"
+                  )}
+                  onClick={handleAddToCart}
+                  disabled={!canBuyNow || addToCartMutation.isPending}
+                >
+                  {addToCartMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      Đang thêm...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Thêm vào giỏ hàng
+                    </span>
+                  )}
+                </Button>
+              </div>
+
               <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground bg-background/50 p-3 rounded-xl border border-border/40">
                 <Lock className="h-4 w-4 shrink-0 text-primary mt-0.5" />
                 <p className="leading-relaxed">
-                  Giao dịch an toàn. Bấm Mua ngay sẽ{' '}
-                  <strong className="text-foreground font-semibold">khóa xe trong 5 phút</strong>{' '}
-                  để bạn hoàn tất địa chỉ và thanh toán qua PayOS. Tiền được giữ an toàn trong Escrow.
+                  Giao dịch an toàn. Bấm{' '}
+                  <strong className="text-foreground font-semibold">Mua Ngay</strong>{' '}
+                  sẽ khóa xe trong 5 phút để bạn hoàn tất địa chỉ và thanh toán qua PayOS. Tiền được giữ an toàn trong Escrow.
                 </p>
               </div>
             </div>
