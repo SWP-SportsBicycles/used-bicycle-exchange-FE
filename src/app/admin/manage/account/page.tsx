@@ -22,44 +22,66 @@ import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
 const roleColors: Record<string, string> = {
-  Buyer: 'bg-blue-100 text-blue-700 border-blue-200',
-  Seller: 'bg-green-100 text-green-700 border-green-200',
-  Admin: 'bg-red-100 text-red-700 border-red-200',
-  Inspector: 'bg-purple-100 text-purple-700 border-purple-200',
+  BUYER: 'bg-blue-100 text-blue-700 border-blue-200',
+  SELLER: 'bg-green-100 text-green-700 border-green-200',
+  ADMIN: 'bg-red-100 text-red-700 border-red-200',
+  INSPECTOR: 'bg-purple-100 text-purple-700 border-purple-200',
 }
 
 const roleLabels: Record<string, { vi: string; en: string }> = {
-  Buyer: { vi: 'Người mua', en: 'Buyer' },
-  Seller: { vi: 'Người bán', en: 'Seller' },
-  Admin: { vi: 'Quản trị', en: 'Admin' },
-  Inspector: { vi: 'Kiểm định viên', en: 'Inspector' },
+  BUYER: { vi: 'Người mua', en: 'Buyer' },
+  SELLER: { vi: 'Người bán', en: 'Seller' },
+  ADMIN: { vi: 'Quản trị', en: 'Admin' },
+  INSPECTOR: { vi: 'Kiểm định viên', en: 'Inspector' },
 }
 
 const statusColors: Record<string, string> = {
-  Active: 'bg-green-100 text-green-700 border-green-200',
-  InActive: 'bg-gray-100 text-gray-700 border-gray-200',
+  active: 'bg-green-100 text-green-700 border-green-200',
+  inactive: 'bg-gray-100 text-gray-700 border-gray-200',
   Banned: 'bg-red-100 text-red-700 border-red-200',
 }
 
 const statusLabels: Record<string, { vi: string; en: string }> = {
-  Active: { vi: 'Hoạt động', en: 'Active' },
-  InActive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
+  active: { vi: 'Hoạt động', en: 'Active' },
+  inactive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
   Banned: { vi: 'Bị cấm', en: 'Banned' },
 }
+
+type UserFilter = 'all' | 'seller' | 'buyer'
 
 export default function AccountManagementPage() {
   const { language } = useLanguage()
   const [searchTerm, setSearchTerm] = useState('')
+  const [userFilter, setUserFilter] = useState<UserFilter>('all')
 
   const usersQuery = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: adminApi.getUsers,
+    queryKey: ['admin-users', userFilter],
+    queryFn: () => {
+      if (userFilter === 'seller') return adminApi.getSellerUsers()
+      if (userFilter === 'buyer') return adminApi.getBuyerUsers()
+      return adminApi.getUsers()
+    },
+  })
+
+  const allCountQuery = useQuery({
+    queryKey: ['admin-users-total-count'],
+    queryFn: adminApi.getUsersTotalCount,
+  })
+
+  const sellerCountQuery = useQuery({
+    queryKey: ['admin-sellers-total-count'],
+    queryFn: adminApi.getSellerUsersTotalCount,
+  })
+
+  const buyerCountQuery = useQuery({
+    queryKey: ['admin-buyers-total-count'],
+    queryFn: adminApi.getBuyerUsersTotalCount,
   })
 
   const filteredUsers = (usersQuery.data || []).filter(
     (user) =>
       user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phoneNumber.includes(searchTerm) ||
+      (user.phoneNumber ?? '').includes(searchTerm) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -86,6 +108,32 @@ export default function AccountManagementPage() {
       {/* Search */}
       <Card className="border-border/60">
         <CardContent className="p-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={userFilter === 'all' ? 'default' : 'outline'}
+              onClick={() => setUserFilter('all')}
+            >
+              {language === 'vi' ? 'Tất cả' : 'All'} ({allCountQuery.data ?? 0})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={userFilter === 'seller' ? 'default' : 'outline'}
+              onClick={() => setUserFilter('seller')}
+            >
+              {language === 'vi' ? 'Người bán' : 'Sellers'} ({sellerCountQuery.data ?? 0})
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={userFilter === 'buyer' ? 'default' : 'outline'}
+              onClick={() => setUserFilter('buyer')}
+            >
+              {language === 'vi' ? 'Người mua' : 'Buyers'} ({buyerCountQuery.data ?? 0})
+            </Button>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -153,7 +201,7 @@ export default function AccountManagementPage() {
                           <div className="font-medium">{user.fullName}</div>
                           <div className="text-xs text-muted-foreground">{user.email}</div>
                         </TableCell>
-                        <TableCell>{user.phoneNumber}</TableCell>
+                        <TableCell>{user.phoneNumber || '-'}</TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -163,12 +211,16 @@ export default function AccountManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={cn('text-xs', statusColors[user.status] || 'bg-gray-100')}
-                          >
-                            {statusLabels[user.status]?.[language] || user.status}
-                          </Badge>
+                          {typeof user.isActive === 'boolean' ? (
+                            <Badge
+                              variant="outline"
+                              className={cn('text-xs', statusColors[user.isActive ? 'active' : 'inactive'] || 'bg-gray-100')}
+                            >
+                              {statusLabels[user.isActive ? 'active' : 'inactive']?.[language] || '-'}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" asChild>

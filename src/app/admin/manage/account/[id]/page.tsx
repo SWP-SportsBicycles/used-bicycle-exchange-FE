@@ -9,14 +9,12 @@ import {
   User, 
   Mail, 
   Phone, 
-  Wallet, 
+  Wallet,
   MapPin, 
   Shield, 
-  Eye, 
-  EyeOff,
   Loader2,
   AlertCircle,
-  Edit
+  CalendarDays,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,31 +23,30 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useLanguage } from '@/lib/language-context'
 import { adminApi } from '@/lib/api/admin-api'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
 
 const roleColors: Record<string, string> = {
-  Buyer: 'bg-blue-100 text-blue-700 border-blue-200',
-  Seller: 'bg-green-100 text-green-700 border-green-200',
-  Admin: 'bg-red-100 text-red-700 border-red-200',
-  Inspector: 'bg-purple-100 text-purple-700 border-purple-200',
+  BUYER: 'bg-blue-100 text-blue-700 border-blue-200',
+  SELLER: 'bg-green-100 text-green-700 border-green-200',
+  ADMIN: 'bg-red-100 text-red-700 border-red-200',
+  INSPECTOR: 'bg-purple-100 text-purple-700 border-purple-200',
 }
 
 const roleLabels: Record<string, { vi: string; en: string }> = {
-  Buyer: { vi: 'Người mua', en: 'Buyer' },
-  Seller: { vi: 'Người bán', en: 'Seller' },
-  Admin: { vi: 'Quản trị', en: 'Admin' },
-  Inspector: { vi: 'Kiểm định viên', en: 'Inspector' },
+  BUYER: { vi: 'Người mua', en: 'Buyer' },
+  SELLER: { vi: 'Người bán', en: 'Seller' },
+  ADMIN: { vi: 'Quản trị', en: 'Admin' },
+  INSPECTOR: { vi: 'Kiểm định viên', en: 'Inspector' },
 }
 
 const statusColors: Record<string, string> = {
-  Active: 'bg-green-100 text-green-700 border-green-200',
-  InActive: 'bg-gray-100 text-gray-700 border-gray-200',
+  active: 'bg-green-100 text-green-700 border-green-200',
+  inactive: 'bg-gray-100 text-gray-700 border-gray-200',
   Banned: 'bg-red-100 text-red-700 border-red-200',
 }
 
 const statusLabels: Record<string, { vi: string; en: string }> = {
-  Active: { vi: 'Hoạt động', en: 'Active' },
-  InActive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
+  active: { vi: 'Hoạt động', en: 'Active' },
+  inactive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
   Banned: { vi: 'Bị cấm', en: 'Banned' },
 }
 
@@ -64,7 +61,6 @@ export default function AccountDetailPage() {
   const { language } = useLanguage()
   const params = useParams()
   const userId = params.id as string
-  const [showPassword, setShowPassword] = useState(false)
 
   const userQuery = useQuery({
     queryKey: ['admin-user', userId],
@@ -117,10 +113,12 @@ export default function AccountDetailPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Edit className="h-4 w-4" />
-          {language === 'vi' ? 'Chỉnh sửa' : 'Edit'}
-        </Button>
+        <Badge variant="outline" className="gap-2">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {user.createdAt
+            ? new Date(user.createdAt).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')
+            : '-'}
+        </Badge>
       </div>
 
       {/* Main Info Card */}
@@ -146,9 +144,9 @@ export default function AccountDetailPage() {
                 </Avatar>
                 <Badge
                   variant="outline"
-                  className={cn('text-xs', statusColors[user.status] || 'bg-gray-100')}
+                  className={cn('text-xs', statusColors[user.isActive ? 'active' : 'inactive'] || 'bg-gray-100')}
                 >
-                  {statusLabels[user.status]?.[language] || user.status}
+                  {statusLabels[user.isActive ? 'active' : 'inactive']?.[language] || '-'}
                 </Badge>
               </div>
 
@@ -189,45 +187,23 @@ export default function AccountDetailPage() {
                       <Phone className="h-4 w-4" />
                       {language === 'vi' ? 'Số điện thoại' : 'Phone Number'}
                     </div>
-                    <p className="font-medium">{user.phoneNumber}</p>
+                    <p className="font-medium">{user.phoneNumber || '-'}</p>
                   </div>
 
-                  <div className="space-y-1 sm:col-span-2">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Wallet className="h-4 w-4" />
-                      {language === 'vi' ? 'Số dư ví' : 'Wallet Balance'}
+                      {language === 'vi' ? 'Tổng doanh thu' : 'Total Revenue'}
                     </div>
-                    <p className="font-medium text-lg text-success">{formatVND(user.walletBalance)}</p>
+                    <p className="font-medium text-lg text-success">{formatVND(user.totalRevenue || 0)}</p>
                   </div>
 
-                  {/* Password Field with Toggle */}
-                  <div className="space-y-1 sm:col-span-2">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Shield className="h-4 w-4" />
-                      {language === 'vi' ? 'Mật khẩu' : 'Password'}
+                      <Wallet className="h-4 w-4" />
+                      {language === 'vi' ? 'Tổng chi tiêu' : 'Total Spent'}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex-1 max-w-md">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={user.password}
-                          readOnly
-                          className="w-full px-3 py-2 border rounded-md bg-muted text-sm font-mono"
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="shrink-0"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+                    <p className="font-medium text-lg">{formatVND(user.totalSpent || 0)}</p>
                   </div>
                 </div>
               </div>
@@ -237,7 +213,7 @@ export default function AccountDetailPage() {
       </motion.div>
 
       {/* Address Info */}
-      {user.pickupAddress && (
+      {(user.pickupAddress || user.senderAddress) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -254,7 +230,7 @@ export default function AccountDetailPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">{language === 'vi' ? 'Địa chỉ' : 'Address'}</p>
-                  <p className="font-medium">{user.pickupAddress}</p>
+                  <p className="font-medium">{user.senderAddress || user.pickupAddress}</p>
                 </div>
                 {user.pickupWardName && (
                   <div className="space-y-1">
@@ -304,6 +280,26 @@ export default function AccountDetailPage() {
               <span>User ID:</span>
               <span className="font-mono">{user.id}</span>
             </div>
+            <div className="flex justify-between">
+              <span>{language === 'vi' ? 'Tổng đơn hàng:' : 'Total orders:'}</span>
+              <span>{user.totalOrders ?? 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{language === 'vi' ? 'Đơn hoàn tất:' : 'Completed orders:'}</span>
+              <span>{user.completedOrders ?? 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{language === 'vi' ? 'Tổng listings:' : 'Total listings:'}</span>
+              <span>{user.totalListings ?? 0}</span>
+            </div>
+            {(user.bankName || user.bankAccountNumber || user.bankAccountName) && (
+              <div className="pt-2 border-t border-border">
+                <p className="font-medium text-foreground mb-1">{language === 'vi' ? 'Thông tin ngân hàng' : 'Bank Information'}</p>
+                <p>{user.bankName || '-'}</p>
+                <p>{user.bankAccountName || '-'}</p>
+                <p>{user.bankAccountNumber || '-'}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

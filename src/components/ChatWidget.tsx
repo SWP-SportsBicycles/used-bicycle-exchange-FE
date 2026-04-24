@@ -18,7 +18,7 @@ export function ChatWidget() {
       id: makeId(),
       role: 'assistant',
       content:
-        'Hi! I am your VeloTrust AI assistant. I can help with buying/selling bikes, pricing, and recommendations.',
+        'Xin chào! Mình là trợ lý ảo của hệ thống VeloTrust, tui có thể giúp gì cho bạn?',
     },
   ])
 
