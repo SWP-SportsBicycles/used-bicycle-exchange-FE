@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { Eye, Loader2, ReceiptText } from 'lucide-react'
@@ -40,10 +41,16 @@ function formatVND(value: number) {
 
 export default function AdminOrderPage() {
   const { language } = useLanguage()
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+
   const ordersQuery = useQuery({
-    queryKey: ['admin-orders', 1, 10],
-    queryFn: () => adminApi.getOrders({ page: 1, size: 10 }),
+    queryKey: ['admin-orders', page, pageSize],
+    queryFn: () => adminApi.getOrders({ page, size: pageSize }),
   })
+
+  const orders = ordersQuery.data ?? []
+  const isLastPage = orders.length < pageSize
 
   return (
     <div className="space-y-6">
@@ -75,7 +82,7 @@ export default function AdminOrderPage() {
             <div className="text-sm text-destructive py-8 text-center">
               {language === 'vi' ? 'Không thể tải danh sách đơn hàng.' : 'Unable to load order list.'}
             </div>
-          ) : (ordersQuery.data ?? []).length === 0 ? (
+          ) : orders.length === 0 ? (
             <div className="text-sm text-muted-foreground py-8 text-center">
               {language === 'vi' ? 'Chưa có đơn hàng.' : 'No orders found.'}
             </div>
@@ -93,9 +100,9 @@ export default function AdminOrderPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(ordersQuery.data ?? []).map((order, index) => (
+                  {orders.map((order, index) => (
                     <TableRow key={order.orderId}>
-                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{(page - 1) * pageSize + index + 1}</TableCell>
                       <TableCell>{order.bikeTitle || '-'}</TableCell>
                       <TableCell>{order.sellerName || '-'}</TableCell>
                       <TableCell className="font-medium">{formatVND(order.totalAmount)}</TableCell>
@@ -116,6 +123,30 @@ export default function AdminOrderPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+                <p className="text-xs text-muted-foreground">
+                  {language === 'vi' ? 'Trang' : 'Page'} {page}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={page <= 1 || ordersQuery.isFetching}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    {language === 'vi' ? 'Trước' : 'Prev'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isLastPage || ordersQuery.isFetching}
+                    onClick={() => setPage((prev) => prev + 1)}
+                  >
+                    {language === 'vi' ? 'Sau' : 'Next'}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

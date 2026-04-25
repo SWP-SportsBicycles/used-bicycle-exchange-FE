@@ -59,14 +59,63 @@ export interface AdminDashboardSummary {
   totalSellers: number;
   totalBuyers: number;
   totalListings: number;
+  activeListings: number;
   pendingListings: number;
   totalOrders: number;
   completedOrders: number;
   lockedOrders: number;
   confirmedOrders: number;
   totalRevenue: number;
+  monthlyRevenue: number;
+  revenueGrowthPercent: number;
+  buyerFeeRevenue: number;
+  sellerFeeRevenue: number;
+  inspectionRevenue: number;
   pendingPayoutAmount: number;
   openDisputes: number;
+  cities: AdminDashboardCityStat[];
+}
+
+export interface AdminDashboardCityStat {
+  city: string;
+  listings: number;
+  orders: number;
+}
+
+export interface AdminReport {
+  reportId: string;
+  orderId: string;
+  buyerId: string;
+  buyerName: string;
+  orderStatus: string;
+  transactionStatus: string;
+  type: string;
+  typeCode: number;
+  typeKey: string;
+  status: string;
+  statusDisplay: string;
+  nextAction: string;
+  reason: string;
+  description: string;
+  videoUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminReportListResponse {
+  pageNumber: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  items: AdminReport[];
+}
+
+export interface AdminListingListResponse {
+  pageNumber: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  items: AdminListing[];
 }
 
 export type UserRole = "BUYER" | "SELLER" | "ADMIN" | "INSPECTOR";
@@ -327,26 +376,108 @@ function pickNumber(source: Record<string, unknown>, keys: string[]) {
 
 function normalizeAdminDashboardSummary(raw: unknown): AdminDashboardSummary {
   const source = extractPayloadObject(raw);
+  const cities = Array.isArray(source.cities)
+    ? source.cities
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const citySource = item as Record<string, unknown>;
+          return {
+            city: pickString(citySource, ["city", "name"]) || "Unknown",
+            listings: pickNumber(citySource, ["listings", "listingCount"]),
+            orders: pickNumber(citySource, ["orders", "orderCount"]),
+          } satisfies AdminDashboardCityStat;
+        })
+        .filter((item): item is AdminDashboardCityStat => Boolean(item))
+    : [];
+
   return {
     totalUsers: pickNumber(source, ["totalUsers", "userCount"]),
     totalSellers: pickNumber(source, ["totalSellers", "sellerCount"]),
     totalBuyers: pickNumber(source, ["totalBuyers", "buyerCount"]),
     totalListings: pickNumber(source, ["totalListings", "listingCount"]),
+    activeListings: pickNumber(source, ["activeListings"]),
     pendingListings: pickNumber(source, ["pendingListings", "pendingListingCount"]),
     totalOrders: pickNumber(source, ["totalOrders", "orderCount"]),
     completedOrders: pickNumber(source, ["completedOrders", "completedOrderCount"]),
     lockedOrders: pickNumber(source, ["lockedOrders", "lockedOrderCount"]),
     confirmedOrders: pickNumber(source, ["confirmedOrders", "confirmedOrderCount"]),
     totalRevenue: pickNumber(source, ["totalRevenue", "revenue"]),
+    monthlyRevenue: pickNumber(source, ["monthlyRevenue"]),
+    revenueGrowthPercent: pickNumber(source, ["revenueGrowthPercent"]),
+    buyerFeeRevenue: pickNumber(source, ["buyerFeeRevenue"]),
+    sellerFeeRevenue: pickNumber(source, ["sellerFeeRevenue"]),
+    inspectionRevenue: pickNumber(source, ["inspectionRevenue"]),
     pendingPayoutAmount: pickNumber(source, ["pendingPayoutAmount", "pendingPayout"]),
     openDisputes: pickNumber(source, ["openDisputes", "disputeCount"]),
+    cities,
+  };
+}
+
+function normalizeAdminReport(raw: unknown): AdminReport {
+  const source = extractPayloadObject(raw);
+  return {
+    reportId: pickString(source, ["reportId", "id"]),
+    orderId: pickString(source, ["orderId"]),
+    buyerId: pickString(source, ["buyerId"]),
+    buyerName: pickString(source, ["buyerName", "buyer"]),
+    orderStatus: pickString(source, ["orderStatus"]),
+    transactionStatus: pickString(source, ["transactionStatus"]),
+    type: pickString(source, ["type"]),
+    typeCode: pickNumber(source, ["typeCode"]),
+    typeKey: pickString(source, ["typeKey"]),
+    status: pickString(source, ["status"]),
+    statusDisplay: pickString(source, ["statusDisplay"]),
+    nextAction: pickString(source, ["nextAction"]),
+    reason: pickString(source, ["reason"]),
+    description: pickString(source, ["description"]),
+    videoUrl: pickString(source, ["videoUrl"]) || null,
+    createdAt: pickString(source, ["createdAt"]),
+    updatedAt: pickString(source, ["updatedAt"]),
+  };
+}
+
+function normalizeAdminReportList(raw: unknown): AdminReportListResponse {
+  const source = extractPayloadObject(raw);
+  const items = Array.isArray(source.items) ? source.items : [];
+  return {
+    pageNumber: pickNumber(source, ["pageNumber", "page"]),
+    pageSize: pickNumber(source, ["pageSize", "size"]),
+    totalItems: pickNumber(source, ["totalItems"]),
+    totalPages: pickNumber(source, ["totalPages"]),
+    items: items.map(normalizeAdminReport),
+  };
+}
+
+function normalizeAdminListingList(raw: unknown): AdminListingListResponse {
+  const source = extractPayloadObject(raw);
+  const items = Array.isArray(source.items) ? source.items : extractArray(source);
+  const pageSize = pickNumber(source, ["pageSize", "size"]) || items.length || 10;
+  const totalItems = pickNumber(source, ["totalItems"]) || items.length;
+  const totalPages = pickNumber(source, ["totalPages"]) || Math.max(1, Math.ceil(totalItems / pageSize));
+  return {
+    pageNumber: pickNumber(source, ["pageNumber", "page"]) || 1,
+    pageSize,
+    totalItems,
+    totalPages,
+    items: items.map(normalizeListing),
   };
 }
 
 export const adminApi = {
+  async getAllListingsPaged(params?: { page?: number; size?: number; status?: string }): Promise<AdminListingListResponse> {
+    const search = new URLSearchParams();
+    search.set("page", String(params?.page ?? 1));
+    search.set("size", String(params?.size ?? 10));
+    if (params?.status) {
+      search.set("status", params.status);
+    }
+    const response = await http.get<unknown>(`/api/admin-listing/all?${search.toString()}`);
+    return normalizeAdminListingList(response);
+  },
+
   async getAllListings() {
-    const response = await http.get<unknown>("/api/admin-listing/all");
-    return extractArray(response).map(normalizeListing);
+    const response = await this.getAllListingsPaged({ page: 1, size: 200 });
+    return response.items;
   },
 
   async getListings() {
@@ -434,5 +565,32 @@ export const adminApi = {
   async getDashboardSummary(): Promise<AdminDashboardSummary> {
     const response = await http.get<unknown>("/api/AdminDashboard");
     return normalizeAdminDashboardSummary(response);
+  },
+
+  async getReports(params?: {
+    page?: number;
+    size?: number;
+    status?: string;
+    type?: string;
+  }): Promise<AdminReportListResponse> {
+    const search = new URLSearchParams();
+    search.set("page", String(params?.page ?? 1));
+    search.set("size", String(params?.size ?? 10));
+    if (params?.status) {
+      search.set("status", params.status);
+    }
+    if (params?.type) {
+      search.set("type", params.type);
+    }
+    const response = await http.get<unknown>(`/api/admin-report?${search.toString()}`);
+    return normalizeAdminReportList(response);
+  },
+
+  approveReport(reportId: string) {
+    return http.put<unknown>(`/api/admin-report/${reportId}/approve`, {});
+  },
+
+  rejectReport(reportId: string) {
+    return http.put<unknown>(`/api/admin-report/${reportId}/reject`, {});
   },
 };
