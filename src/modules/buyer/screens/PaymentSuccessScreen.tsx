@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
+import { buyerApi } from '@/lib/api/buyer-api'
 
 /**
  * PaymentSuccessScreen
@@ -12,18 +13,17 @@ import { useQueryClient } from '@tanstack/react-query'
  * Trang trung gian xử lý redirect từ PayOS sau khi thanh toán.
  * PayOS redirect về: /payment-success?code=00&id=...&cancel=false&status=PAID&orderCode=...
  *
- * Params:
- *  - code: "00" = thành công, khác = thất bại
- *  - status: "PAID" | "CANCELLED" | "PENDING"
- *  - cancel: "false" | "true"
- *  - orderCode: mã đơn hàng PayOS
- *  - id: payment link ID
+ * Vấn đề: PayOS redirect browser ngay lập tức, nhưng webhook tới backend
+ * có thể mất vài giây. Nếu redirect ngay, đơn hàng vẫn còn "pending".
+ *
+ * Giải pháp: Poll backend GET /api/buyer-order cho đến khi có đơn nào
+ * chuyển sang "paid" (tối đa 15 giây), rồi mới redirect.
  */
 export default function PaymentSuccessScreen() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const hasRedirected = useRef(false)
+  const hasStarted = useRef(false)
 
   const code = searchParams.get('code')
   const status = searchParams.get('status')
@@ -33,29 +33,73 @@ export default function PaymentSuccessScreen() {
   const isSuccess = code === '00' && status === 'PAID' && cancel === 'false'
   const isCancelled = cancel === 'true' || status === 'CANCELLED'
 
+  const [pollAttempt, setPollAttempt] = useState(0)
+  const MAX_POLL = 5   // 5 × 3s = 15 giây tối đa
+  const POLL_INTERVAL = 3000
+
   useEffect(() => {
-    if (hasRedirected.current) return
-    hasRedirected.current = true
+    if (hasStarted.current) return
+    hasStarted.current = true
 
-    // Invalidate queries để refresh dữ liệu đơn hàng
-    queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
-    queryClient.invalidateQueries({ queryKey: ['buyer-order'] })
+    // Trường hợp hủy: redirect ngay, không cần poll
+    if (isCancelled) {
+      toast.error('Thanh toán đã bị hủy.')
+      queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      router.replace('/buyer/orders')
+      return
+    }
 
-    const timer = setTimeout(() => {
-      if (isSuccess) {
-        toast.success('Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.')
-        router.replace('/buyer/orders?status=paid')
-      } else if (isCancelled) {
-        toast.error('Thanh toán đã bị hủy.')
-        router.replace('/buyer/orders')
-      } else {
-        // Trạng thái không xác định → về danh sách đơn hàng
-        router.replace('/buyer/orders')
+    // Trường hợp không xác định
+    if (!isSuccess) {
+      router.replace('/buyer/orders')
+      return
+    }
+
+    // Trường hợp thành công: poll backend đến khi thấy đơn "paid"
+    let attempt = 0
+    let cancelled = false
+
+    const poll = async () => {
+      if (cancelled) return
+
+      try {
+        const page = await buyerApi.getOrders(1, 20)
+        const paidOrder = page.items.find(o => o.status === 'paid')
+
+        if (paidOrder) {
+          // Backend đã cập nhật → redirect
+          queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+          queryClient.invalidateQueries({ queryKey: ['buyer-order'] })
+          toast.success('Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.')
+          router.replace('/buyer/orders?status=paid')
+          return
+        }
+      } catch {
+        // Ignore fetch errors, keep polling
       }
-    }, 1500)
 
-    return () => clearTimeout(timer)
-  }, [isSuccess, isCancelled, router, queryClient])
+      attempt += 1
+      setPollAttempt(attempt)
+
+      if (attempt >= MAX_POLL) {
+        // Đã poll đủ lần, redirect dù backend chưa cập nhật
+        queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+        toast.success('Thanh toán thành công! Đơn hàng sẽ được cập nhật trong giây lát.')
+        router.replace('/buyer/orders?status=paid')
+        return
+      }
+
+      setTimeout(poll, POLL_INTERVAL)
+    }
+
+    // Bắt đầu poll sau 1 giây (cho webhook có thêm thời gian)
+    const timer = setTimeout(poll, 1000)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
@@ -94,7 +138,13 @@ export default function PaymentSuccessScreen() {
 
       <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        <span>Đang chuyển hướng về đơn hàng...</span>
+        <span>
+          {isSuccess
+            ? pollAttempt === 0
+              ? 'Đang kiểm tra xác nhận từ hệ thống...'
+              : `Đang chờ xác nhận... (${pollAttempt}/${MAX_POLL})`
+            : 'Đang chuyển hướng...'}
+        </span>
       </div>
     </div>
   )
