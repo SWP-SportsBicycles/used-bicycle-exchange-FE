@@ -272,6 +272,20 @@ export const inspectorApi = {
     const normalized = normalizeHistory(response);
     return normalized.id ? normalized : null;
   },
+
+  // Inspector Report APIs
+  async getReports() {
+    const response = await http.get<unknown>("/api/inspector-report");
+    return extractArray(response);
+  },
+
+  async confirmReport(reportId: string) {
+    return http.put<unknown>(`/api/inspector-report/${reportId}/confirm`, {});
+  },
+
+  async rejectReport(reportId: string) {
+    return http.put<unknown>(`/api/inspector-report/${reportId}/reject`, {});
+  },
 };
 
 function normalizeHistory(raw: unknown): InspectorHistory {

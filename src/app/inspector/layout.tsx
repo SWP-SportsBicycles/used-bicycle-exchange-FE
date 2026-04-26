@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { 
   LayoutDashboard, 
   ClipboardCheck, 
-  Calendar,
+  FileWarning,
   CheckCircle2,
   ChevronRight 
 } from 'lucide-react'
@@ -42,9 +42,9 @@ const sidebarItems: SidebarItem[] = [
     label: { vi: 'Kiểm định xe', en: 'Bike Inspection' }
   },
   { 
-    href: '/inspector/schedule', 
-    icon: Calendar, 
-    label: { vi: 'Lịch Kiểm Định', en: 'Schedule' }
+    href: '/inspector/report', 
+    icon: FileWarning, 
+    label: { vi: 'Báo Cáo', en: 'Reports' }
   },
   { 
     href: '/inspector/completed', 
