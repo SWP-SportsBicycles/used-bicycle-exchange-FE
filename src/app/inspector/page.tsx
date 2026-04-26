@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   ClipboardCheck, 
   Calendar,
@@ -20,8 +21,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { 
   MOCK_INSPECTOR_ASSIGNMENTS, 
-  formatVND,
-  CITIES 
+  formatVND
 } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
@@ -184,10 +184,12 @@ export default function InspectorDashboardPage() {
                 >
                   {/* Bike Image & Info */}
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img 
+                    <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                      <Image 
                         src={assignment.listing.images[0]} 
                         alt={assignment.listing.title}
+                        width={64}
+                        height={64}
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -215,7 +217,7 @@ export default function InspectorDashboardPage() {
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-[200px]">{assignment.seller.address}</span>
+                      <span className="truncate max-w-50">{assignment.seller.address}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Phone className="h-3.5 w-3.5" />
@@ -226,7 +228,7 @@ export default function InspectorDashboardPage() {
                   {/* Action */}
                   <div className="flex sm:flex-col gap-2">
                     <Button size="sm" className="flex-1 sm:flex-none" asChild>
-                      <Link href={`/inspector/inspect/${assignment.id}`}>
+                      <Link href={`/inspector/assigned/${assignment.id}`}>
                         {assignment.status === 'in_progress' 
                           ? (language === 'vi' ? 'Tiếp tục' : 'Continue')
                           : (language === 'vi' ? 'Bắt đầu' : 'Start')
@@ -260,7 +262,7 @@ export default function InspectorDashboardPage() {
           <CardContent>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
                   {language === 'vi' 
                     ? 'Luôn chụp ảnh số serial và so sánh với thông tin đăng ký'
@@ -268,7 +270,7 @@ export default function InspectorDashboardPage() {
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
                   {language === 'vi' 
                     ? 'Kiểm tra kỹ khung xe xem có vết nứt hay biến dạng không'
@@ -276,7 +278,7 @@ export default function InspectorDashboardPage() {
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
                   {language === 'vi' 
                     ? 'Test phanh và hệ thống chuyển số trước khi đánh giá'
@@ -284,7 +286,7 @@ export default function InspectorDashboardPage() {
                 </span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
                   {language === 'vi' 
                     ? 'Ghi chú chi tiết mọi vấn đề phát hiện được'

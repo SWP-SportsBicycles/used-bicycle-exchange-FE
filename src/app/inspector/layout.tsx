@@ -4,6 +4,7 @@ import { type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
 import { 
   LayoutDashboard, 
   ClipboardCheck, 
@@ -14,11 +15,21 @@ import {
 import { Header } from '@/components/header'
 import { RoleGuard } from '@/components/guards/RoleGuard'
 import { Badge } from '@/components/ui/badge'
+import { inspectorApi } from '@/lib/api/inspector-api'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
 
-const sidebarItems = [
+type SidebarItem = {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  label: { vi: string; en: string }
+  exact?: boolean
+  badge?: number
+  badgeTone?: 'alert' | 'default'
+}
+
+const sidebarItems: SidebarItem[] = [
   { 
     href: '/inspector', 
     icon: LayoutDashboard, 
@@ -28,8 +39,7 @@ const sidebarItems = [
   { 
     href: '/inspector/assigned', 
     icon: ClipboardCheck, 
-    label: { vi: 'Xe Được Giao', en: 'Assigned' },
-    badge: 3
+    label: { vi: 'Kiểm định xe', en: 'Bike Inspection' }
   },
   { 
     href: '/inspector/schedule', 
@@ -48,6 +58,20 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { language } = useLanguage()
 
+  const pendingListingsQuery = useQuery({
+    queryKey: ['inspector-listings', 'pending'],
+    queryFn: inspectorApi.getPendingListings,
+    refetchInterval: 15000,
+  })
+
+  const pendingCount = pendingListingsQuery.data?.length ?? 0
+
+  const sidebarItemsWithBadge = sidebarItems.map((item) =>
+    item.href === '/inspector/assigned'
+      ? { ...item, badge: pendingCount, badgeTone: 'alert' as const }
+      : item
+  )
+
   return (
     <RoleGuard allow={['inspector']}>
       <div className="min-h-screen bg-background">
@@ -65,7 +89,7 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
           
           <nav className="flex-1 p-4">
             <ul className="space-y-1">
-              {sidebarItems.map((item) => {
+              {sidebarItemsWithBadge.map((item) => {
                 const isActive = item.exact 
                   ? pathname === item.href 
                   : pathname.startsWith(item.href)
@@ -75,23 +99,23 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
                     <Link
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
                         isActive 
-                          ? 'bg-primary text-primary-foreground' 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-sm hover:shadow-primary/30' 
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                       )}
                     >
                       <item.icon className="h-5 w-5" />
                       {item.label[language]}
-                      {item.badge && (
+                      {typeof item.badge === 'number' && (
                         <Badge 
-                          variant={isActive ? 'secondary' : 'default'}
+                          variant={item.badgeTone === 'alert' ? 'destructive' : isActive ? 'secondary' : 'default'}
                           className="ml-auto h-5 px-1.5 text-xs"
                         >
                           {item.badge}
                         </Badge>
                       )}
-                      {isActive && !item.badge && (
+                      {isActive && typeof item.badge !== 'number' && (
                         <ChevronRight className="h-4 w-4 ml-auto" />
                       )}
                     </Link>
@@ -100,31 +124,13 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
               })}
             </ul>
           </nav>
-
-          {/* Stats Summary */}
-          <div className="p-4 border-t border-border/50">
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="p-3 rounded-lg bg-muted">
-                <p className="text-2xl font-bold text-primary">{user.assignedInspections || 0}</p>
-                <p className="text-xs text-muted-foreground">
-                  {language === 'vi' ? 'Đang chờ' : 'Pending'}
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-muted">
-                <p className="text-2xl font-bold text-success">{user.completedInspections || 0}</p>
-                <p className="text-xs text-muted-foreground">
-                  {language === 'vi' ? 'Hoàn thành' : 'Completed'}
-                </p>
-              </div>
-            </div>
-          </div>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
           {/* Mobile Navigation */}
           <div className="lg:hidden flex items-center gap-2 p-4 border-b border-border/50 overflow-x-auto bg-card/50 backdrop-blur-sm">
-            {sidebarItems.map((item) => {
+            {sidebarItemsWithBadge.map((item) => {
               const isActive = item.exact 
                 ? pathname === item.href 
                 : pathname.startsWith(item.href)
@@ -134,16 +140,16 @@ export default function InspectorLayout({ children }: { children: ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors',
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200',
                     isActive 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                      : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
                   )}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label[language]}
-                  {item.badge && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                  {typeof item.badge === 'number' && (
+                    <Badge variant={item.badgeTone === 'alert' ? 'destructive' : 'secondary'} className="h-5 px-1.5 text-xs">
                       {item.badge}
                     </Badge>
                   )}

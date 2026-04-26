@@ -1,16 +1,20 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { 
+  normalizeListingsPayload, 
+  normalizeOrdersPayload 
+} from '@/modules/seller/utils/normalization'
 import { 
   Package, 
   ShoppingCart, 
   Wallet, 
   TrendingUp, 
   Eye,
-  Clock,
   CheckCircle2,
-  AlertCircle,
   ArrowUpRight,
   ChevronRight
 } from 'lucide-react'
@@ -20,9 +24,9 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
+import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
+import { useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
 import { 
-  MOCK_LISTINGS, 
-  MOCK_SELLER_ORDERS, 
   MOCK_WALLET_TRANSACTIONS,
   formatVND,
   ORDER_STATUS_LABELS
@@ -31,10 +35,15 @@ import { cn } from '@/lib/utils'
 
 const statusColors: Record<string, string> = {
   pending_deposit: 'bg-muted text-muted-foreground',
-  soft_reserved: 'bg-[#407F3E]/15 text-[#407F3E]',
+  pending_seller_confirm: 'bg-muted text-muted-foreground',
+  seller_confirmed: 'bg-[#407F3E]/15 text-[#407F3E]',
+  pending_inspection: 'bg-accent/20 text-accent-foreground',
+  inspection_passed: 'bg-[#407F3E]/15 text-[#407F3E]',
+  inspection_failed: 'bg-destructive/20 text-destructive',
   inspection_scheduled: 'bg-accent/20 text-accent-foreground',
   inspection_completed: 'bg-[#407F3E]/15 text-[#407F3E]',
   pending_payment: 'bg-[#407F3E]/15 text-[#407F3E]',
+  shipping: 'bg-accent/20 text-accent-foreground',
   delivered: 'bg-[#407F3E]/15 text-[#407F3E]',
   pending_confirmation: 'bg-[#407F3E]/15 text-[#407F3E]',
   completed: 'bg-[#407F3E]/15 text-[#407F3E]',
@@ -46,18 +55,37 @@ export default function SellerDashboardPage() {
   const { user } = useAuth()
   const { language } = useLanguage()
 
-  // Mock data for this seller
-  const myListings = MOCK_LISTINGS.slice(0, 3)
-  const myOrders = MOCK_SELLER_ORDERS
+  const { data: listingsData, isLoading: isLoadingListings } = useSellerListings({ pageSize: 100 })
+  const { data: ordersData, isLoading: isLoadingOrders } = useSellerOrders({ size: 100 })
+
+  // Data for this seller
+  const normalizedListings = useMemo(() => normalizeListingsPayload(listingsData), [listingsData])
+  const myListings = useMemo(() => normalizedListings.slice(0, 3), [normalizedListings])
+  const myOrders = useMemo(() => normalizeOrdersPayload(ordersData).slice(0, 3), [ordersData])
   const recentTransactions = MOCK_WALLET_TRANSACTIONS.slice(0, 3)
 
   const stats = {
-    totalListings: myListings.length,
+    totalListings: normalizedListings.length,
     activeListings: myListings.filter(l => l.status === 'published').length,
-    pendingOrders: myOrders.filter(o => !['completed', 'cancelled'].includes(o.status)).length,
+    pendingOrders: normalizeOrdersPayload(ordersData).filter(o => 
+      !['completed', 'cancelled', 'delivered'].includes(o.status)
+    ).length,
     totalEarnings: user.walletBalance || 0,
-    thisMonthViews: 1247,
-    conversionRate: 4.8,
+    thisMonthViews: 1247, // Mock as backend doesn't have views yet
+    conversionRate: 4.8,  // Mock
+  }
+
+  if (isLoadingListings || isLoadingOrders) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-sm text-muted-foreground">
+            {language === 'vi' ? 'Đang tải dữ liệu...' : 'Loading data...'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,32 +166,6 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Link href="/seller/wallet" className="block">
-            <Card className="border-[#407F3E]/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300 cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {language === 'vi' ? 'Số Dư Ví' : 'Wallet Balance'}
-                </CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-[#407F3E]" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-extrabold text-[#407F3E]" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
-                <p className="text-xs text-[#407F3E] flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" />
-                  +12% {language === 'vi' ? 'tháng này' : 'this month'}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
           <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -208,29 +210,35 @@ export default function SellerDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {myOrders.map((order) => (
-                  <div 
-                    key={order.id} 
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
-                      <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{order.listing.title}</p>
-                      <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
+                {myOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {language === 'vi' ? 'Chưa có đơn hàng nào' : 'No orders yet'}
+                  </p>
+                ) : (
+                  myOrders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
+                        <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{order.listing.title}</p>
+                        <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className={cn('text-xs', statusColors[order.status] || 'bg-muted')}>
+                          {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]?.[language] || order.status}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatVND(order.depositAmount)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className={cn('text-xs', statusColors[order.status])}>
-                        {ORDER_STATUS_LABELS[order.status][language]}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatVND(order.depositAmount)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -259,125 +267,58 @@ export default function SellerDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {myListings.map((listing) => (
-                  <Link 
-                    key={listing.id} 
-                    href={`/listing/${listing.id}`}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
-                      <img 
-                        src={listing.images[0]} 
-                        alt={listing.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{listing.title}</p>
-                      <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {listing.isVeloSafeVerified && (
-                        <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />
-                      )}
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          'text-xs',
-                          listing.status === 'published' 
-                            ? 'bg-[#407F3E]/15 text-[#407F3E]' 
-                            : 'bg-muted text-muted-foreground'
+                {myListings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {language === 'vi' ? 'Chưa có tin đăng nào' : 'No listings yet'}
+                  </p>
+                ) : (
+                  myListings.map((listing) => (
+                    <Link 
+                      key={listing.id} 
+                      href={`/seller/listings/${listing.id}`}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0 relative">
+                        <Image
+                          src={listing.images[0] || '/placeholder.svg'}
+                          alt={listing.title}
+                          fill
+                          sizes="48px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{listing.title}</p>
+                        <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {listing.isVeloSafeVerified && (
+                          <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />
                         )}
-                      >
-                        {listing.status === 'published' 
-                          ? (language === 'vi' ? 'Đang bán' : 'Active')
-                          : (language === 'vi' ? 'Nháp' : 'Draft')
-                        }
-                      </Badge>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </Link>
-                ))}
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            'text-xs',
+                            listing.status === 'published' 
+                              ? 'bg-[#407F3E]/15 text-[#407F3E]' 
+                              : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {listing.status === 'published' 
+                            ? (language === 'vi' ? 'Đang bán' : 'Active')
+                            : (language === 'vi' ? 'Nháp/Chờ duyệt' : 'Draft/Pending')
+                          }
+                        </Badge>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Link>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
-
-      {/* Recent Transactions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{language === 'vi' ? 'Giao Dịch Gần Đây' : 'Recent Transactions'}</CardTitle>
-              <CardDescription>
-                {language === 'vi' ? 'Lịch sử ví tiền' : 'Wallet history'}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/seller/wallet" className="gap-1">
-                {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentTransactions.map((tx) => (
-                <div 
-                  key={tx.id} 
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      'h-8 w-8 rounded-full flex items-center justify-center',
-                      tx.amount > 0 ? 'bg-[#407F3E]/15' : 'bg-destructive/20'
-                    )}>
-                      {tx.amount > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-[#407F3E]" />
-                      ) : (
-                        <Wallet className="h-4 w-4 text-destructive" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tx.createdAt).toLocaleDateString('vi-VN')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={cn(
-                      'text-sm font-semibold',
-                      tx.amount > 0 ? 'text-[#407F3E]' : 'text-destructive'
-                    )}>
-                      {tx.amount > 0 ? '+' : ''}{formatVND(tx.amount)}
-                    </p>
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        'text-xs',
-                        tx.status === 'completed' 
-                          ? 'bg-[#407F3E]/15 text-[#407F3E]' 
-                          : 'bg-muted text-muted-foreground'
-                      )}
-                    >
-                      {tx.status === 'completed' 
-                        ? (language === 'vi' ? 'Hoàn thành' : 'Completed')
-                        : (language === 'vi' ? 'Đang xử lý' : 'Pending')
-                      }
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   )
 }

@@ -45,15 +45,23 @@ export function AuthModal({
   const [resetErrors, setResetErrors] = React.useState<Record<string, string>>({})
   const [resetSent, setResetSent] = React.useState(false)
 
-  React.useEffect(() => {
-    if (!open) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const resetModalState = React.useCallback(() => {
     setView('login')
     setLoginErrors({})
     setRegErrors({})
     setResetErrors({})
     setResetSent(false)
-  }, [open])
+  }, [])
+
+  const handleDialogOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        resetModalState()
+      }
+      onOpenChange(nextOpen)
+    },
+    [onOpenChange, resetModalState],
+  )
 
   /* Compact inputs — fits form + benefits without scrollbar (desktop) */
   const inputClass =
@@ -99,7 +107,7 @@ export function AuthModal({
   }
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleDialogOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className={cn(

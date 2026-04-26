@@ -1,19 +1,32 @@
 import { http } from "@/lib/api/http";
 
-// FE uses this as request DTO only; backend entity fields (id/userId/...) remain BE-owned.
 export interface SellerShippingProfileRequest {
-  senderName: string;
-  senderPhone: string;
-  senderAddress: string;
-  fromDistrictId: number;
-  fromWardCode: string;
-  fromWardName?: string;
-  fromDistrictName?: string;
-  fromProvinceName?: string;
-  isDefault?: boolean;
+  senderName: string
+  senderPhone: string
+  senderAddress: string
+  fromDistrictId: number
+  fromWardCode: string
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountName?: string
 }
 
-export type SellerShippingProfileDraft = Partial<SellerShippingProfileRequest>;
+export interface SellerShippingProfileResponse {
+  senderName: string
+  senderPhone: string
+  senderAddress: string
+  fromDistrictId: number
+  fromWardCode: string
+  fromWardName?: string
+  fromDistrictName?: string
+  fromProvinceName?: string
+  isDefault?: boolean
+  bankName?: string
+  bankAccountNumber?: string
+  bankAccountName?: string
+}
+
+export type SellerShippingProfileDraft = Partial<SellerShippingProfileResponse>
 
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
@@ -45,6 +58,9 @@ function toDraftProfile(payload: unknown): SellerShippingProfileDraft {
     fromDistrictName: typeof source.fromDistrictName === "string" ? source.fromDistrictName : undefined,
     fromProvinceName: typeof source.fromProvinceName === "string" ? source.fromProvinceName : undefined,
     isDefault: typeof source.isDefault === "boolean" ? source.isDefault : undefined,
+    bankName: typeof source.bankName === "string" ? source.bankName : undefined,
+    bankAccountNumber: typeof source.bankAccountNumber === "string" ? source.bankAccountNumber : undefined,
+    bankAccountName: typeof source.bankAccountName === "string" ? source.bankAccountName : undefined,
   };
 }
 
@@ -55,6 +71,6 @@ export const sellerShippingApi = {
   },
 
   async upsertProfile(payload: SellerShippingProfileRequest) {
-    return http.put<unknown>("/api/SellerShippingProfile", payload);
+    return http.post<unknown>('/api/SellerShippingProfile', payload)
   },
 };

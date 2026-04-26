@@ -20,117 +20,23 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useLanguage } from '@/lib/language-context'
 import { MOCK_LISTINGS, formatVND } from '@/lib/mock-data'
-import { useDeleteListing, useSubmitListing, useWithdrawListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import {
+  useDeleteListing,
+  useResubmitListing,
+  useSubmitListing,
+  useWithdrawListing,
+} from '@/modules/seller/hooks/useSellerListingMutations'
 import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
 import { cn } from '@/lib/utils'
 
-type ListingStatus =
-  | 'draft'
-  | 'pending_review'
-  | 'pending'
-  | 'published'
-  | 'reserved'
-  | 'sold'
-  | 'rejected'
-  | 'withdrawn'
+import { 
+  normalizeListingsPayload, 
+  normalizeListingStatus,
+  type SellerListingItem,
+  type ListingStatus 
+} from '@/modules/seller/utils/normalization'
 
-type SellerListingItem = {
-  id: string
-  title: string
-  price: number
-  status: ListingStatus
-  images: string[]
-  isVeloSafeVerified: boolean
-}
-
-type ConfirmAction = 'submit' | 'withdraw' | 'delete'
-
-function normalizeListingStatus(value: unknown): ListingStatus {
-  const raw = typeof value === 'string' ? value : ''
-  if (
-    raw === 'draft' ||
-    raw === 'pending_review' ||
-    raw === 'pending' ||
-    raw === 'published' ||
-    raw === 'reserved' ||
-    raw === 'sold' ||
-    raw === 'rejected' ||
-    raw === 'withdrawn'
-  ) {
-    return raw
-  }
-  return 'draft'
-}
-
-function normalizeListingsPayload(payload: unknown): SellerListingItem[] {
-  const findArray = (value: unknown): unknown[] => {
-    if (Array.isArray(value)) {
-      return value
-    }
-
-    if (value && typeof value === 'object') {
-      const container = value as Record<string, unknown>
-      const candidates = ['items', 'data', 'listings', 'results']
-
-      for (const key of candidates) {
-        if (Array.isArray(container[key])) {
-          return container[key] as unknown[]
-        }
-
-        if (container[key] && typeof container[key] === 'object') {
-          const nested = container[key] as Record<string, unknown>
-          for (const nestedKey of candidates) {
-            if (Array.isArray(nested[nestedKey])) {
-              return nested[nestedKey] as unknown[]
-            }
-          }
-        }
-      }
-    }
-
-    return []
-  }
-
-  return findArray(payload)
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return null
-      }
-
-      const raw = item as Record<string, unknown>
-      const medias = Array.isArray(raw.medias) ? raw.medias : []
-      const mediaImages = medias
-        .map((media) => {
-          if (!media || typeof media !== 'object') return ''
-          const record = media as Record<string, unknown>
-          return typeof record.image === 'string' ? record.image : ''
-        })
-        .filter(Boolean)
-
-      const images = (Array.isArray(raw.images) ? raw.images : mediaImages).filter(
-        (entry): entry is string => typeof entry === 'string',
-      )
-
-      const id =
-        (typeof raw.id === 'string' && raw.id) ||
-        (typeof raw.listingId === 'string' && raw.listingId) ||
-        ''
-
-      if (!id) {
-        return null
-      }
-
-      return {
-        id,
-        title: typeof raw.title === 'string' ? raw.title : 'Untitled listing',
-        price: typeof raw.price === 'number' ? raw.price : Number(raw.price ?? 0),
-        status: normalizeListingStatus(raw.status),
-        images,
-        isVeloSafeVerified: Boolean(raw.isVeloSafeVerified),
-      } satisfies SellerListingItem
-    })
-    .filter((item): item is SellerListingItem => Boolean(item))
-}
+type ConfirmAction = 'submit' | 'withdraw' | 'delete' | 'resubmit'
 
 function mapMockToSellerListings(): SellerListingItem[] {
   return MOCK_LISTINGS.slice(0, 6).map((listing) => ({
@@ -149,10 +55,11 @@ export default function SellerListingsPage() {
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
   const deleteMutation = useDeleteListing()
+  const resubmitMutation = useResubmitListing()
   const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; listing: SellerListingItem } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending
+  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
 
   const myListings = useMemo(() => {
     if (isError) {
@@ -162,13 +69,12 @@ export default function SellerListingsPage() {
   }, [data, isError])
 
   const resolveStatusLabel = (status: ListingStatus) => {
-    if (status === 'published') return language === 'vi' ? 'Dang ban' : 'Active'
-    if (status === 'pending_review' || status === 'pending') return language === 'vi' ? 'Cho duyet' : 'Pending'
-    if (status === 'reserved') return language === 'vi' ? 'Da giu cho' : 'Reserved'
-    if (status === 'sold') return language === 'vi' ? 'Da ban' : 'Sold'
-    if (status === 'rejected') return language === 'vi' ? 'Bi tu choi' : 'Rejected'
-    if (status === 'withdrawn') return language === 'vi' ? 'Da rut' : 'Withdrawn'
-    return language === 'vi' ? 'Nhap' : 'Draft'
+    if (status === 'published') return language === 'vi' ? 'Đang bán' : 'Active'
+    if (status === 'pending_review' || status === 'pending') return language === 'vi' ? 'Chờ duyệt' : 'Pending'
+    if (status === 'sold') return language === 'vi' ? 'Đã bán' : 'Sold'
+    if (status === 'rejected') return language === 'vi' ? 'Bị từ chối' : 'Rejected'
+    if (status === 'withdrawn') return language === 'vi' ? 'Đã rút' : 'Withdrawn'
+    return language === 'vi' ? 'Nháp' : 'Draft'
   }
 
   const resolveStatusClass = (status: ListingStatus) => {
@@ -189,6 +95,8 @@ export default function SellerListingsPage() {
         await submitMutation.mutateAsync(confirmState.listing.id)
       } else if (confirmState.action === 'withdraw') {
         await withdrawMutation.mutateAsync(confirmState.listing.id)
+      } else if (confirmState.action === 'resubmit') {
+        await resubmitMutation.mutateAsync(confirmState.listing.id)
       } else {
         await deleteMutation.mutateAsync(confirmState.listing.id)
       }
@@ -198,7 +106,7 @@ export default function SellerListingsPage() {
         mutationError instanceof Error
           ? mutationError.message
           : language === 'vi'
-            ? 'Thao tac that bai. Vui long thu lai.'
+            ? 'Thao tác thất bại. Vui lòng thử lại.'
             : 'Action failed. Please try again.',
       )
     }
@@ -226,7 +134,7 @@ export default function SellerListingsPage() {
           <Alert className="mb-4 border-amber-300 bg-amber-50 text-amber-900">
             <AlertDescription>
               {language === 'vi'
-                ? 'Khong the tai du lieu tu API, dang hien thi du lieu fallback.'
+                ? 'Không thể tải dữ liệu từ API, đang hiển thị dữ liệu fallback.'
                 : 'Unable to load API data, showing fallback mock data.'}
               {error instanceof Error ? ` (${error.message})` : ''}
             </AlertDescription>
@@ -242,71 +150,114 @@ export default function SellerListingsPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {language === 'vi' ? 'Dang tai tin dang...' : 'Loading listings...'}
+            {language === 'vi' ? 'Đang tải tin đăng...' : 'Loading listings...'}
           </div>
         ) : myListings.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            {language === 'vi' ? 'Ban chua co tin dang nao.' : 'You do not have any listings yet.'}
+            {language === 'vi' ? 'Bạn chưa có tin đăng nào.' : 'You do not have any listings yet.'}
           </div>
         ) : (
         <div className="space-y-4">
           {myListings.map((listing) => (
-            <div
+            <Link
               key={listing.id}
-              className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted"
+              href={`/seller/listings/${listing.id}`}
+              className="block"
             >
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                <Image
-                  src={listing.images[0] ?? '/placeholder.svg'}
-                  alt={listing.title}
-                  width={48}
-                  height={48}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <Image
+                    src={listing.images[0] ?? '/placeholder.svg'}
+                    alt={listing.title}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{listing.title}</p>
-                <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
-              </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{listing.title}</p>
+                  <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
+                </div>
 
-              <div className="flex items-center gap-2">
-                {listing.isVeloSafeVerified && <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />}
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-xs',
-                    resolveStatusClass(listing.status)
+                <div className="flex items-center gap-2" style={{ pointerEvents: 'none' }}>
+                  {listing.isVeloSafeVerified && <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />}
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-xs',
+                      resolveStatusClass(listing.status)
+                    )}
+                  >
+                    {resolveStatusLabel(listing.status)}
+                  </Badge>
+
+                  {listing.status === 'draft' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'submit', listing }); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
+                    </Button>
                   )}
-                >
-                  {resolveStatusLabel(listing.status)}
-                </Badge>
 
-                {listing.status === 'draft' && (
-                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'submit', listing })}>
-                    {language === 'vi' ? 'Gui duyet' : 'Submit'}
-                  </Button>
-                )}
+                  {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      asChild 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <Link href={`/seller/listings/${listing.id}/edit`}>
+                        {language === 'vi' ? 'Sửa' : 'Edit'}
+                      </Link>
+                    </Button>
+                  )}
 
-                {listing.status === 'published' && (
-                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'withdraw', listing })}>
-                    {language === 'vi' ? 'Rut tin' : 'Withdraw'}
-                  </Button>
-                )}
+                  {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'withdraw', listing}); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Rút tin' : 'Withdraw'}
+                    </Button>
+                  )}
 
-                {(listing.status === 'draft' || listing.status === 'rejected') && (
-                  <Button size="sm" variant="destructive" onClick={() => setConfirmState({ action: 'delete', listing })}>
-                    {language === 'vi' ? 'Xoa' : 'Delete'}
-                  </Button>
-                )}
+                  {listing.status === 'rejected' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'resubmit', listing}); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
+                    </Button>
+                  )}
 
-                <Button size="icon-sm" variant="ghost" asChild>
-                  <Link href={`/listing/${listing.id}`}>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </Link>
-                </Button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         )}
@@ -316,33 +267,35 @@ export default function SellerListingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {confirmState?.action === 'submit'
-                  ? language === 'vi'
-                    ? 'Gui tin de duyet?'
-                    : 'Submit listing for review?'
+                  ? language === 'vi' ? 'Xác nhận gửi duyệt' : 'Confirm Submission'
                   : confirmState?.action === 'withdraw'
-                    ? language === 'vi'
-                      ? 'Rut tin dang?'
-                      : 'Withdraw listing?'
-                    : language === 'vi'
-                      ? 'Xoa tin dang?'
-                      : 'Delete listing?'}
+                    ? language === 'vi' ? 'Xác nhận rút tin' : 'Confirm Withdrawal'
+                    : confirmState?.action === 'resubmit'
+                      ? language === 'vi' ? 'Xác nhận gửi lại duyệt' : 'Confirm Resubmission'
+                      : language === 'vi' ? 'Xác nhận xóa' : 'Confirm Deletion'}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {confirmState?.listing.title}
+                {confirmState?.action === 'submit'
+                  ? language === 'vi' ? 'Bạn có chắc chắn muốn gửi tin đăng này cho quản trị viên phê duyệt không?' : 'Are you sure you want to submit this listing for admin approval?'
+                  : confirmState?.action === 'withdraw'
+                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không? Nó sẽ không còn hiển thị với người mua nữa.' : 'Are you sure you want to withdraw this listing? It will no longer be visible to buyers.'
+                    : confirmState?.action === 'resubmit'
+                      ? language === 'vi' ? 'Bạn có muốn gửi lại tin đăng này để quản trị viên xem xét lại không?' : 'Do you want to resubmit this listing for admin review?'
+                      : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isActionPending}>
-                {language === 'vi' ? 'Huy' : 'Cancel'}
+                {language === 'vi' ? 'Hủy' : 'Cancel'}
               </AlertDialogCancel>
               <AlertDialogAction onClick={executeAction} disabled={isActionPending}>
                 {isActionPending ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {language === 'vi' ? 'Dang xu ly' : 'Processing'}
+                    {language === 'vi' ? 'Đang xử lý' : 'Processing'}
                   </span>
                 ) : language === 'vi' ? (
-                  'Xac nhan'
+                  'Xác nhận'
                 ) : (
                   'Confirm'
                 )}

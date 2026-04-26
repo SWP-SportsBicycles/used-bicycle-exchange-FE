@@ -1,8 +1,20 @@
 import { type NextRequest } from "next/server";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const DEFAULT_API_BASE = "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+
+function resolveApiBase() {
+  const raw = process.env.NEXT_PUBLIC_API_URL;
+  const normalized = raw?.trim();
+
+  // Empty env values should behave like "missing" and fall back to default.
+  if (!normalized) {
+    return DEFAULT_API_BASE;
+  }
+
+  return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+}
+
+const API_BASE = resolveApiBase();
 
 interface RouteContext {
   params: Promise<{ path: string[] }>;
@@ -40,23 +52,13 @@ async function forward(req: NextRequest, context: RouteContext, method: string) 
   const targetUrl = buildTargetUrl(req, path);
   const headers = copyRequestHeaders(req);
 
-  let body: BodyInit | undefined = undefined;
-  if (method !== "GET" && method !== "HEAD") {
-    const contentType = req.headers.get("content-type") ?? "";
-    if (contentType.includes("multipart/form-data")) {
-      // Forward raw binary for file uploads — req.text() corrupts binary data
-      body = await req.arrayBuffer();
-    } else {
-      const text = await req.text();
-      body = text.length > 0 ? text : undefined;
-    }
-  }
+  const bodyBuffer = method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer();
 
   try {
     const upstream = await fetch(targetUrl, {
       method,
       headers,
-      body,
+      body: bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined,
       redirect: "manual",
       cache: "no-store",
     });

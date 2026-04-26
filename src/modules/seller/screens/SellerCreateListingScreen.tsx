@@ -1,11 +1,10 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react'
-import { useCreateListing } from '@/modules/seller/hooks/useSellerListingMutations'
-import { listingSchema } from '@/modules/seller/schemas/listing-schema'
+import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
+import { useCreateListing, useSubmitListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,9 +29,14 @@ const steps = [
 export default function SellerCreateListingScreen() {
   const { language } = useLanguage()
   const createListingMutation = useCreateListing()
+  const submitListingMutation = useSubmitListing()
+  const uploadMediaMutation = useUploadMedia()
+  
   const [currentStep, setCurrentStep] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -48,13 +52,72 @@ export default function SellerCreateListingScreen() {
     serial: '',
     city: '',
     price: '',
-    images: [] as string[],
-    serialPhoto: '',
-    groupsetPhoto: '',
+    paint: '',
+    brakeType: '',
+    overall: '',
   })
+
+  // State for files
+  const [images, setImages] = useState<File[]>([])
+  const [video, setVideo] = useState<File | null>(null)
+  const [groupsetPhoto, setGroupsetPhoto] = useState<File | null>(null)
+
+  // Object URLs for preview
+  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [groupsetPhotoUrl, setGroupsetPhotoUrl] = useState<string | null>(null)
+
+  // File input refs
+  const imagesInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+  const groupsetPhotoInputRef = useRef<HTMLInputElement>(null)
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      imageUrls.forEach(URL.revokeObjectURL)
+      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
+    }
+  }, [imageUrls, videoUrl, groupsetPhotoUrl])
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'images' | 'video' | 'groupset'
+  ) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    if (type === 'images') {
+      const newImages = [...images, ...files].slice(0, 10 - images.length)
+      setImages(newImages)
+      setImageUrls(newImages.map(file => URL.createObjectURL(file)))
+    } else if (type === 'video') {
+      const file = files[0]
+      setVideo(file)
+      if (videoUrl) URL.revokeObjectURL(videoUrl)
+      setVideoUrl(URL.createObjectURL(file))
+    } else if (type === 'groupset') {
+      const file = files[0]
+      setGroupsetPhoto(file)
+      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
+      setGroupsetPhotoUrl(URL.createObjectURL(file))
+    }
+    
+    // Clear input
+    e.target.value = ''
+  }
+
+  const removeImage = (index: number) => {
+    const newImages = images.filter((_, i) => i !== index)
+    const newUrls = imageUrls.filter((_, i) => i !== index)
+    URL.revokeObjectURL(imageUrls[index])
+    setImages(newImages)
+    setImageUrls(newUrls)
   }
 
   const nextStep = () => {
@@ -69,98 +132,88 @@ export default function SellerCreateListingScreen() {
     }
   }
 
-  const addMockImage = () => {
-    const mockImages = [
-      'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80',
-      'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=800&q=80',
-      'https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?w=800&q=80',
-    ]
-    const randomImage = mockImages[Math.floor(Math.random() * mockImages.length)]
-    setFormData((prev) => ({
-      ...prev,
-      images: [...prev.images, randomImage].slice(0, 10),
-    }))
-  }
-
-  const removeImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }))
-  }
-
   const handleSubmitForReview = async () => {
     setSubmitError(null)
     setSubmitSuccess(null)
 
-    const medias = [
-      ...formData.images.map((image) => ({ image, type: 0 as const })),
-      ...(formData.serialPhoto ? [{ image: formData.serialPhoto, type: 0 as const }] : []),
-      ...(formData.groupsetPhoto ? [{ image: formData.groupsetPhoto, type: 0 as const }] : []),
-    ]
-
-    const payload = {
-      title: formData.title,
-      description: formData.description,
-      serialNumber: formData.serial,
-      category: formData.category,
-      brand: formData.brand,
-      frameSize: formData.frameSize,
-      frameMaterial: formData.frameMaterial || undefined,
-      condition: formData.condition,
-      paint: undefined,
-      groupset: formData.groupset,
-      operating: formData.usageHistory || undefined,
-      tireRim: formData.wheelSize || undefined,
-      brakeType: undefined,
-      overall: undefined,
-      price: Number(String(formData.price).replace(/,/g, '')),
-      city: formData.city,
-      medias,
-    }
-
-    const validationResult = listingSchema.safeParse(payload)
-    if (!validationResult.success) {
-      const firstIssue = validationResult.error.issues[0]
-      setSubmitError(firstIssue?.message ?? (language === 'vi' ? 'Du lieu khong hop le' : 'Invalid listing data'))
+    // Basic validation
+    if (
+      !formData.title || !formData.category || !formData.brand || !formData.price ||
+      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial
+    ) {
+      setSubmitError(language === 'vi' ? 'Vui lòng điền đầy đủ các trường bắt buộc (*).' : 'Please fill all required fields (*).')
       return
     }
 
+    if (images.length === 0) {
+      setSubmitError(language === 'vi' ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.')
+      return
+    }
+
+    setIsSubmitting(true)
+
     try {
-      await createListingMutation.mutateAsync(validationResult.data)
+      // 1. Tạo listing
+      const priceVal = Number(String(formData.price).replace(/,/g, ''))
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        serialNumber: formData.serial,
+        category: formData.category,
+        brand: formData.brand,
+        frameSize: formData.frameSize,
+        frameMaterial: formData.frameMaterial,
+        condition: formData.condition,
+        groupset: formData.groupset,
+        operating: formData.usageHistory,
+        tireRim: formData.wheelSize,
+        price: priceVal,
+        city: formData.city,
+        paint: formData.paint || 'N/A', // fallback if empty but now added to UI
+        overall: formData.overall || 'N/A',
+        brakeType: formData.brakeType || 'Chưa Xách Định',
+      }
+
+      const createRes = await createListingMutation.mutateAsync(payload)
+      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+      const rawId = nested.id ?? nested.listingId
+      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+      
+      if (!listingId) {
+        throw new Error('Failed to retrieve listingId from response')
+      }
+
+      // 2. Upload media
+      const allMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
+      if (allMediaFiles.length > 0) {
+        await uploadMediaMutation.mutateAsync({ listingId, files: allMediaFiles })
+      }
+
+      // 3. Gửi duyệt (submit)
+      await submitListingMutation.mutateAsync(listingId)
+
       setSubmitSuccess(
         language === 'vi'
-          ? 'Da gui tin dang len he thong, vui long cho admin duyet.'
-          : 'Listing submitted successfully and is awaiting admin review.',
+          ? 'Đã gửi tin đăng lên hệ thống, vui lòng chờ admin duyệt.'
+          : 'Listing submitted successfully and is awaiting admin review.'
       )
-      setCurrentStep(0)
-      setFormData({
-        title: '',
-        category: '',
-        brand: '',
-        model: '',
-        condition: '',
-        description: '',
-        frameSize: '',
-        frameMaterial: '',
-        groupset: '',
-        wheelSize: '',
-        usageHistory: '',
-        serial: '',
-        city: '',
-        price: '',
-        images: [],
-        serialPhoto: '',
-        groupsetPhoto: '',
-      })
+      
+      // Reset form on success
+      setTimeout(() => {
+        window.location.href = '/seller/listings'
+      }, 2000)
+
     } catch (error) {
       setSubmitError(
         error instanceof Error
           ? error.message
           : language === 'vi'
-            ? 'Khong the gui tin luc nay. Vui long thu lai.'
-            : 'Unable to submit listing right now. Please try again.',
+            ? 'Không thể gửi tin lúc này. Vui lòng thử lại.'
+            : 'Unable to submit listing right now. Please try again.'
       )
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -215,7 +268,7 @@ export default function SellerCreateListingScreen() {
           <CardDescription>
             {currentStep === 0 && (language === 'vi' ? 'Thông tin cơ bản về xe' : 'Basic bike information')}
             {currentStep === 1 && (language === 'vi' ? 'Chi tiết thông số kỹ thuật' : 'Technical specifications')}
-            {currentStep === 2 && (language === 'vi' ? 'Tải lên hình ảnh chất lượng cao' : 'Upload high-quality photos')}
+            {currentStep === 2 && (language === 'vi' ? 'Tải lên hình ảnh và video thực tế' : 'Upload real photos and video')}
             {currentStep === 3 && (language === 'vi' ? 'Đặt giá và xuất bản' : 'Set price and publish')}
           </CardDescription>
         </CardHeader>
@@ -316,7 +369,7 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="model">{language === 'vi' ? 'Model' : 'Model'} *</Label>
+                    <Label htmlFor="model">{language === 'vi' ? 'Model' : 'Model'}</Label>
                     <Input
                       id="model"
                       placeholder={language === 'vi' ? 'VD: TCR Advanced Pro 1' : 'E.g., TCR Advanced Pro 1'}
@@ -363,7 +416,7 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="frameMaterial">{language === 'vi' ? 'Chất Liệu Khung' : 'Frame Material'} *</Label>
+                    <Label htmlFor="frameMaterial">{language === 'vi' ? 'Chất Liệu Khung' : 'Frame Material'}</Label>
                     <Select value={formData.frameMaterial} onValueChange={(value) => updateField('frameMaterial', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn chất liệu' : 'Select material'} />
@@ -396,7 +449,7 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="wheelSize">{language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'} *</Label>
+                    <Label htmlFor="wheelSize">{language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'}</Label>
                     <Select value={formData.wheelSize} onValueChange={(value) => updateField('wheelSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn cỡ bánh' : 'Select wheel size'} />
@@ -412,22 +465,42 @@ export default function SellerCreateListingScreen() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="usageHistory">{language === 'vi' ? 'Lịch Sử Sử Dụng' : 'Usage History'}</Label>
-                  <Textarea
-                    id="usageHistory"
-                    placeholder={
-                      language === 'vi'
-                        ? 'VD: 3000km trong 18 tháng, chủ yếu đi weekend, bảo dưỡng định kỳ'
-                        : 'E.g., 3000km in 18 months, mostly weekend rides, regular maintenance'
-                    }
-                    rows={3}
-                    value={formData.usageHistory}
-                    onChange={(e) => updateField('usageHistory', e.target.value)}
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="brakeType">{language === 'vi' ? 'Loại Phanh' : 'Brake Type'} *</Label>
+                    <Select value={formData.brakeType} onValueChange={(value) => updateField('brakeType', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={language === 'vi' ? 'Chọn loại phanh' : 'Select brake type'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Rim Brake">Phanh Vành (Rim Brake)</SelectItem>
+                        <SelectItem value="Mechanical Disc Brake">Phanh Đĩa Cơ</SelectItem>
+                        <SelectItem value="Hydraulic Disc Brake">Phanh Đĩa Thủy Lực</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paint">{language === 'vi' ? 'Màu Sơn' : 'Paint Color'} *</Label>
+                    <Input
+                      id="paint"
+                      placeholder={language === 'vi' ? 'VD: Đen bóng / Nhám' : 'E.g., Gloss Black'}
+                      value={formData.paint}
+                      onChange={(e) => updateField('paint', e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="overall">{language === 'vi' ? 'Khấu Hao / Đánh Giá (%)' : 'Overall Condition'} *</Label>
+                    <Input
+                      id="overall"
+                      placeholder={language === 'vi' ? 'VD: Xe mới 95%, ít xước xát' : 'E.g., 95% like new'}
+                      value={formData.overall}
+                      onChange={(e) => updateField('overall', e.target.value)}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Label htmlFor="serial">{language === 'vi' ? 'Số Serial' : 'Serial Number'} *</Label>
@@ -453,7 +526,24 @@ export default function SellerCreateListingScreen() {
                       onChange={(e) => updateField('serial', e.target.value)}
                     />
                   </div>
+                </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="usageHistory">{language === 'vi' ? 'Lịch Sử Sử Dụng' : 'Usage History'}</Label>
+                  <Textarea
+                    id="usageHistory"
+                    placeholder={
+                      language === 'vi'
+                        ? 'VD: 3000km trong 18 tháng, chủ yếu đi weekend, bảo dưỡng định kỳ'
+                        : 'E.g., 3000km in 18 months, mostly weekend rides, regular maintenance'
+                    }
+                    rows={3}
+                    value={formData.usageHistory}
+                    onChange={(e) => updateField('usageHistory', e.target.value)}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="city">{language === 'vi' ? 'Thành Phố' : 'City'} *</Label>
                     <Select value={formData.city} onValueChange={(value) => updateField('city', value)}>
@@ -475,20 +565,31 @@ export default function SellerCreateListingScreen() {
 
             {currentStep === 2 && (
               <div className="space-y-6">
+                
+                {/* Images */}
                 <div className="space-y-4">
                   <div>
                     <Label className="text-base">{language === 'vi' ? 'Hình Ảnh Xe' : 'Bike Photos'} *</Label>
                     <p className="text-sm text-muted-foreground">
                       {language === 'vi'
-                        ? 'Tải lên ít nhất 3 ảnh chất lượng cao (tối đa 10 ảnh)'
-                        : 'Upload at least 3 high-quality photos (max 10)'}
+                        ? 'Tải lên ít nhất 1 ảnh chất lượng cao (tối đa 10 ảnh)'
+                        : 'Upload at least 1 high-quality photos (max 10)'}
                     </p>
                   </div>
 
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple 
+                    className="hidden" 
+                    ref={imagesInputRef} 
+                    onChange={(e) => handleFileChange(e, 'images')} 
+                  />
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {formData.images.map((img, index) => (
+                    {imageUrls.map((url, index) => (
                       <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
-                        <Image src={img} alt={`Bike ${index + 1}`} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
+                        <Image src={url} alt={`Bike ${index + 1}`} fill className="object-cover" sizes="(max-width: 640px) 50vw, 25vw" />
                         <Button
                           variant="destructive"
                           size="icon"
@@ -503,10 +604,10 @@ export default function SellerCreateListingScreen() {
                       </div>
                     ))}
 
-                    {formData.images.length < 10 && (
+                    {images.length < 10 && (
                       <button
                         type="button"
-                        onClick={addMockImage}
+                        onClick={() => imagesInputRef.current?.click()}
                         className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-2"
                       >
                         <Upload className="h-6 w-6 text-muted-foreground" />
@@ -516,89 +617,57 @@ export default function SellerCreateListingScreen() {
                   </div>
                 </div>
 
+                {/* Video Option */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-base">{language === 'vi' ? 'Video Thực Tế' : 'Live Video'} (Khuyên dùng)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {language === 'vi' ? 'Quay 1 vòng quanh xe để tăng độ tin cậy' : 'Take a full 360 tour to increase trust'}
+                    </p>
+                  </div>
+                  <input type="file" accept="video/*" className="hidden" ref={videoInputRef} onChange={(e) => handleFileChange(e, 'video')} />
+                  
+                  {videoUrl ? (
+                    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                      <video src={videoUrl} controls className="w-full h-full object-contain" />
+                      <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => { setVideo(null); setVideoUrl(null); }}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-[21/9] sm:aspect-[21/6] rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
+                      <Video className="h-8 w-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{language === 'vi' ? 'Tải lên video' : 'Upload video'}</span>
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Label className="text-base">{language === 'vi' ? 'Ảnh Số Serial' : 'Serial Number Photo'} *</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-sm">
-                              {language === 'vi'
-                                ? 'Ảnh rõ ràng của số serial trên khung xe để admin xác minh'
-                                : 'Clear photo of serial number on frame for admin verification'}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Label className="text-base">{language === 'vi' ? 'Ảnh Groupset' : 'Groupset Photo'}</Label>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => updateField('serialPhoto', 'mock-serial-photo.jpg')}
-                      className={cn(
-                        'w-full aspect-video rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2',
-                        formData.serialPhoto ? 'border-success bg-success/10' : 'border-border hover:border-primary hover:bg-primary/5',
-                      )}
-                    >
-                      {formData.serialPhoto ? (
-                        <>
-                          <Check className="h-8 w-8 text-success" />
-                          <span className="text-sm text-success">{language === 'vi' ? 'Đã tải lên' : 'Uploaded'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            {language === 'vi' ? 'Tải ảnh số serial' : 'Upload serial photo'}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-base">{language === 'vi' ? 'Ảnh Groupset' : 'Groupset Photo'} *</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-sm">
-                              {language === 'vi'
-                                ? 'Ảnh rõ ràng của bộ truyền động để xác minh model'
-                                : 'Clear photo of groupset to verify model'}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => updateField('groupsetPhoto', 'mock-groupset-photo.jpg')}
-                      className={cn(
-                        'w-full aspect-video rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2',
-                        formData.groupsetPhoto ? 'border-success bg-success/10' : 'border-border hover:border-primary hover:bg-primary/5',
-                      )}
-                    >
-                      {formData.groupsetPhoto ? (
-                        <>
-                          <Check className="h-8 w-8 text-success" />
-                          <span className="text-sm text-success">{language === 'vi' ? 'Đã tải lên' : 'Uploaded'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
-                            {language === 'vi' ? 'Tải ảnh groupset' : 'Upload groupset photo'}
-                          </span>
-                        </>
-                      )}
-                    </button>
+                    <input type="file" accept="image/*" className="hidden" ref={groupsetPhotoInputRef} onChange={(e) => handleFileChange(e, 'groupset')} />
+                    
+                    {groupsetPhotoUrl ? (
+                      <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                         <Image src={groupsetPhotoUrl} alt="Groupset" fill className="object-cover" />
+                         <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => { setGroupsetPhoto(null); setGroupsetPhotoUrl(null); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => groupsetPhotoInputRef.current?.click()}
+                        className="w-full aspect-video rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5"
+                      >
+                        <Camera className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {language === 'vi' ? 'Tải ảnh groupset' : 'Upload groupset photo'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -621,8 +690,8 @@ export default function SellerCreateListingScreen() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {language === 'vi'
-                      ? 'Phí hoa hồng 5% sẽ được trừ khi giao dịch hoàn tất'
-                      : '5% commission fee will be deducted upon completion'}
+                      ? 'Nền tảng thu 5% phí trên giá bán khi giao dịch thành công.'
+                      : 'Platform takes a 5% fee on selling price upon successful transaction.'}
                   </p>
                 </div>
 
@@ -644,8 +713,8 @@ export default function SellerCreateListingScreen() {
                       <span className="font-medium">{formData.groupset || '-'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">{language === 'vi' ? 'Hình ảnh' : 'Photos'}</span>
-                      <span className="font-medium">{formData.images.length} / 10</span>
+                      <span className="text-muted-foreground">{language === 'vi' ? 'Files đính kèm' : 'Attachments'}</span>
+                      <span className="font-medium">{[...images, video, groupsetPhoto].filter(Boolean).length}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{language === 'vi' ? 'Thành phố' : 'City'}</span>
@@ -660,8 +729,8 @@ export default function SellerCreateListingScreen() {
                     <p className="font-medium text-primary">{language === 'vi' ? 'Lưu ý quan trọng' : 'Important Notice'}</p>
                     <p className="text-muted-foreground mt-1">
                       {language === 'vi'
-                        ? 'Tin đăng của bạn sẽ được Admin xét duyệt trong 24h. Sau khi duyệt, xe sẽ hiển thị trên marketplace.'
-                        : 'Your listing will be reviewed by Admin within 24h. Once approved, it will appear on the marketplace.'}
+                        ? 'Tin đăng của bạn sẽ được gửi tới Admin để duyệt trước khi xuất bản.'
+                        : 'Your listing will be reviewed by an Admin before being published.'}
                     </p>
                   </div>
                 </div>
@@ -670,20 +739,20 @@ export default function SellerCreateListingScreen() {
           </motion.div>
 
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-            <Button variant="outline" onClick={prevStep} disabled={currentStep === 0} className="gap-2">
+            <Button variant="outline" onClick={prevStep} disabled={currentStep === 0 || isSubmitting} className="gap-2">
               <ChevronLeft className="h-4 w-4" />
               {language === 'vi' ? 'Quay lại' : 'Back'}
             </Button>
 
             {currentStep < steps.length - 1 ? (
-              <Button onClick={nextStep} className="gap-2">
+              <Button onClick={nextStep} disabled={isSubmitting} className="gap-2">
                 {language === 'vi' ? 'Tiếp theo' : 'Next'}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2" onClick={handleSubmitForReview} disabled={createListingMutation.isPending}>
-                {createListingMutation.isPending ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review'}
+              <Button className="gap-2" onClick={handleSubmitForReview} disabled={isSubmitting}>
+                {isSubmitting ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
+                {isSubmitting ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
               </Button>
             )}
           </div>

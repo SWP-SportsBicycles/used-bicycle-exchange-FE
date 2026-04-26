@@ -66,6 +66,7 @@ export interface BuyerListing {
   serial: string;
   status: "draft" | "pending_review" | "published" | "reserved" | "sold" | "withdrawn";
   overall?: string;           // BE inspection overall status
+
   seller: {
     id: string;
     name: string;
