@@ -37,6 +37,7 @@ export default function ApprovalsPage() {
   const { language } = useLanguage();
   const queryClient = useQueryClient();
   const [activeStatus, setActiveStatus] = useState<ListingFilter>("pending");
+  const [allPage, setAllPage] = useState(1);
   const [rejectListingId, setRejectListingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -49,8 +50,8 @@ export default function ApprovalsPage() {
   });
 
   const allListingsQuery = useQuery({
-    queryKey: ["admin-listings", "all"],
-    queryFn: adminApi.getAllListings,
+    queryKey: ["admin-listings", "all", allPage],
+    queryFn: () => adminApi.getAllListingsPaged({ page: allPage, size: 10 }),
   });
 
   const pendingListingsQuery = useQuery({
@@ -90,7 +91,9 @@ export default function ApprovalsPage() {
     },
   });
 
-  const allListings = allListingsQuery.data ?? [];
+  const allListings = allListingsQuery.data?.items ?? [];
+  const allListingsTotalItems = allListingsQuery.data?.totalItems ?? allListings.length;
+  const allListingsTotalPages = Math.max(allListingsQuery.data?.totalPages ?? 1, 1);
   const pendingListings = pendingListingsQuery.data ?? [];
   const pendingApprovals = pendingListings.filter((item) => item.status === "pending");
   const approvedApprovals = allListings.filter((item) => item.status === "approved");
@@ -197,9 +200,13 @@ export default function ApprovalsPage() {
               type="button"
               size="sm"
               variant={activeStatus === "all" ? "default" : "outline"}
-              onClick={() => setActiveStatus("all")}
+              onClick={() => {
+                setActiveStatus("all");
+                setAllPage(1);
+                void allListingsQuery.refetch();
+              }}
             >
-              {filterLabel.all} ({allListings.length})
+              {filterLabel.all} ({allListingsTotalItems})
             </Button>
             <Button
               type="button"
@@ -318,6 +325,32 @@ export default function ApprovalsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {activeStatus === "all" && allListingsTotalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                {language === "vi" ? "Trang" : "Page"} {allPage}/{allListingsTotalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={allPage <= 1 || allListingsQuery.isFetching}
+                  onClick={() => setAllPage((prev) => Math.max(1, prev - 1))}
+                >
+                  {language === "vi" ? "Trước" : "Prev"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={allPage >= allListingsTotalPages || allListingsQuery.isFetching}
+                  onClick={() => setAllPage((prev) => Math.min(allListingsTotalPages, prev + 1))}
+                >
+                  {language === "vi" ? "Sau" : "Next"}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

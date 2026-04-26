@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     {
       href: "/admin/disputes",
       icon: AlertOctagon,
-      label: { vi: "Tranh Chấp", en: "Disputes" },
+      label: { vi: "Báo Cáo", en: "Reports" },
       badge: 2,
     },
     {

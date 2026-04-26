@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { Bar, BarChart, Cell, Pie, PieChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
-import { Package, Users, Wallet, ClipboardList, ReceiptText } from 'lucide-react'
+import { Package, Users, Wallet, ClipboardList, ReceiptText, MapPin } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
@@ -128,6 +128,7 @@ export default function AdminDashboardPage() {
     revenue: revenueByMonthMap.get(monthIndex) ?? 0,
   }))
   const totalRevenueFromLine = revenueLineData.reduce((sum, item) => sum + item.revenue, 0)
+  const cityStats = dashboard?.cities ?? []
 
   const formatRevenueTick = (value: number) => {
     const abs = Math.abs(value)
@@ -239,6 +240,55 @@ export default function AdminDashboardPage() {
           </Card>
         </motion.div>
       </div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.43 }}>
+        <Card className="border-border/60 shadow-athletic">
+          <CardHeader>
+            <CardTitle>{language === 'vi' ? 'Thống Kê Theo Thành Phố' : 'City Statistics'}</CardTitle>
+            <CardDescription>
+              {language === 'vi'
+                ? 'Dữ liệu số tin đăng và giao dịch theo từng khu vực'
+                : 'Listings and transaction counts by city'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cityStats.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {language === 'vi' ? 'Chưa có dữ liệu thành phố.' : 'No city data available.'}
+              </p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-3">
+                {cityStats.map((city) => (
+                  <div key={city.city} className="rounded-lg border border-border/60 bg-muted/25 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <MapPin className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-archivo)' }}>
+                        {city.city}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{language === 'vi' ? 'Tin đăng' : 'Listings'}</p>
+                        <p className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>
+                          {city.listings.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{language === 'vi' ? 'Giao dịch' : 'Orders'}</p>
+                        <p className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>
+                          {city.orders.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
         <Card>
