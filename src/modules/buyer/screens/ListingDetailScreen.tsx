@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { use } from 'react'
@@ -85,7 +86,7 @@ export default function ListingDetailScreen({ params }: PageProps) {
   }
   
   const conditionLabel = conditionLabels[listing.condition] || listing.condition
-  const canBuyNow = !listing.isLocked && listing.status === 'published' && Boolean(listing.bikeId)
+  const canBuyNow = listing.status === 'published' && Boolean(listing.bikeId)
 
   const specs = [
     { label: 'Thương hiệu', value: listing.brand },
@@ -108,7 +109,7 @@ export default function ListingDetailScreen({ params }: PageProps) {
 
     // Kiểm tra giỏ hàng cache trước khi gọi API
     const alreadyInCart = cart?.items.some(
-      (item) => item.bikeId === listing.bikeId || item.listingId === listing.bikeId
+      (item) => item.bikeId === listing.bikeId || item.listingId === listing.id
     )
     if (alreadyInCart) {
       toast.info('Sản phẩm đã được thêm vào giỏ hàng', {
@@ -204,7 +205,7 @@ export default function ListingDetailScreen({ params }: PageProps) {
                 </div>
                 <div className="flex gap-2">
                   <WishlistButton
-                    key={`${listing.bikeId ?? listing.id}-${listing.isWishlisted ? '1' : '0'}`}
+                    key={listing.bikeId ?? listing.id}
                     listingId={listing.bikeId ?? listing.id}
                     initialIsWishlisted={Boolean(listing.isWishlisted)}
                   />
@@ -239,26 +240,11 @@ export default function ListingDetailScreen({ params }: PageProps) {
               </div>
             </div>
 
-            {listing.isLocked && (
-              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-                <p className="text-sm font-medium leading-relaxed">
-                  Xe này đang trong trạng thái Cart Lock 5 phút bởi một người mua khác. Vui lòng quay lại sau.
-                </p>
-              </div>
-            )}
 
             {/* Premium CTA Buy Panel */}
-            <div className={cn(
-              "rounded-3xl border p-6 lg:p-8 transition-all duration-300",
-              listing.isLocked 
-                ? "border-border/50 bg-muted/30" 
-                : "border-border/40 bg-card shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden"
-            )}>
-              {/* Subtle accent glow instead of full neon background */}
-              {!listing.isLocked && (
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-              )}
+            <div className="rounded-3xl border border-border/40 bg-card shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden p-6 lg:p-8 transition-all duration-300">
+              {/* Subtle accent glow */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
               
               <div className="mb-8 flex items-start justify-between relative z-10">
                 <div>
@@ -279,26 +265,18 @@ export default function ListingDetailScreen({ params }: PageProps) {
               <div className="flex flex-col gap-3">
                 {/* Mua ngay — full width, primary */}
                 <Button
-                  className={cn(
-                    "w-full h-14 rounded-2xl text-lg font-bold shadow-lg transition-all",
-                    !listing.isLocked && "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02]",
-                    listing.isLocked && "opacity-60 cursor-not-allowed"
-                  )}
+                  className="w-full h-14 rounded-2xl text-lg font-bold shadow-lg transition-all bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.02]"
                   onClick={handleBuyNow}
                   disabled={!canBuyNow}
                 >
                   <Zap className="mr-2 h-5 w-5" />
-                  {listing.isLocked ? 'Đang có người giao dịch' : 'Mua Ngay'}
+                  Mua Ngay
                 </Button>
 
                 {/* Thêm vào giỏ hàng — outline, secondary */}
                 <Button
                   variant="outline"
-                  className={cn(
-                    "w-full h-12 rounded-2xl text-base font-semibold transition-all",
-                    !listing.isLocked && "hover:scale-[1.01] border-primary/40 text-primary hover:bg-primary/5",
-                    listing.isLocked && "opacity-60 cursor-not-allowed"
-                  )}
+                  className="w-full h-12 rounded-2xl text-base font-semibold transition-all hover:scale-[1.01] border-primary/40 text-primary hover:bg-primary/5"
                   onClick={handleAddToCart}
                   disabled={!canBuyNow || addToCartMutation.isPending}
                 >
@@ -321,7 +299,7 @@ export default function ListingDetailScreen({ params }: PageProps) {
                 <p className="leading-relaxed">
                   Giao dịch an toàn. Bấm{' '}
                   <strong className="text-foreground font-semibold">Mua Ngay</strong>{' '}
-                  sẽ khóa xe trong 5 phút để bạn hoàn tất địa chỉ và thanh toán qua PayOS. Tiền được giữ an toàn trong Escrow.
+                  để đặt hàng và thanh toán qua PayOS. Tiền được giữ an toàn trong Escrow VeloTrust cho đến khi bạn xác nhận nhận hàng.
                 </p>
               </div>
             </div>

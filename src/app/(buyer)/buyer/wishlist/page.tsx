@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Header } from "@/components/header";
+import { BuyerAccountLayout } from "@/modules/buyer/components/BuyerAccountLayout";
 import { ListingCard } from "@/modules/buyer/components/ListingCard";
 import { useWishlist } from "@/modules/buyer/hooks/useWishlist";
 import { Heart, HeartCrack, Bike } from "lucide-react";
@@ -14,9 +14,8 @@ export default function WishlistPage() {
   const { data: wishlistPage, isLoading } = useWishlist(page, 12);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-background">
-      <Header />
-      <main className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
+    <BuyerAccountLayout>
+      <div className="w-full">
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-foreground flex items-center gap-3 tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 dark:bg-rose-900/30 text-rose-500 shadow-sm">
@@ -104,7 +103,7 @@ export default function WishlistPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </BuyerAccountLayout>
   );
 }

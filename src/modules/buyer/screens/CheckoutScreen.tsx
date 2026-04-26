@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -7,8 +8,8 @@ import Image from 'next/image'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X, Clock } from 'lucide-react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
@@ -23,15 +24,15 @@ import { useCart } from '../hooks/useCart'
 import { useCancelOrder } from '../hooks/useCancelOrder'
 import { useListingDetail } from '../hooks/useListingDetail'
 import { useOrderDetail } from '../hooks/useOrders'
+import { useQueryClient } from '@tanstack/react-query'
 import { formatVND } from '@/lib/mock-data'
 import { type BuyerListing, type CheckoutResponse } from '@/lib/api/buyer-api'
 import { cn } from '@/lib/utils'
-import { saveExpiringOrder, removeExpiringOrder } from '@/lib/order-expiry'
 
 const checkoutSchema = z.object({
   receiverName: z.string().min(2, 'Vui lòng nhập họ tên hợp lệ'),
   receiverPhone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, 'Số điện thoại không hợp lệ'),
-  provinceId: z.number({ required_error: 'Vui lòng chọn Tỉnh/Thành phố' }),
+  provinceId: z.number({ required_error: 'Vui lòng chọn Tỉnh/Thành phố' }).optional(),
   toDistrictId: z.number({ required_error: 'Vui lòng chọn Quận/Huyện' }),
   toWardCode: z.string({ required_error: 'Vui lòng chọn Phường/Xã' }).min(1, 'Vui lòng chọn Phường/Xã'),
   receiverAddress: z.string().min(5, 'Vui lòng nhập chi tiết số nhà, tên đường'),
@@ -42,6 +43,7 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>
 export default function CheckoutScreen() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const listingId = searchParams.get('listingId')
   const bikeId = searchParams.get('bikeId')          // Direct buy-now flow
   const orderId = searchParams.get('orderId')
@@ -59,8 +61,6 @@ export default function CheckoutScreen() {
 
   const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
-  const [qrSecondsLeft, setQrSecondsLeft] = useState(120) // 2 phút
-  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const selectedCartItems = cart?.items.filter((item) => item.isSelected) ?? []
   const primaryCartItem = selectedCartItems[0] ?? cart?.items[0]
@@ -92,37 +92,27 @@ export default function CheckoutScreen() {
   const { data: orderStatusData } = useOrderStatusPolling(checkoutData?.orderId)
 
   // ── QR Modal helpers ───────────────────────────────────────────────────────
-  const startQrCountdown = useCallback(() => {
-    setQrSecondsLeft(120)
-    if (qrTimerRef.current) clearInterval(qrTimerRef.current)
-    qrTimerRef.current = setInterval(() => {
-      setQrSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(qrTimerRef.current!)
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-  }, [])
-
   const openQrModal = useCallback((data: CheckoutResponse) => {
     setCheckoutData(data)
     setShowQrModal(true)
-    startQrCountdown()
-  }, [startQrCountdown])
+  }, [])
 
-  // Khi countdown hết (0 giây) → redirect về /buyer/orders
-  useEffect(() => {
-    if (qrSecondsLeft === 0 && showQrModal) {
-      setShowQrModal(false)
-      toast.error('Hết thời gian thanh toán. Vui lòng thanh toán lại.')
-      router.push('/buyer/orders')
-    }
-  }, [qrSecondsLeft, showQrModal, router])
+  /** Redirect đúng mode khi đóng QR modal hoặc quay lại */
+  const modalCloseRedirect =
+    isDirectMode
+      ? '/marketplace'
+      : isOrderPaymentMode && orderId
+        ? `/buyer/orders/${orderId}`
+        : '/buyer/cart'
 
-  // Dọn timer khi unmount
-  useEffect(() => () => { if (qrTimerRef.current) clearInterval(qrTimerRef.current) }, [])
+  /** Redirect nút "Quay lại" (trước khi checkout) */
+  const backRedirect =
+    isDirectMode
+      ? (listingId ? `/marketplace/${listingId}` : '/marketplace')
+      : isOrderPaymentMode && orderId
+        ? `/buyer/orders/${orderId}`
+        : '/buyer/cart'
+
 
   const methods = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -131,20 +121,22 @@ export default function CheckoutScreen() {
       receiverPhone: '',
       receiverAddress: '',
       toWardCode: '',
+      toDistrictId: undefined as unknown as number,
+      provinceId: undefined,
     },
   })
 
   useEffect(() => {
     if (orderStatusData?.status === 'paid') {
-      removeExpiringOrder(orderStatusData.orderId)
-      toast.success('Thanh toán thành công. Đơn hàng đã được ghi nhận.')
-      router.push(`/buyer/orders/${orderStatusData.orderId}`)
+      toast.success('Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.')
+      queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      router.push(`/buyer/orders?status=paid`)
     } else if (orderStatusData?.status === 'cancelled') {
-      if (orderStatusData.orderId) removeExpiringOrder(orderStatusData.orderId)
       toast.error('Đơn hàng đã bị hủy.')
+      queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
     }
-  }, [isOrderPaymentMode, orderId, orderStatusData?.orderId, orderStatusData?.status, router])
+  }, [isDirectMode, isOrderPaymentMode, orderId, orderStatusData?.orderId, orderStatusData?.status, router, queryClient])
 
   const onSubmit = (data: CheckoutFormValues) => {
     if (isOrderPaymentMode) {
@@ -175,20 +167,7 @@ export default function CheckoutScreen() {
         },
         {
           onSuccess: (res) => {
-            const expiresAt = res.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
-            if (res.payosQrUrl && res.payosQrUrl !== 'undefined' && res.payosQrUrl.startsWith('http')) {
-              saveExpiringOrder(res.orderId, expiresAt)
-              openQrModal(res)
-              return
-            }
-            paymentLinkMutation.mutate(res.orderId, {
-              onSuccess: (payRes) => {
-                const newData = { ...res, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || res.payosQrUrl || '' }
-                saveExpiringOrder(res.orderId, expiresAt)
-                openQrModal(newData)
-              },
-              onError: () => toast.error('Không thể tạo mã thanh toán PayOS.'),
-            })
+            router.push(`/buyer/checkout?orderId=${res.orderId}`)
           },
           onError: (err) => {
             const msg = err instanceof Error ? err.message : ''
@@ -210,20 +189,7 @@ export default function CheckoutScreen() {
       },
       {
         onSuccess: (res) => {
-          const expiresAt = res.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
-          if (res.payosQrUrl && res.payosQrUrl !== 'undefined' && res.payosQrUrl.startsWith('http')) {
-            saveExpiringOrder(res.orderId, expiresAt)
-            openQrModal(res)
-            return
-          }
-          paymentLinkMutation.mutate(res.orderId, {
-            onSuccess: (payRes) => {
-              const newData = { ...res, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || res.payosQrUrl || '' }
-              saveExpiringOrder(res.orderId, expiresAt)
-              openQrModal(newData)
-            },
-            onError: () => toast.error('Không thể tạo mã thanh toán PayOS.'),
-          })
+          router.push(`/buyer/checkout?orderId=${res.orderId}`)
         },
         onError: () => toast.error('Có lỗi khi tạo đơn hàng từ giỏ hàng.'),
       },
@@ -236,17 +202,13 @@ export default function CheckoutScreen() {
       return
     }
     if (existingOrder.payosQrUrl?.startsWith('http')) {
-      const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
-      const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt, payosQrUrl: existingOrder.payosQrUrl }
-      saveExpiringOrder(existingOrder.id, expiresAt)
+      const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt: existingOrder.expiresAt ?? '', payosQrUrl: existingOrder.payosQrUrl }
       openQrModal(data)
       return
     }
     paymentLinkMutation.mutate(existingOrder.id, {
       onSuccess: (payRes) => {
-        const expiresAt = existingOrder.expiresAt ?? new Date(Date.now() + 2 * 60 * 1000).toISOString()
-        const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt, payosQrUrl: payRes.checkoutUrl || payRes.qrCode || existingOrder.payosQrUrl || '' }
-        saveExpiringOrder(existingOrder.id, expiresAt)
+        const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt: existingOrder.expiresAt ?? '', payosQrUrl: payRes.checkoutUrl || payRes.qrCode || existingOrder.payosQrUrl || '' }
         openQrModal(data)
       },
       onError: () => toast.error('Không thể tạo lại mã thanh toán cho đơn hàng này.'),
@@ -256,29 +218,26 @@ export default function CheckoutScreen() {
   const handleTimerExpire = () => {
     const activeOrderId = checkoutData?.orderId ?? existingOrder?.id
     if (activeOrderId) {
-      removeExpiringOrder(activeOrderId)
       toast.info('Hết thời gian thanh toán. Đang hủy đơn...')
       cancelOrderMutation.mutate(activeOrderId, {
         onSuccess: () => {
           toast.error('Hết thời gian thanh toán. Đơn hàng đã bị hủy.')
-          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : '/buyer/cart')
+          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
         },
         onError: () => {
           toast.error('Hết thời gian thanh toán.')
-          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : '/buyer/cart')
+          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
         },
       })
     } else {
       toast.error('Hết thời gian thanh toán. Đơn hàng đã bị hủy.')
-      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : '/buyer/cart')
+      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
     }
   }
 
   const handleCancelOrder = () => {
     const activeOrderId = checkoutData?.orderId ?? existingOrder?.id
     if (!activeOrderId) return
-
-    removeExpiringOrder(activeOrderId)
     cancelOrderMutation.mutate(activeOrderId, {
       onSuccess: () => {
         router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
@@ -371,7 +330,7 @@ export default function CheckoutScreen() {
             <Button
               variant="ghost"
               className="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => router.back()}
+              onClick={() => router.push(backRedirect)}
             >
               <ArrowLeft className="h-4 w-4" />
               Quay lại
@@ -542,10 +501,8 @@ export default function CheckoutScreen() {
     {/* ── QR Payment Modal ─────────────────────────────────────────────── */}
     <Dialog open={showQrModal} onOpenChange={(open) => {
       if (!open) {
-        // Người dùng đóng modal thủ công → redirect về orders
-        if (qrTimerRef.current) clearInterval(qrTimerRef.current)
         setShowQrModal(false)
-        router.push('/buyer/orders')
+        router.push(modalCloseRedirect)
       }
     }}>
       <DialogContent className="max-w-sm rounded-3xl p-0 overflow-hidden border-primary/20 shadow-2xl" showCloseButton={false}>
@@ -553,13 +510,12 @@ export default function CheckoutScreen() {
         <div className="bg-primary/5 border-b border-primary/10 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <span className="font-bold text-foreground">Thanh toán qua PayOS</span>
+            <DialogTitle className="font-bold text-foreground">Thanh toán qua PayOS</DialogTitle>
           </div>
           <button
             onClick={() => {
-              if (qrTimerRef.current) clearInterval(qrTimerRef.current)
               setShowQrModal(false)
-              router.push('/buyer/orders')
+              router.push(modalCloseRedirect)
             }}
             className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
@@ -567,27 +523,6 @@ export default function CheckoutScreen() {
           </button>
         </div>
 
-        {/* Countdown bar */}
-        <div className="px-6 pt-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Thời gian còn lại
-            </span>
-            <span className={`text-sm font-bold tabular-nums ${
-              qrSecondsLeft <= 30 ? 'text-destructive animate-pulse' : 'text-primary'
-            }`}>
-              {String(Math.floor(qrSecondsLeft / 60)).padStart(2, '0')}:{String(qrSecondsLeft % 60).padStart(2, '0')}
-            </span>
-          </div>
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                qrSecondsLeft <= 30 ? 'bg-destructive' : 'bg-primary'
-              }`}
-              style={{ width: `${(qrSecondsLeft / 120) * 100}%` }}
-            />
-          </div>
-        </div>
 
         {/* QR */}
         <div className="px-6 pb-4 pt-2">

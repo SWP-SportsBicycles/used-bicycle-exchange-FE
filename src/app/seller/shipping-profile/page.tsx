@@ -39,7 +39,22 @@ function isNotFoundError(error: unknown) {
   return message.includes('not found') || message.includes('404')
 }
 
+import { Suspense } from 'react'
+
 export default function SellerShippingProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="mx-auto max-w-3xl py-10 text-center text-muted-foreground">
+        <Loader2 className="mr-2 inline-block h-4 w-4 animate-spin" />
+        Đang tải thông tin...
+      </div>
+    }>
+      <ShippingProfileContent />
+    </Suspense>
+  )
+}
+
+function ShippingProfileContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { language } = useLanguage()

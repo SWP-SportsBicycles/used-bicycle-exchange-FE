@@ -40,25 +40,28 @@ async function forward(req: NextRequest, context: RouteContext, method: string) 
   const targetUrl = buildTargetUrl(req, path);
   const headers = copyRequestHeaders(req);
 
-  const bodyText = method === "GET" || method === "HEAD" ? undefined : await req.text();
+  let body: BodyInit | undefined = undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    const contentType = req.headers.get("content-type") ?? "";
+    if (contentType.includes("multipart/form-data")) {
+      // Forward raw binary for file uploads — req.text() corrupts binary data
+      body = await req.arrayBuffer();
+    } else {
+      const text = await req.text();
+      body = text.length > 0 ? text : undefined;
+    }
+  }
 
   try {
     const upstream = await fetch(targetUrl, {
       method,
       headers,
-      body: bodyText && bodyText.length > 0 ? bodyText : undefined,
+      body,
       redirect: "manual",
       cache: "no-store",
     });
 
     const payload = await upstream.arrayBuffer();
-
-    // TEMP DEBUG — see what BE actually returns for 500 errors on wishlist
-    if (targetUrl.includes("wishlist") && upstream.status === 500) {
-      const debugText = new TextDecoder().decode(payload);
-      console.log(`[PROXY] wishlist 500 response (${debugText.length} chars):`);
-      console.log(debugText.substring(0, 800));
-    }
 
     return new Response(payload, {
       status: upstream.status,

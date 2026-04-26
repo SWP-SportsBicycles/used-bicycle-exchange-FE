@@ -181,6 +181,19 @@ export interface DisputePayload {
   mediaUrls?: string[];       // Video evidence URLs (uploaded via /api/Upload/video)
 }
 
+export interface BuyerReport {
+  id: string;
+  orderId: string;
+  type: number | string;
+  reason: string;
+  description?: string;
+  videoUrl?: string;
+  evidenceVideo?: string;
+  status: string;
+  createdAt: string;
+  resolution?: string;
+}
+
 export interface WishlistPage {
   items: BuyerListing[];
   totalCount: number;
@@ -868,19 +881,44 @@ export const buyerApi = {
 
   /**
    * Tạo báo cáo/khiếu nại.
-   * Swagger: POST /api/buyer-report/{orderId} — CreateReportDTO { type, reason }
+   * Swagger: POST /api/buyer-report/{orderId} — multipart/form-data { type (int), reason, description?, mediaUrls? }
    */
-  createDispute: (orderId: string, data: DisputePayload) =>
-    http.post<unknown>(`/api/buyer-report/${orderId}`, {
-      type: data.type || "other",
-      reason: data.reason,
-      ...(data.mediaUrls && data.mediaUrls.length > 0 ? { mediaUrls: data.mediaUrls } : {}),
-    }),
+  createDispute: async (orderId: string, data: DisputePayload): Promise<unknown> => {
+    const formData = new FormData()
+    formData.append('type', String(parseInt(data.type, 10)))
+    formData.append('reason', data.reason)
+    // 'description' carries video URLs since BE schema has no mediaUrls field
+    if (data.mediaUrls && data.mediaUrls.length > 0) {
+      // BE field name is 'videoUrl' (singular) — confirmed from response body
+      // If multiple videos, join as comma-separated or append first one
+      formData.append('videoUrl', data.mediaUrls[0])
+      // Also append remaining as mediaUrls in case BE supports multiple
+      if (data.mediaUrls.length > 1) {
+        data.mediaUrls.slice(1).forEach(url => formData.append('mediaUrls', url))
+      }
+    }
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+    const res = await fetch(`/api/proxy/api/buyer-report/${orderId}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      let msg = 'Gửi khiếu nại thất bại'
+      try {
+        const err = JSON.parse(errText)
+        msg = err?.errors ? JSON.stringify(err.errors) : (err?.message || err?.title || msg)
+      } catch { msg = errText || msg }
+      throw new Error(msg)
+    }
+    return res.json().catch(() => null)
+  },
 
   /** Lấy danh sách report của buyer */
-  getMyReports: async () => {
+  getMyReports: async (): Promise<BuyerReport[]> => {
     const raw = await http.get<unknown>("/api/buyer-report/my");
-    return unwrap(raw);
+    return unwrap<BuyerReport[]>(raw);
   },
 
   // ---------- Wishlist ----------

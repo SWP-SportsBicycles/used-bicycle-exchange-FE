@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* VeloTrust - Professional Sporty Light Theme
+/* SBE - Professional Sporty Light Theme
    Design Vision: "Strava meets Specialized"
    High contrast, Electric Blue accent, glassmorphism, dynamic shadows */
 :root {
@@ -264,7 +264,7 @@
       0 10px 20px -18px rgba(37, 50, 24, 0.28);
   }
 
-  /* Trust / Why VeloTrust card */
+  /* Trust / Why SBETrust card */
   .trust-card {
     @apply rounded-2xl border border-border/50 bg-card/85 p-6
            backdrop-blur-md transition-all duration-300;

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Phone, Mail, MapPin, ShieldCheck, Truck, Facebook, Instagram, Youtube } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
@@ -14,20 +15,11 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-6">
         {/* Brand */}
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary shadow-athletic">
-              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-primary-foreground" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="5.5" cy="17.5" r="3.5" />
-                <circle cx="18.5" cy="17.5" r="3.5" />
-                <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-              </svg>
-            </div>
-            <span className="text-xl font-extrabold text-white" style={{ fontFamily: 'var(--font-archivo)' }}>
-              VeloTrust
-            </span>
+          <div className="flex items-center gap-2.5 bg-white/90 p-1.5 rounded-lg w-fit">
+            <Image src="/logoSBE.jpg" alt="SBE Logo" width={120} height={40} className="h-9 w-auto object-contain mix-blend-multiply" />
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-300">
-            Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định VeloSafe.
+            Nền tảng mua bán xe đạp thể thao đã qua sử dụng, minh bạch thông tin và hỗ trợ kiểm định SBESafe.
           </p>
           <div className="mt-4 flex items-center gap-2 text-sm text-lime-200">
             <ShieldCheck className="h-4 w-4" />
@@ -54,7 +46,7 @@ export function Footer() {
             {[
               { href: '/marketplace', label: 'Marketplace' },
               { href: '/#how-it-works', label: 'Cách hoạt động' },
-              { href: '/#why-velotrust', label: 'Tại sao VeloTrust' },
+              { href: '/#why-velotrust', label: 'Tại sao SBETrust' },
               { href: sellerCtaHref, label: 'Đăng bán xe' },
             ].map((link) => (
               <li key={link.href}>
@@ -69,7 +61,7 @@ export function Footer() {
           <h4 className="text-sm font-semibold uppercase tracking-wide text-white">Chính sách</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
             <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-lime-200" /> Giao hàng toàn quốc</li>
-            <li>Chính sách kiểm định VeloSafe</li>
+            <li>Chính sách kiểm định SBESafe</li>
             <li>Đổi trả và hoàn tiền</li>
             <li>Bảo mật dữ liệu</li>
             <li>Điều khoản sử dụng</li>
@@ -86,7 +78,7 @@ export function Footer() {
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-lime-200 shrink-0" />
-              support@velotrust.vn
+              support@sbe.vn
             </li>
             <li className="flex items-start gap-2">
               <MapPin className="mt-1 h-4 w-4 text-lime-200 shrink-0" />
@@ -110,7 +102,7 @@ export function Footer() {
 
       <div className="border-t border-slate-700/70 py-5 text-center text-xs text-slate-400">
         <div className="mx-auto max-w-7xl px-4 lg:px-6">
-          Copyright {new Date().getFullYear()} VeloTrust. All rights reserved.
+          Copyright {new Date().getFullYear()} SBE. All rights reserved.
         </div>
       </div>
     </footer>

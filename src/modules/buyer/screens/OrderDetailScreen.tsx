@@ -34,10 +34,12 @@ export default function OrderDetailScreen({ params }: PageProps) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50">Không tìm thấy đơn hàng.</div>
   }
 
-  const showDisputeButton = ['delivered', 'completed'].includes(order.status)
+  const showCreateDisputeButton = ['delivered', 'completed'].includes(order.status)
+  const showViewDisputeButton = order.status === 'disputed'
   const showCancelButton = ['pending', 'paid'].includes(order.status)
   const isAwaitingPayment = order.status === 'pending'
   const paymentStatusLabel = isAwaitingPayment ? 'Chờ thanh toán Escrow' : 'Đã thanh toán Escrow'
+
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -77,7 +79,16 @@ export default function OrderDetailScreen({ params }: PageProps) {
               <div className="p-6">
                 <div className="flex flex-col gap-6 sm:flex-row">
                   <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-2xl border border-border/50 shadow-inner">
-                    <Image src={order.listing.images[0]} alt={order.listing.title} fill className="object-cover" />
+                    <Image
+                      src={order.listing.images[0] || '/placeholder.png'}
+                      alt={order.listing.title}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=No+Image'
+                      }}
+                    />
                   </div>
                   <div className="flex flex-1 flex-col justify-center">
                     <h3 className="mb-3 text-xl font-bold leading-tight text-foreground">{order.listing.title}</h3>
@@ -169,10 +180,18 @@ export default function OrderDetailScreen({ params }: PageProps) {
                 </Button>
               )}
 
-              {showDisputeButton && (
+              {showCreateDisputeButton && (
                 <Button asChild variant="destructive" className="h-12 w-full rounded-xl text-base font-bold shadow-lg shadow-rose-500/20">
                   <Link href={`/buyer/orders/${order.id}/dispute`}>
                     <ShieldAlert className="mr-2 h-5 w-5" /> Yêu cầu khiếu nại (Hoàn tiền)
+                  </Link>
+                </Button>
+              )}
+
+              {showViewDisputeButton && (
+                <Button asChild variant="outline" className="h-12 w-full rounded-xl text-base font-bold border-amber-500/50 text-amber-600 hover:bg-amber-500/10">
+                  <Link href={`/buyer/orders/${order.id}/dispute`}>
+                    <ShieldAlert className="mr-2 h-5 w-5" /> Xem tình trạng khiếu nại
                   </Link>
                 </Button>
               )}

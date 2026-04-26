@@ -9,9 +9,10 @@ import { BuyerOrder } from '@/lib/api/buyer-api'
 
 interface CancelOrderDialogProps {
   order: BuyerOrder
+  onSuccess?: () => void
 }
 
-export function CancelOrderDialog({ order }: CancelOrderDialogProps) {
+export function CancelOrderDialog({ order, onSuccess }: CancelOrderDialogProps) {
   const [open, setOpen] = useState(false)
   const cancelMutation = useCancelOrder()
 
@@ -19,6 +20,10 @@ export function CancelOrderDialog({ order }: CancelOrderDialogProps) {
     cancelMutation.mutate(order.id, {
       onSuccess: () => {
         setOpen(false)
+        onSuccess?.()
+      },
+      onError: () => {
+        // error toast already handled in useCancelOrder
       }
     })
   }
@@ -26,8 +31,12 @@ export function CancelOrderDialog({ order }: CancelOrderDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 rounded-xl h-11 font-semibold w-full">
-          Hủy đơn hàng
+        <Button
+          variant="outline"
+          className="text-destructive border-destructive/30 hover:bg-destructive/10 rounded-xl h-11 font-semibold w-full"
+          disabled={cancelMutation.isPending}
+        >
+          {cancelMutation.isPending ? 'Đang hủy...' : 'Hủy đơn hàng'}
         </Button>
       </DialogTrigger>
       <DialogContent className="rounded-3xl sm:rounded-3xl border-border/50 shadow-athletic-lg overflow-hidden">

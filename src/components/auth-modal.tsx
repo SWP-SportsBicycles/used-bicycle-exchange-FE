@@ -47,6 +47,7 @@ export function AuthModal({
 
   React.useEffect(() => {
     if (!open) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setView('login')
     setLoginErrors({})
     setRegErrors({})
@@ -130,7 +131,7 @@ export function AuthModal({
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-black/5" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/55 via-black/15 to-black/5" />
             </div>
 
             {/* Form column — no inner scroll on md; content sized to fit */}

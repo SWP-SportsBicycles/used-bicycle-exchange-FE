@@ -4,8 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles, Lock } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { MapPin, ShieldCheck, Star, TrendingDown, Flame, Sparkles } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { type BuyerListing } from '@/lib/api/buyer-api'
 import { formatVND } from '@/lib/utils'
@@ -88,7 +87,6 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             'relative flex flex-col overflow-hidden rounded-3xl bg-card',
             'shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] transition-all duration-300',
             'hover:shadow-athletic hover:-translate-y-1',
-            listing.isLocked && 'opacity-70',
           )}
         >
 
@@ -108,16 +106,6 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
 
             {/* Gradient overlay — richer on hover */}
             <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/10 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80" />
-
-            {/* ── Locked overlay */}
-            {listing.isLocked && (
-              <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px] flex items-center justify-center">
-                <Badge className="bg-slate-700 text-white text-sm px-4 py-1.5 flex items-center gap-1.5 rounded-xl">
-                  <Lock className="h-3.5 w-3.5" />
-                  Đang giao dịch (Locked)
-                </Badge>
-              </div>
-            )}
 
             {/* ── VeloSafe badge (top-left) */}
             {listing.isVeloSafeVerified && (
@@ -140,7 +128,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             )}
 
             {/* ── Promo ribbon (top-right) */}
-            {resolvedTag && PromoIcon && !listing.isLocked && (
+            {resolvedTag && PromoIcon && (
               <div
                 className={cn(
                   'absolute right-3 top-3 flex items-center gap-1 rounded-xl px-3 py-1.5 shadow-lg text-[11px] font-bold',
@@ -206,7 +194,7 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             </div>
 
             {/* Divider */}
-            <div className="my-4 h-[1px] w-full bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+            <div className="my-4 h-px w-full bg-linear-to-r from-transparent via-border/50 to-transparent" />
 
             {/* Price & Savings */}
             <div className="flex items-end justify-between">
