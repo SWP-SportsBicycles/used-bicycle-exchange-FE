@@ -8,7 +8,6 @@ import {
   LayoutDashboard, 
   Package, 
   ShoppingCart, 
-  Wallet, 
   MapPin,
   Plus,
   ChevronRight 
@@ -37,11 +36,6 @@ const sidebarItems = [
     href: '/seller/orders', 
     icon: ShoppingCart, 
     label: { vi: 'Đơn Hàng', en: 'Orders' }
-  },
-  { 
-    href: '/seller/wallet', 
-    icon: Wallet, 
-    label: { vi: 'Ví Tiền', en: 'Wallet' }
   },
   {
     href: '/seller/shipping-profile',

@@ -167,32 +167,6 @@ export default function SellerDashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Link href="/seller/wallet" className="block">
-            <Card className="border-[#407F3E]/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300 cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {language === 'vi' ? 'Số Dư Ví' : 'Wallet Balance'}
-                </CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-[#407F3E]" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-extrabold text-[#407F3E]" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(stats.totalEarnings)}</div>
-                <p className="text-xs text-[#407F3E] flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" />
-                  +12% {language === 'vi' ? 'tháng này' : 'this month'}
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
           <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -344,81 +318,6 @@ export default function SellerDashboardPage() {
           </Card>
         </motion.div>
       </div>
-
-      {/* Recent Transactions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{language === 'vi' ? 'Giao Dịch Gần Đây' : 'Recent Transactions'}</CardTitle>
-              <CardDescription>
-                {language === 'vi' ? 'Lịch sử ví tiền' : 'Wallet history'}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/seller/wallet" className="gap-1">
-                {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentTransactions.map((tx) => (
-                <div 
-                  key={tx.id} 
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      'h-8 w-8 rounded-full flex items-center justify-center',
-                      tx.amount > 0 ? 'bg-[#407F3E]/15' : 'bg-destructive/20'
-                    )}>
-                      {tx.amount > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-[#407F3E]" />
-                      ) : (
-                        <Wallet className="h-4 w-4 text-destructive" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(tx.createdAt).toLocaleDateString('vi-VN')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={cn(
-                      'text-sm font-semibold',
-                      tx.amount > 0 ? 'text-[#407F3E]' : 'text-destructive'
-                    )}>
-                      {tx.amount > 0 ? '+' : ''}{formatVND(tx.amount)}
-                    </p>
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        'text-xs',
-                        tx.status === 'completed' 
-                          ? 'bg-[#407F3E]/15 text-[#407F3E]' 
-                          : 'bg-muted text-muted-foreground'
-                      )}
-                    >
-                      {tx.status === 'completed' 
-                        ? (language === 'vi' ? 'Hoàn thành' : 'Completed')
-                        : (language === 'vi' ? 'Đang xử lý' : 'Pending')
-                      }
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   )
 }

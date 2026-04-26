@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useUpdateListing, useUploadMedia, useSubmitListing, useResubmitListing } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -166,12 +166,38 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const { language } = useLanguage()
   const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
+  const submitListingMutation = useSubmitListing()
+  const resubmitListingMutation = useResubmitListing()
   const mediaSeed = useMemo(() => extractMediaSeed(initialData), [initialData])
+  
+  // Track original status to determine which API to call after update
+  const [originalStatus] = useState(() => {
+    const status = typeof initialData?.status === 'string' ? initialData.status.trim() : ''
+    // Normalize status similar to detail page
+    const normalized = status
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/[\s-]+/g, '_')
+      .toLowerCase()
+    
+    if (normalized === 'published' || normalized === 'active') return 'published'
+    if (normalized === 'pending_review' || normalized === 'pending' || normalized === 'pending_inspection') return 'pending_review'
+    if (normalized === 'rejected') return 'rejected'
+    if (normalized === 'withdrawn' || normalized === 'cancelled' || normalized === 'canceled') return 'withdrawn'
+    if (normalized === 'sold' || normalized === 'completed') return 'sold'
+    return 'draft'
+  })
   
   const [currentStep, setCurrentStep] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Combined loading state
+  const isLoading = isSubmitting || 
+    updateListingMutation.isPending || 
+    uploadMediaMutation.isPending ||
+    submitListingMutation.isPending ||
+    resubmitListingMutation.isPending
   
   const [formData, setFormData] = useState({
     title: str(initialData?.title),
@@ -306,7 +332,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     setIsSubmitting(true)
 
     try {
-      // 1. Tạo listing
+      // Prepare payload for update
       const priceVal = Number(String(formData.price).replace(/,/g, ''))
       const payload = {
         title: formData.title,
@@ -327,22 +353,81 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      // 1. Update listing
-      await updateListingMutation.mutateAsync({
-        listingId,
-        data: payload
-      })
+      // Different flows based on original status
+      if (originalStatus === 'rejected') {
+        // FLOW 1: Resubmit first, then update (only for rejected listings)
+        try {
+          await resubmitListingMutation.mutateAsync(listingId)
+          
+          // Update listing after resubmit succeeds
+          await updateListingMutation.mutateAsync({
+            listingId,
+            data: payload
+          })
+          
+          setSubmitSuccess(
+            language === 'vi'
+              ? 'Gửi lại tin đăng thành công! Tin đang chờ duyệt.'
+              : 'Listing resubmitted successfully! Waiting for approval.'
+          )
+        } catch (resubmitError) {
+          // If resubmit fails, don't try to update
+          throw resubmitError
+        }
+      } else if (originalStatus === 'withdrawn') {
+        // FLOW 2: Only update (withdrawn listings cannot be resubmitted)
+        await updateListingMutation.mutateAsync({
+          listingId,
+          data: payload
+        })
+        
+        setSubmitSuccess(
+          language === 'vi'
+            ? 'Cập nhật tin đăng thành công! Tin vẫn ở trạng thái đã rút.'
+            : 'Listing updated successfully! Listing remains withdrawn.'
+        )
+      } else if (originalStatus === 'draft') {
+        // FLOW 2: Update first, then submit
+        try {
+          await updateListingMutation.mutateAsync({
+            listingId,
+            data: payload
+          })
+          
+          await submitListingMutation.mutateAsync(listingId)
+          
+          setSubmitSuccess(
+            language === 'vi'
+              ? 'Gửi tin đăng thành công! Tin đang chờ duyệt.'
+              : 'Listing submitted successfully! Waiting for approval.'
+          )
+        } catch (submitError) {
+          // If submit fails, listing is still updated
+          setSubmitSuccess(
+            language === 'vi'
+              ? 'Cập nhật tin đăng thành công! (Chưa gửi duyệt)'
+              : 'Listing updated successfully! (Not submitted)'
+          )
+        }
+      } else {
+        // FLOW 3: Just update
+        await updateListingMutation.mutateAsync({
+          listingId,
+          data: payload
+        })
+        
+        setSubmitSuccess(
+          language === 'vi'
+            ? 'Cập nhật tin đăng thành công!'
+            : 'Listing updated successfully!'
+        )
+      }
 
+      // Upload new media files if any (common for all flows)
       const newMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
       if (newMediaFiles.length > 0) {
         await uploadMediaMutation.mutateAsync({ listingId, files: newMediaFiles })
       }
-
-      setSubmitSuccess(
-        language === 'vi'
-          ? 'Cập nhật tin đăng thành công!'
-          : 'Listing updated successfully!'
-      )
       
       // Navigate back after success
       setTimeout(() => {
@@ -900,20 +985,20 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
           </motion.div>
 
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-            <Button variant="outline" onClick={prevStep} disabled={currentStep === 0 || isSubmitting} className="gap-2">
+            <Button variant="outline" onClick={prevStep} disabled={currentStep === 0 || isLoading} className="gap-2">
               <ChevronLeft className="h-4 w-4" />
               {language === 'vi' ? 'Quay lại' : 'Back'}
             </Button>
 
             {currentStep < steps.length - 1 ? (
-              <Button onClick={nextStep} disabled={isSubmitting} className="gap-2">
+              <Button onClick={nextStep} disabled={isLoading} className="gap-2">
                 {language === 'vi' ? 'Tiếp theo' : 'Next'}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2" onClick={handleSubmitForReview} disabled={isSubmitting}>
-                {isSubmitting ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isSubmitting ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
+              <Button className="gap-2" onClick={handleSubmitForReview} disabled={isLoading}>
+                {isLoading ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
+                {isLoading ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
               </Button>
             )}
           </div>
