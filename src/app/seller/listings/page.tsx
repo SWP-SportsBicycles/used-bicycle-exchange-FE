@@ -159,76 +159,105 @@ export default function SellerListingsPage() {
         ) : (
         <div className="space-y-4">
           {myListings.map((listing) => (
-            <div
+            <Link
               key={listing.id}
-              className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted"
+              href={`/seller/listings/${listing.id}`}
+              className="block"
             >
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                <Image
-                  src={listing.images[0] ?? '/placeholder.svg'}
-                  alt={listing.title}
-                  width={48}
-                  height={48}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <Image
+                    src={listing.images[0] ?? '/placeholder.svg'}
+                    alt={listing.title}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{listing.title}</p>
-                <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
-              </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{listing.title}</p>
+                  <p className="text-xs text-muted-foreground">{formatVND(listing.price)}</p>
+                </div>
 
-              <div className="flex items-center gap-2">
-                {listing.isVeloSafeVerified && <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />}
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-xs',
-                    resolveStatusClass(listing.status)
+                <div className="flex items-center gap-2" style={{ pointerEvents: 'none' }}>
+                  {listing.isVeloSafeVerified && <CheckCircle2 className="h-4 w-4 text-[#407F3E]" />}
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-xs',
+                      resolveStatusClass(listing.status)
+                    )}
+                  >
+                    {resolveStatusLabel(listing.status)}
+                  </Badge>
+
+                  {listing.status === 'draft' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'submit', listing }); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
+                    </Button>
                   )}
-                >
-                  {resolveStatusLabel(listing.status)}
-                </Badge>
 
-                {listing.status === 'draft' && (
-                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'submit', listing })}>
-                    {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
-                  </Button>
-                )}
+                  {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      asChild 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <Link href={`/seller/listings/${listing.id}/edit`}>
+                        {language === 'vi' ? 'Sửa' : 'Edit'}
+                      </Link>
+                    </Button>
+                  )}
 
-                {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'withdrawn' || listing.status === 'pending_review' || listing.status === 'pending') && (
-                  <Button size="sm" variant="outline" asChild>
-                    <Link href={`/seller/listings/${listing.id}/edit`}>
-                      {language === 'vi' ? 'Sửa' : 'Edit'}
-                    </Link>
-                  </Button>
-                )}
+                  {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'withdraw', listing}); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Rút tin' : 'Withdraw'}
+                    </Button>
+                  )}
 
-                {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
-                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'withdraw', listing })}>
-                    {language === 'vi' ? 'Rút tin' : 'Withdraw'}
-                  </Button>
-                )}
+                  {listing.status === 'rejected' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'resubmit', listing}); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
+                    </Button>
+                  )}
 
-                {listing.status === 'rejected' && (
-                  <Button size="sm" variant="outline" onClick={() => setConfirmState({ action: 'resubmit', listing })}>
-                    {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
-                  </Button>
-                )}
-
-                {(listing.status === 'draft' || listing.status === 'rejected') && (
-                  <Button size="sm" variant="destructive" onClick={() => setConfirmState({ action: 'delete', listing })}>
-                    {language === 'vi' ? 'Xóa' : 'Delete'}
-                  </Button>
-                )}
-
-                <Button size="icon-sm" variant="ghost" asChild>
-                  <Link href={`/seller/listings/${listing.id}`}>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </Link>
-                </Button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         )}
