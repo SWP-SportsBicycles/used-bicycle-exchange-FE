@@ -127,7 +127,7 @@ function MarketplacePageContent({
 
   // Client-side sort (server đã filter — chỉ sort local batch hiện tại)
   const filteredListings = useMemo(() => {
-    let result = [...(listingPage?.items ?? [])]
+    const result = [...(listingPage?.items ?? [])]
     switch (sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.price - b.price)
@@ -218,7 +218,7 @@ function MarketplacePageContent({
           {/* Listings Grid */}
           <div className="flex-1 min-w-0">
             {/* Toolbar */}
-            <div className="sticky top-20 z-30 mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-background/85 px-4 py-3 backdrop-blur-xl shadow-sm supports-[backdrop-filter]:bg-background/60">
+            <div className="sticky top-20 z-30 mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/50 bg-background/85 px-4 py-3 backdrop-blur-xl shadow-sm supports-backdrop-filter:bg-background/60">
               <div className="flex items-center gap-3">
                 <MobileFilterSheet 
                   filters={filters} 

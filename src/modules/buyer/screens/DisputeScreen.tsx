@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
 import { useOrderDetail } from '../hooks/useOrders'
-import { useDisputeMutation, useUploadMedia } from '../hooks/useDispute'
+import { useDisputeMutation, useUploadMedia, useMyReports } from '../hooks/useDispute'
 
 const disputeSchema = z.object({
   type: z.string().min(1, 'Vui long chon loai khieu nai'),
@@ -41,9 +41,13 @@ export default function DisputeScreen({ params }: PageProps) {
   const { id } = use(params)
   const router = useRouter()
   const { data: order, isLoading: isOrderLoading } = useOrderDetail(id)
+  const { data: reports, isLoading: isReportsLoading } = useMyReports()
   
   const disputeMutation = useDisputeMutation()
   const uploadMutation = useUploadMedia()
+
+  const existingReport = reports?.find(r => r.orderId === id)
+  const isViewMode = order?.status === 'disputed' || existingReport
 
   const { control, register, handleSubmit, setValue, formState: { errors } } = useForm<DisputeFormValues>({
     resolver: zodResolver(disputeSchema),
@@ -73,7 +77,7 @@ export default function DisputeScreen({ params }: PageProps) {
 
   const onSubmit = (data: DisputeFormValues) => {
     if (!order) return
-    disputeMutation.mutate({ orderId: order.id, data: { type: data.type, reason: data.reason, mediaUrls: data.mediaUrls } }, {
+    disputeMutation.mutate({ orderId: order.id, data: { type: String(Number(data.type)), reason: data.reason, mediaUrls: data.mediaUrls } }, {
       onSuccess: () => {
         toast.success('Đã gửi yêu cầu khiếu nại thành công. VeloTrust sẽ phản hồi trong 24h.')
         router.push(`/buyer/orders/${order.id}`)
@@ -82,7 +86,7 @@ export default function DisputeScreen({ params }: PageProps) {
     })
   }
 
-  if (isOrderLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Đang tải...</div>
+  if (isOrderLoading || (isViewMode && isReportsLoading)) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="animate-spin mr-2"/> Đang tải...</div>
   if (!order) return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Không tìm thấy đơn hàng.</div>
 
   return (
@@ -100,19 +104,99 @@ export default function DisputeScreen({ params }: PageProps) {
         </nav>
 
         <div className="rounded-3xl bg-card border border-rose-200 shadow-sm overflow-hidden mt-2">
-          <div className="bg-rose-50/80 px-6 py-5 flex items-start gap-4 border-b border-rose-100/60">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
-              <AlertTriangle className="h-5 w-5" />
+          {isViewMode ? (
+            <div className="bg-amber-50/80 px-6 py-5 flex items-start gap-4 border-b border-amber-100/60">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-amber-900">Chi tiết khiếu nại</h2>
+                <p className="text-sm mt-1.5 text-amber-800/80 leading-relaxed max-w-2xl">
+                  {existingReport 
+                    ? `Khiếu nại được tạo vào ngày ${new Date(existingReport.createdAt).toLocaleDateString('vi-VN')}. VeloTrust đang trong quá trình xử lý.`
+                    : 'Đơn hàng này đang trong trạng thái khiếu nại. VeloTrust sẽ sớm liên hệ với bạn.'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-rose-900">Yêu cầu khiếu nại / Hoàn tiền</h2>
-              <p className="text-sm mt-1.5 text-rose-800/80 leading-relaxed max-w-2xl">
-                Theo chính sách Escrow, bạn phải cung cấp video mở hộp (unbox) rõ ràng, không cắt ghép làm bằng chứng. Hạn chót gửi khiếu nại là 24h kể từ khi GHN báo giao thành công.
-              </p>
+          ) : (
+            <div className="bg-rose-50/80 px-6 py-5 flex items-start gap-4 border-b border-rose-100/60">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-rose-900">Yêu cầu khiếu nại / Hoàn tiền</h2>
+                <p className="text-sm mt-1.5 text-rose-800/80 leading-relaxed max-w-2xl">
+                  Theo chính sách Escrow, bạn phải cung cấp video mở hộp (unbox) rõ ràng, không cắt ghép làm bằng chứng. Hạn chót gửi khiếu nại là 24h kể từ khi GHN báo giao thành công.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
           
           <div className="p-6 md:p-8">
+            {isViewMode ? (
+              <div className="space-y-6">
+                {existingReport ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">Loại khiếu nại</Label>
+                      <p className="font-medium text-foreground text-lg">
+                        {reportTypeOptions.find(o => o.value === existingReport.type?.toString())?.label || 'Khác'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">Video bằng chứng (Unbox Video)</Label>
+                      <div className="flex gap-4 overflow-x-auto pb-2">
+                        {existingReport.videoUrl || existingReport.evidenceVideo || existingReport.description ? (
+                          (existingReport.videoUrl || existingReport.evidenceVideo || existingReport.description || '').split(',').map((url, i) => (
+                            <a href={url} target="_blank" rel="noopener noreferrer" key={i} className="relative h-28 w-40 bg-black rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-md group cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+                              <PlayCircle className="h-10 w-10 text-white/70 group-hover:text-white transition-colors" />
+                              <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2 text-xs font-medium text-white text-center">
+                                Xem Video {i+1}
+                              </div>
+                            </a>
+                          ))
+                        ) : (
+                          <p className="text-sm italic text-muted-foreground">Không có video đính kèm.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">Mô tả chi tiết</Label>
+                      <div className="p-4 bg-secondary/10 rounded-2xl border border-border/60">
+                        <p className="text-base whitespace-pre-wrap leading-relaxed">{existingReport.reason}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">Trạng thái xử lý</Label>
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/30">
+                        <p className="font-bold text-amber-700 dark:text-amber-400 capitalize">
+                          {existingReport.status?.replace(/_/g, ' ') || 'Đang xử lý'}
+                        </p>
+                        {existingReport.resolution && (
+                          <div className="mt-3 pt-3 border-t border-amber-200/50 dark:border-amber-800/50">
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Quyết định từ VeloTrust:</p>
+                            <p className="text-sm text-amber-700 dark:text-amber-400">{existingReport.resolution}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Đang tải thông tin chi tiết khiếu nại...</p>
+                  </div>
+                )}
+                
+                <div className="pt-6 border-t border-border/50 flex justify-end gap-4">
+                  <Button variant="outline" type="button" onClick={() => router.back()} className="rounded-xl h-12 px-6 font-semibold">
+                    Quay lại
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               <div className="space-y-4">
                 <Label className="text-base font-bold flex items-center gap-1.5">
@@ -171,7 +255,7 @@ export default function DisputeScreen({ params }: PageProps) {
                     {mediaUrls.map((url, i) => (
                       <div key={i} className="relative h-28 w-40 bg-black rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-md group">
                         <PlayCircle className="h-10 w-10 text-white/70 group-hover:text-white transition-colors" />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-xs font-medium text-white">
+                        <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2 text-xs font-medium text-white">
                           Video {i+1}
                         </div>
                       </div>
@@ -210,6 +294,7 @@ export default function DisputeScreen({ params }: PageProps) {
                 </Button>
               </div>
             </form>
+            )}
           </div>
         </div>
       </main>

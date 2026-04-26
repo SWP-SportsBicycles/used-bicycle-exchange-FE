@@ -65,13 +65,6 @@ async function forward(req: NextRequest, context: RouteContext, method: string) 
 
     const payload = await upstream.arrayBuffer();
 
-    // TEMP DEBUG — see what BE actually returns for 500 errors on wishlist
-    if (targetUrl.includes("wishlist") && upstream.status === 500) {
-      const debugText = new TextDecoder().decode(payload);
-      console.log(`[PROXY] wishlist 500 response (${debugText.length} chars):`);
-      console.log(debugText.substring(0, 800));
-    }
-
     return new Response(payload, {
       status: upstream.status,
       headers: copyResponseHeaders(upstream.headers),

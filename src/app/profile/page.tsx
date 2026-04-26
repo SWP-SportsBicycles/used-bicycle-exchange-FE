@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState } from 'react'
@@ -18,7 +19,7 @@ import {
   Building,
   CreditCard
 } from 'lucide-react'
-import { Header } from '@/components/header'
+import { BuyerAccountLayout } from '@/modules/buyer/components/BuyerAccountLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,9 +96,8 @@ export default function ProfilePage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
+      <BuyerAccountLayout>
+        <div className="w-full max-w-4xl">
           <Card>
             <CardContent className="py-16 text-center">
               <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
@@ -114,16 +114,14 @@ export default function ProfilePage() {
               </Button>
             </CardContent>
           </Card>
-        </main>
-      </div>
+        </div>
+      </BuyerAccountLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="mx-auto max-w-4xl px-4 py-8 lg:px-6">
+    <BuyerAccountLayout>
+      <div className="w-full max-w-4xl">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold tracking-tight">
@@ -481,7 +479,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </motion.div>
-      </main>
-    </div>
+      </div>
+    </BuyerAccountLayout>
   )
 }

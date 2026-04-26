@@ -22,9 +22,9 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'VeloTrust - Marketplace Xe Đạp Thể Thao Đã Qua Sử Dụng',
-  description: 'Nền tảng mua bán xe đạp thể thao đã qua sử dụng uy tín với dịch vụ kiểm định VeloSafe tại Hà Nội, TP.HCM và Đà Nẵng.',
-  generator: 'v0.app',
+  title: 'SBE - Marketplace Xe Đạp Thể Thao Đã Qua Sử Dụng',
+  description: 'Nền tảng mua bán xe đạp thể thao đã qua sử dụng uy tín với dịch vụ kiểm định SBE tại Hà Nội, TP.HCM và Đà Nẵng.',
+  generator: 'SBE',
   icons: {
     icon: '/icon.svg',
     apple: '/apple-icon.png',
@@ -43,7 +43,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="vi" className="bg-background">
+    <html lang="vi" className="bg-background" suppressHydrationWarning>
+      <head>
+        {/* Prevent flash of wrong theme before React hydrates */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('sbe-theme');if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${archivo.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         <Providers>
           {children}

@@ -3,11 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { buyerApi, type BuyerCart } from '@/lib/api/buyer-api'
 
-export function useCart() {
+export function useCart(options?: { enabled?: boolean }) {
   return useQuery<BuyerCart>({
     queryKey: ['buyer-cart'],
     queryFn: () => buyerApi.getCart(),
     staleTime: 1000 * 15,
+    enabled: options?.enabled ?? true,
   })
 }
 

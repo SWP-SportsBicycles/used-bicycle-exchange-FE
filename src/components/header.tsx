@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   CircleCheckBig,
@@ -10,9 +11,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Package,
   ShoppingCart,
   Shield,
+  Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +31,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth, type UserRole } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
+import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
 import { useCart } from '@/modules/buyer/hooks/useCart'
 
@@ -50,11 +54,12 @@ const roleColors: Record<UserRole, string> = {
 export function Header() {
   const { user, isAuthenticated, logout } = useAuth()
   const { language, setLanguage, t } = useLanguage()
+  const { theme, toggleTheme } = useTheme()
   const pathname = usePathname()
   const isHome = pathname === '/'
   const authRedirect = encodeURIComponent(pathname || '/')
   const isBuyer = user.role === 'buyer'
-  const { data: cart } = useCart()
+  const { data: cart } = useCart({ enabled: isBuyer })
   const cartCount = isBuyer ? (cart?.items?.length ?? 0) : 0
   const showPostListingCta = (user.role === 'seller' || user.role === 'guest') && (!isHome || isAuthenticated)
   const postListingHref =
@@ -81,23 +86,15 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-border/40 bg-card/85 backdrop-blur-xl shadow-sm">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary shadow-sm transition-all duration-300 group-hover:scale-105">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-4.5 w-4.5 text-primary-foreground"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="5.5" cy="17.5" r="3.5" />
-              <circle cx="18.5" cy="17.5" r="3.5" />
-              <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-            </svg>
-          </div>
-          <span className="hidden text-[2rem] font-bold tracking-tighter text-foreground sm:inline-block" style={{ fontFamily: 'var(--font-archivo)' }}>
-            SBE
-          </span>
+        <Link href="/" className="flex items-center gap-3 group transition-opacity hover:opacity-80">
+          <Image 
+            src="/logoSBE.jpg" 
+            alt="SBE Logo" 
+            width={120} 
+            height={40} 
+            className="h-10 w-auto object-contain mix-blend-multiply rounded-lg" 
+            priority
+          />
         </Link>
 
         {/* Assurance Marquee */}
@@ -147,6 +144,18 @@ export function Header() {
               </Link>
             </Button>
           )}
+
+          {/* Dark Mode Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="relative h-9 w-9 p-0"
+            aria-label={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-300 dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-300 dark:rotate-0 dark:scale-100" />
+          </Button>
 
           {/* Language Toggle */}
           <DropdownMenu>

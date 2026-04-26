@@ -15,15 +15,14 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react'
-import { Header } from '@/components/header'
-import { Footer } from '@/components/footer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
 import { useOrders } from '../hooks/useOrders'
 import { useWishlist } from '../hooks/useWishlist'
 import { formatVND } from '@/lib/mock-data'
-import { type BuyerOrder } from '@/lib/api/buyer-api'
+import { BuyerOrder } from '@/lib/api/buyer-api'
+import { BuyerAccountLayout } from '../components/BuyerAccountLayout'
 
 // ── Status helpers ──────────────────────────────────────────────────────────
 
@@ -187,10 +186,8 @@ export default function BuyerDashboardScreen() {
   const firstName = user.name?.split(' ').pop() || user.name || 'bạn'
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-background">
-      <Header />
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 lg:px-6">
+    <BuyerAccountLayout>
+      <div className="w-full">
 
         {/* ── Hero Greeting ── */}
         <motion.div
@@ -199,7 +196,7 @@ export default function BuyerDashboardScreen() {
           transition={{ duration: 0.4 }}
           className="mb-8"
         >
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/90 via-primary to-primary/70 p-6 shadow-lg md:p-8">
+          <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-primary/90 via-primary to-primary/70 p-6 shadow-lg md:p-8">
             {/* Background decoration */}
             <div className="absolute right-0 top-0 h-48 w-48 -translate-y-1/4 translate-x-1/4 rounded-full bg-white/10 blur-2xl" />
             <div className="absolute bottom-0 left-1/3 h-32 w-32 translate-y-1/4 rounded-full bg-white/5 blur-xl" />
@@ -425,9 +422,7 @@ export default function BuyerDashboardScreen() {
             </Button>
           </div>
         </motion.div>
-      </main>
-
-      <Footer />
-    </div>
+      </div>
+    </BuyerAccountLayout>
   )
 }

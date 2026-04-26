@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import { buyerApi, DisputePayload } from '@/lib/api/buyer-api'
+import { buyerApi, DisputePayload, BuyerReport } from '@/lib/api/buyer-api'
 
 export function useDisputeMutation() {
   const queryClient = useQueryClient()
@@ -11,7 +11,16 @@ export function useDisputeMutation() {
     onSuccess: (_, { orderId }) => {
       queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       queryClient.invalidateQueries({ queryKey: ['buyer-order-detail', orderId] })
+      queryClient.invalidateQueries({ queryKey: ['buyer-reports'] })
     },
+  })
+}
+
+export function useMyReports() {
+  return useQuery<BuyerReport[]>({
+    queryKey: ['buyer-reports'],
+    queryFn: () => buyerApi.getMyReports(),
+    staleTime: 1000 * 30, // 30 seconds
   })
 }
 

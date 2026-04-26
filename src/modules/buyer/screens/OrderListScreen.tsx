@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Header } from '@/components/header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,12 @@ import { formatVND } from '@/lib/mock-data'
 import { BuyerOrder } from '@/lib/api/buyer-api'
 import { OrderCardSkeleton } from '../components/skeletons/OrderCardSkeleton'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { BuyerAccountLayout } from '../components/BuyerAccountLayout'
+import { Search } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 
 const statusColorMap: Record<BuyerOrder['status'], string> = {
   pending: 'bg-status-draft',
@@ -33,48 +40,114 @@ const statusLabelMap: Record<BuyerOrder['status'], string> = {
 }
 
 import { useState } from 'react'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function OrderListScreen() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const queryStatus = searchParams.get('status')
+  
   const [statusFilter, setStatusFilter] = useState<BuyerOrder['status'] | 'all'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(1)
+  
   const { data: orderPage, isLoading } = useOrders(page, 10)
+  const queryClient = useQueryClient()
 
-  const filteredItems = orderPage?.items?.filter(order => 
-    statusFilter === 'all' ? true : order.status === statusFilter
-  ) || []
+  useEffect(() => {
+    if (!queryStatus) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatusFilter('all')
+      return
+    }
+    const validStatuses: Array<BuyerOrder['status']> = ['pending', 'paid', 'shipping', 'delivered', 'completed', 'cancelled', 'disputed']
+    if (validStatuses.includes(queryStatus as BuyerOrder['status'])) {
+      setStatusFilter(queryStatus as BuyerOrder['status'])
+      setPage(1)
+      return
+    }
+    setStatusFilter('all')
+  }, [queryStatus])
+
+  const handleTabChange = (status: string) => {
+    setStatusFilter(status as BuyerOrder['status'] | 'all')
+    setPage(1)
+    if (status === 'all') {
+      router.push(pathname)
+    } else {
+      router.push(`${pathname}?status=${status}`)
+    }
+  }
+
+  const filteredItems = orderPage?.items?.filter(order => {
+    const matchesStatus = statusFilter === 'all' ? true : order.status === statusFilter
+    const matchesSearch = searchQuery === '' 
+      ? true 
+      : order.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        order.listing.title.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesStatus && matchesSearch
+  }) || []
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header />
-      <main className="mx-auto max-w-5xl px-4 py-8 lg:px-6">
-        <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>
-              Đơn hàng của tôi
-            </h1>
-            <p className="text-muted-foreground mt-1">Quản lý và theo dõi tiến trình giao hàng.</p>
+    <BuyerAccountLayout>
+      <div className="w-full">
+        <div className="mb-6 flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>
+                Đơn hàng của tôi
+              </h1>
+              <p className="text-muted-foreground text-sm mt-1">Quản lý và theo dõi tiến trình giao hàng.</p>
+            </div>
+            
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm theo mã đơn hoặc tên xe..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 rounded-xl bg-background border-border/50 focus-visible:ring-primary/20"
+              />
+            </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <Button 
-              variant={statusFilter === 'all' ? 'default' : 'outline'} 
-              size="sm" 
-              onClick={() => setStatusFilter('all')}
-              className="rounded-full"
-            >
-              Tất cả
-            </Button>
-            {Object.entries(statusLabelMap).map(([key, label]) => (
-              <Button 
-                key={key}
-                variant={statusFilter === key ? 'default' : 'outline'} 
-                size="sm" 
-                onClick={() => setStatusFilter(key as BuyerOrder['status'])}
-                className="rounded-full whitespace-nowrap"
+          {/* Premium Tabs */}
+          <div className="relative w-full">
+            <div className="flex gap-6 overflow-x-auto border-b border-border/50 pb-px scrollbar-hide">
+              <button
+                onClick={() => handleTabChange('all')}
+                className={cn(
+                  "pb-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative",
+                  statusFilter === 'all' 
+                    ? "text-primary" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                {label}
-              </Button>
-            ))}
+                Tất cả
+                {statusFilter === 'all' && (
+                  <motion.div layoutId="order-tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                )}
+              </button>
+              {Object.entries(statusLabelMap).map(([key, label]) => (
+                <button 
+                  key={key}
+                  onClick={() => handleTabChange(key)}
+                  className={cn(
+                    "pb-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative",
+                    statusFilter === key 
+                      ? "text-primary" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                  {statusFilter === key && (
+                    <motion.div layoutId="order-tab-indicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -96,17 +169,24 @@ export default function OrderListScreen() {
         ) : (
           <div className="space-y-5">
             {filteredItems.map((order) => (
-              <div key={order.id} className="rounded-3xl bg-card border border-border/40 shadow-sm overflow-hidden hover:shadow-athletic transition-all duration-300 group">
-                <div className="bg-secondary/30 px-6 py-4 border-b border-border/40 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 text-sm">
+              <div key={order.id} className="rounded-2xl bg-card border border-border/40 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] overflow-hidden hover:shadow-md transition-all duration-300 group">
+                <div className="bg-secondary/20 px-5 py-3 border-b border-border/40 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 text-sm">
                     <span className="font-bold text-foreground uppercase tracking-wider">
-                      Mã ĐH: {(order.id || 'N/A').split('-')[0]}
+                      Đơn hàng: {(order.id || 'N/A').split('-')[0]}
                     </span>
+                    <span className="w-1 h-1 rounded-full bg-border/80 hidden sm:block" />
                     <span className="text-muted-foreground font-medium hidden sm:inline-block">
-                      {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                      {new Date(order.createdAt).toLocaleDateString('vi-VN', {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                      })}
                     </span>
                   </div>
-                  <Badge className={`${statusColorMap[order.status]} hover:${statusColorMap[order.status]} text-white border-0 px-3 py-1 rounded-full font-semibold shadow-sm`}>
+                  <Badge className={cn(
+                    "px-3 py-1 rounded-full font-semibold border-0 shadow-sm transition-colors",
+                    statusColorMap[order.status],
+                    `hover:${statusColorMap[order.status]}`
+                  )}>
                     {statusLabelMap[order.status]}
                   </Badge>
                 </div>
@@ -157,7 +237,10 @@ export default function OrderListScreen() {
                               Thanh toán ngay
                             </Link>
                           </Button>
-                          <CancelOrderDialog order={order} />
+                          <CancelOrderDialog
+                            order={order}
+                            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })}
+                          />
                         </>
                       )}
                       <Button asChild variant={order.status === 'pending' ? 'ghost' : 'default'} className="w-full h-11 rounded-xl font-semibold">
@@ -199,7 +282,7 @@ export default function OrderListScreen() {
             </Button>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </BuyerAccountLayout>
   )
 }

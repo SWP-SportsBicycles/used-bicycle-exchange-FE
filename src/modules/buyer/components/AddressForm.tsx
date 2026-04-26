@@ -38,7 +38,7 @@ export function AddressForm() {
             disabled={isLoadingProvinces} 
             onValueChange={(val) => {
               setValue('provinceId', Number(val))
-              setValue('toDistrictId', null) // Reset cascaded values
+              setValue('toDistrictId', undefined as unknown as number) // reset cascade
               setValue('toWardCode', '')
             }}
           >

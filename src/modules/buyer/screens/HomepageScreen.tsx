@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -57,7 +58,7 @@ const trustFeatures = [
   {
     icon: ShieldCheck,
     title: 'Kiểm Định Chuyên Gia',
-    subtitle: 'VeloSafe™',
+    subtitle: 'SBESafe™',
     description: 'Mỗi xe được kiểm tra bởi đội ngũ chuyên gia với quy trình 50+ điểm kiểm tra, đảm bảo chất lượng và tình trạng thực tế.',
     delay: 0,
   },
@@ -95,26 +96,26 @@ const howItWorksSteps = [
     step: 2,
     icon: CircleDollarSign,
     title: 'Thanh Toán An Toàn',
-    description: 'Bấm Mua Ngay → Xe khóa 5 phút → Quét QR PayOS thanh toán 100%.',
+    description: 'Bấm Mua Ngay → Điền địa chỉ giao hàng → Quét QR PayOS thanh toán an toàn qua Escrow.',
   },
   {
     step: 3,
     icon: CheckCircle2,
     title: 'Nhận Xe Đã Kiểm Định',
-    description: 'Xe được kiểm tra VeloSafe, đóng gói cẩn thận và vận chuyển đến tận tay bạn.',
+    description: 'Xe được kiểm tra SBESafe, đóng gói cẩn thận và vận chuyển đến tận tay bạn.',
   },
 ]
 
 const testimonials = [
   {
-    quote: 'Mua xe trên VeloTrust rất yên tâm. Xe đúng như mô tả, được kiểm định kỹ và giao hàng nhanh. Tiết kiệm được 15 triệu so với mua mới.',
+    quote: 'Mua xe trên SBETrust rất yên tâm. Xe đúng như mô tả, được kiểm định kỹ và giao hàng nhanh. Tiết kiệm được 15 triệu so với mua mới.',
     name: 'Trần Minh Tuấn',
     role: 'Người Mua',
     avatar: 'https://i.pravatar.cc/150?u=minh-tuan',
     rating: 5,
   },
   {
-    quote: 'Đã bán 3 xe trên VeloTrust. Quy trình đơn giản, có hỗ trợ giá bán hợp lý và thanh toán rất nhanh sau khi hoàn tất.',
+    quote: 'Đã bán 3 xe trên SBETrust. Quy trình đơn giản, có hỗ trợ giá bán hợp lý và thanh toán rất nhanh sau khi hoàn tất.',
     name: 'Nguyễn Hương Ly',
     role: 'Người Bán',
     avatar: 'https://i.pravatar.cc/150?u=huong-ly',
@@ -209,6 +210,7 @@ export default function HomePage() {
     if (term) params.set('q', term)
     if (selectedCity !== 'all') params.set('city', selectedCity)
     if (selectedBikeType !== 'all') params.set('type', selectedBikeType)
+    
     const query = params.toString()
     router.push(query ? `/marketplace?${query}` : '/marketplace')
   }
@@ -282,8 +284,7 @@ export default function HomePage() {
               className="mt-7 max-w-2xl text-lg leading-relaxed text-slate-300/90 sm:text-xl"
             >
               Mỗi chiếc xe trải qua{' '}
-              <strong className="font-semibold text-white">50+ điểm kiểm tra VeloSafe™</strong>.
-              Bấm <strong className="font-semibold text-white">Mua Ngay</strong>, xe được khóa 5 phút cho bạn thanh toán QR. Tiền giữ an toàn đến khi nhận xe.
+              <strong className="font-semibold text-white">kiểm tra SBE Safe™</strong>. Bấm <strong className="font-semibold text-white">Mua Ngay</strong>, tiền giữ an toàn trong Escrow đến khi bạn nhận xe và hài lòng.
             </motion.p>
 
             {/* ── Search bar ── */}
@@ -349,7 +350,9 @@ export default function HomePage() {
                 {['Giant TCR', 'Trek Domane', 'Specialized', 'Gravel', 'E-Bike'].map((q) => (
                   <button
                     key={q}
-                    onClick={() => { setSearchInput(q); applyHeroSearch() }}
+                    onClick={() => {
+                      setSearchInput(q); applyHeroSearch()
+                    }}
                     className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs text-slate-300 transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-lime-200"
                   >
                     {q}
@@ -769,27 +772,7 @@ export default function HomePage() {
           </motion.div>
 
           {/* Stats */}
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-40px' }}
-            variants={staggerContainer}
-            className="mt-14 grid grid-cols-2 gap-6 lg:grid-cols-4"
-          >
-            {[
-              { value: 1200, suffix: '+', label: 'Người dùng tin tưởng' },
-              { value: 500, suffix: '+', label: 'Giao dịch thành công' },
-              { value: 98, suffix: '%', label: 'Hài lòng' },
-              { value: 2.5, suffix: ' tỷ+', label: 'Giá trị giao dịch (VNĐ)', isFloat: true },
-            ].map((stat) => (
-              <motion.div key={stat.label} variants={staggerItem} className="text-center">
-                <p className="stat-number">
-                  <AnimatedNumber value={stat.value} suffix={stat.suffix} isFloat={stat.isFloat} />
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+         
         </div>
       </section>
 
