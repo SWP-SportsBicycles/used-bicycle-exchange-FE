@@ -403,6 +403,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
           )
         } catch (submitError) {
           // If submit fails, listing is still updated
+          console.warn('Submit failed:', submitError)
           setSubmitSuccess(
             language === 'vi'
               ? 'Cập nhật tin đăng thành công! (Chưa gửi duyệt)'
