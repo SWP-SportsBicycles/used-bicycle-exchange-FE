@@ -93,6 +93,21 @@ export interface InspectorHistoryPaginated {
   pageSize: number;
 }
 
+export interface InspectorReportItem {
+  reportId: string;
+  buyerName: string;
+  orderStatus: string;
+  transactionStatus: string;
+  status: string;
+  reason: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface InspectorReportDetail extends InspectorReportItem {
+  videoUrl: string | null;
+}
+
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
   if (!payload || typeof payload !== "object") {
     return {};
@@ -237,6 +252,22 @@ function normalizeListingDetail(payload: unknown): InspectorListingDetail {
   };
 }
 
+function normalizeInspectorReport(payload: unknown): InspectorReportDetail {
+  const source = extractPayloadObject(payload);
+
+  return {
+    reportId: pickString(source, ["reportId", "id"]),
+    buyerName: pickString(source, ["buyerName", "buyer", "buyerFullName"]),
+    orderStatus: pickString(source, ["orderStatus"]),
+    transactionStatus: pickString(source, ["transactionStatus"]),
+    status: pickString(source, ["status"]),
+    reason: pickString(source, ["reason"]),
+    description: pickString(source, ["description"]),
+    createdAt: pickString(source, ["createdAt", "createdDate", "created_at"]),
+    videoUrl: pickString(source, ["videoUrl", "video", "evidenceVideoUrl"]) || null,
+  };
+}
+
 export const inspectorApi = {
   async getPendingListings() {
     const response = await http.get<unknown>("/api/inspector-listing/pending");
@@ -271,6 +302,34 @@ export const inspectorApi = {
     const response = await http.get<unknown>(`/api/inspector/history/${inspectionId}`);
     const normalized = normalizeHistory(response);
     return normalized.id ? normalized : null;
+  },
+
+  // Inspector Report APIs
+  async getReports(): Promise<InspectorReportItem[]> {
+    const response = await http.get<unknown>("/api/inspector-report");
+    return extractArray(response).map(normalizeInspectorReport).map((report) => ({
+      reportId: report.reportId,
+      buyerName: report.buyerName,
+      orderStatus: report.orderStatus,
+      transactionStatus: report.transactionStatus,
+      status: report.status,
+      reason: report.reason,
+      description: report.description,
+      createdAt: report.createdAt,
+    }));
+  },
+
+  async getReportDetail(reportId: string): Promise<InspectorReportDetail> {
+    const response = await http.get<unknown>(`/api/inspector-report/${reportId}`);
+    return normalizeInspectorReport(response);
+  },
+
+  async confirmReport(reportId: string) {
+    return http.put<unknown>(`/api/inspector-report/${reportId}/confirm`, {});
+  },
+
+  async rejectReport(reportId: string) {
+    return http.put<unknown>(`/api/inspector-report/${reportId}/reject`, {});
   },
 };
 

@@ -102,6 +102,23 @@ export interface AdminReport {
   updatedAt: string;
 }
 
+export interface AdminReportDetail {
+  reportId: string;
+  orderId: string;
+  buyerId: string;
+  buyerName: string;
+  buyerEmail: string;
+  inspectorMessage: string;
+  orderStatus: string;
+  transactionStatus: string;
+  totalAmount: number;
+  refundAmount: number;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  canRefund: boolean;
+}
+
 export interface AdminReportListResponse {
   pageNumber: number;
   pageSize: number;
@@ -436,6 +453,27 @@ function normalizeAdminReport(raw: unknown): AdminReport {
   };
 }
 
+function normalizeAdminReportDetail(raw: unknown): AdminReportDetail {
+  const source = extractPayloadObject(raw);
+
+  return {
+    reportId: pickString(source, ["reportId", "id"]),
+    orderId: pickString(source, ["orderId"]),
+    buyerId: pickString(source, ["buyerId"]),
+    buyerName: pickString(source, ["buyerName", "buyer"]),
+    buyerEmail: pickString(source, ["buyerEmail", "email"]),
+    inspectorMessage: pickString(source, ["inspectorMessage"]),
+    orderStatus: pickString(source, ["orderStatus"]),
+    transactionStatus: pickString(source, ["transactionStatus"]),
+    totalAmount: pickNumber(source, ["totalAmount"]),
+    refundAmount: pickNumber(source, ["refundAmount"]),
+    bankName: pickString(source, ["bankName"]),
+    bankAccountNumber: pickString(source, ["bankAccountNumber"]),
+    bankAccountName: pickString(source, ["bankAccountName"]),
+    canRefund: typeof source.canRefund === "boolean" ? source.canRefund : true,
+  };
+}
+
 function normalizeAdminReportList(raw: unknown): AdminReportListResponse {
   const source = extractPayloadObject(raw);
   const items = Array.isArray(source.items) ? source.items : [];
@@ -592,5 +630,14 @@ export const adminApi = {
 
   rejectReport(reportId: string) {
     return http.put<unknown>(`/api/admin-report/${reportId}/reject`, {});
+  },
+
+  async getReportDetail(reportId: string): Promise<AdminReportDetail> {
+    const response = await http.get<unknown>(`/api/admin-report/${reportId}`);
+    return normalizeAdminReportDetail(response);
+  },
+
+  refundReport(reportId: string) {
+    return http.put<unknown>(`/api/admin-report/${reportId}/refund`, {});
   },
 };
