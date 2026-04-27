@@ -203,7 +203,7 @@ export const sellerApi = {
 
   /** Seller xác nhận đã giao hàng cho đơn vị vận chuyển (GHN) */
   shipOrder(orderId: string) {
-    return http.post<unknown>(`/api/SellerOrder/${orderId}/ship`);
+    return http.post<unknown>(`/api/seller-shipment/${orderId}/create`);
   },
 
   cancelOrder(orderId: string) {

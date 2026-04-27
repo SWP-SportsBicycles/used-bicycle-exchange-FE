@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -51,6 +52,7 @@ function mapMockToSellerListings(): SellerListingItem[] {
 
 export default function SellerListingsPage() {
   const { language } = useLanguage()
+  const router = useRouter()
   const { data, isLoading, isError, error } = useSellerListings({ pageNumber: 1, pageSize: 10 })
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
@@ -224,7 +226,7 @@ export default function SellerListingsPage() {
                     </Button>
                   )}
 
-                  {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
+{(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
                     <Button 
                       size="sm" 
                       variant="outline" 
@@ -251,6 +253,21 @@ export default function SellerListingsPage() {
                       style={{ pointerEvents: 'auto' }}
                     >
                       {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
+                    </Button>
+                  )}
+
+{(listing.status === 'draft' || listing.status === 'rejected') && (
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      onClick={(e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setConfirmState({ action: 'delete', listing}); 
+                      }}
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      {language === 'vi' ? 'Xóa' : 'Delete'}
                     </Button>
                   )}
 
