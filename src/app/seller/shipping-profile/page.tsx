@@ -44,7 +44,7 @@ const EMPTY_FORM: ShippingProfileForm = {
 function isNotFoundError(error: unknown) {
   if (!(error instanceof Error)) return false
   const message = error.message.toLowerCase()
-  return message.includes('not found') || message.includes('404')
+  return message.includes('not found') || message.includes('404') || message.includes('chưa có profile') || message.includes('chua co profile')
 }
 
 import { Suspense } from 'react'

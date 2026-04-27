@@ -245,7 +245,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
   }
 
-  const submitGoogleSession = async (idToken: string, role: AuthRole, target: GoogleIntent) => {
+  const submitGoogleSession = async (idToken: string, role: AuthRole | undefined, target: GoogleIntent) => {
     setLoginErrorMessage(null)
     setRegisterErrorMessage(null)
     setIsGoogleSubmitting(true)
@@ -300,11 +300,10 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       const idToken = await result.user.getIdToken()
 
       if (target === 'login') {
-        // Try First, Ask Later: gọi API ngay với role mặc định.
-        // Nếu tài khoản đã tồn tại, backend trả về session có role đúng
-        // và loginWithSession/refreshMe sẽ lấy role thực từ /me → redirect thẳng.
-        // Nếu tài khoản chưa tồn tại (API lỗi) → hiện UI chọn role.
-        const success = await submitGoogleSession(idToken, 2, 'login')
+        // Try First, Ask Later: gọi API với role = undefined
+        // Nếu tài khoản đã tồn tại, backend sẽ trả về session.
+        // Nếu tài khoản chưa tồn tại, backend sẽ báo lỗi (do thiếu role) → hiện UI chọn role.
+        const success = await submitGoogleSession(idToken, undefined, 'login')
         if (!success) {
           // Tài khoản chưa đăng ký – xoá lỗi API rồi cho user chọn role
           setLoginErrorMessage(null)
