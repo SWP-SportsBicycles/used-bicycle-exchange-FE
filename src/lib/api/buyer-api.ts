@@ -180,19 +180,31 @@ export interface DisputePayload {
   type: string;               // BE expects ReportTypeEnum
   reason: string;
   mediaUrls?: string[];       // Video evidence URLs (uploaded via /api/Upload/video)
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 }
 
 export interface BuyerReport {
   id: string;
+  reportId?: string;           // BE may return reportId instead of id
   orderId: string;
-  type: number | string;
+  type: number | string;       // BE returns display string e.g. "Thiếu phụ kiện / Sai hàng"
   reason: string;
   description?: string;
   videoUrl?: string;
   evidenceVideo?: string;
-  status: string;
+  status: string;              // raw enum: "Pending" | "Reviewing" | "Resolved" | "Rejected"
+  statusDisplay?: string;      // BE human-readable status e.g. "Đang chờ Inspector kiểm định"
+  nextAction?: string;         // BE next action hint
   createdAt: string;
   resolution?: string;
+  hasBankInfo?: boolean;
+  bankInfo?: {
+    bankName?: string;
+    bankAccountName?: string;
+    bankAccountNumber?: string;
+  };
 }
 
 export interface WishlistPage {
@@ -888,16 +900,13 @@ export const buyerApi = {
     const formData = new FormData()
     formData.append('type', String(parseInt(data.type, 10)))
     formData.append('reason', data.reason)
-    // 'description' carries video URLs since BE schema has no mediaUrls field
+    // Swagger field name is 'evidenceVideo' (string/$binary). We send the pre-uploaded URL string.
     if (data.mediaUrls && data.mediaUrls.length > 0) {
-      // BE field name is 'videoUrl' (singular) — confirmed from response body
-      // If multiple videos, join as comma-separated or append first one
-      formData.append('videoUrl', data.mediaUrls[0])
-      // Also append remaining as mediaUrls in case BE supports multiple
-      if (data.mediaUrls.length > 1) {
-        data.mediaUrls.slice(1).forEach(url => formData.append('mediaUrls', url))
-      }
+      formData.append('evidenceVideo', data.mediaUrls[0])
     }
+    if (data.bankName) formData.append('bankName', data.bankName)
+    if (data.bankAccountNumber) formData.append('bankAccountNumber', data.bankAccountNumber)
+    if (data.bankAccountName) formData.append('bankAccountName', data.bankAccountName)
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
     const res = await fetch(`/api/proxy/api/buyer-report/${orderId}`, {
       method: 'POST',

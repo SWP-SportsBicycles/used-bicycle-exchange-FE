@@ -6,10 +6,10 @@ import Image from 'next/image'
 import { Header } from '@/components/header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Package, ChevronRight } from 'lucide-react'
+import { Package, ChevronRight, CheckCircle, Loader2 } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { formatVND } from '@/lib/mock-data'
-import { BuyerOrder } from '@/lib/api/buyer-api'
+import { BuyerOrder, buyerApi } from '@/lib/api/buyer-api'
 import { OrderCardSkeleton } from '../components/skeletons/OrderCardSkeleton'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
@@ -18,6 +18,7 @@ import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 
 const statusColorMap: Record<BuyerOrder['status'], string> = {
   pending: 'bg-status-draft',
@@ -52,9 +53,37 @@ export default function OrderListScreen() {
   const [statusFilter, setStatusFilter] = useState<BuyerOrder['status'] | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null)
+  const [completingOrderId, setCompletingOrderId] = useState<string | null>(null)
   
   const { data: orderPage, isLoading } = useOrders(page, 10)
   const queryClient = useQueryClient()
+
+  const handleConfirmReceived = async (orderId: string) => {
+    setConfirmingOrderId(orderId)
+    try {
+      await buyerApi.syncShipment(orderId)
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      toast.success('Xác nhận đã nhận hàng thành công!')
+    } catch {
+      toast.error('Xác nhận thất bại. Vui lòng thử lại.')
+    } finally {
+      setConfirmingOrderId(null)
+    }
+  }
+
+  const handleCompleteOrder = async (orderId: string) => {
+    setCompletingOrderId(orderId)
+    try {
+      await buyerApi.confirmReceived(orderId)
+      await queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
+      toast.success('Đơn hàng đã hoàn tất!')
+    } catch {
+      toast.error('Xác nhận hoàn tất thất bại. Vui lòng thử lại.')
+    } finally {
+      setCompletingOrderId(null)
+    }
+  }
 
   useEffect(() => {
     if (!queryStatus) {
@@ -243,7 +272,35 @@ export default function OrderListScreen() {
                           />
                         </>
                       )}
-                      <Button asChild variant={order.status === 'pending' ? 'ghost' : 'default'} className="w-full h-11 rounded-xl font-semibold">
+                      {order.status === 'shipping' && (
+                        <Button
+                          variant="default"
+                          className="w-full h-11 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20 transition-all duration-200"
+                          disabled={confirmingOrderId === order.id}
+                          onClick={() => handleConfirmReceived(order.id)}
+                        >
+                          {confirmingOrderId === order.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Đang xử lý...</>
+                          ) : (
+                            <><CheckCircle className="h-4 w-4 mr-2" />Đã nhận hàng</>
+                          )}
+                        </Button>
+                      )}
+                      {order.status === 'delivered' && (
+                        <Button
+                          variant="default"
+                          className="w-full h-11 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 transition-all duration-200"
+                          disabled={completingOrderId === order.id}
+                          onClick={() => handleCompleteOrder(order.id)}
+                        >
+                          {completingOrderId === order.id ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Đang xử lý...</>
+                          ) : (
+                            <><CheckCircle className="h-4 w-4 mr-2" />Hoàn tất đơn hàng</>
+                          )}
+                        </Button>
+                      )}
+                      <Button asChild variant={order.status === 'pending' ? 'ghost' : 'outline'} className="w-full h-11 rounded-xl font-semibold">
                         <Link href={`/buyer/orders/${order.id}`}>
                           Xem chi tiết <ChevronRight className="h-4 w-4 ml-1" />
                         </Link>

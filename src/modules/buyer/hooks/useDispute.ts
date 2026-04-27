@@ -19,7 +19,15 @@ export function useDisputeMutation() {
 export function useMyReports() {
   return useQuery<BuyerReport[]>({
     queryKey: ['buyer-reports'],
-    queryFn: () => buyerApi.getMyReports(),
+    queryFn: async () => {
+      const raw = await buyerApi.getMyReports()
+      // BE returns `reportId` — normalize so `id` is always set
+      return (Array.isArray(raw) ? raw : []).map((r) => ({
+        ...r,
+        id: r.id ?? r.reportId ?? '',
+        orderId: r.orderId ?? '',
+      }))
+    },
     staleTime: 1000 * 30, // 30 seconds
   })
 }
