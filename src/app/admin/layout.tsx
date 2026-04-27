@@ -34,9 +34,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     refetchInterval: 15000,
   });
 
+  const disputesCountQuery = useQuery({
+    queryKey: ["admin-reports-sidebar-count"],
+    queryFn: () => adminApi.getReports({ page: 1, size: 1 }),
+    refetchInterval: 15000,
+  });
+
   const pendingApprovalsCount = (listingsQuery.data ?? []).filter(
     (item) => item.status === "pending",
   ).length;
+  const openDisputesCount = disputesCountQuery.data?.totalItems ?? 0;
 
   const sidebarItems = [
     {
@@ -61,7 +68,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       href: "/admin/disputes",
       icon: AlertOctagon,
       label: { vi: "Đơn khiếu nại", en: "Disputes" },
-      badge: 2,
+      badge: openDisputesCount,
+      badgeTone: "alert",
     },
     {
       href: "/admin/create/inspectors",

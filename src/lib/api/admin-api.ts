@@ -491,11 +491,15 @@ function normalizeAdminReportDetail(raw: unknown): AdminReportDetail {
 function normalizeAdminReportList(raw: unknown): AdminReportListResponse {
   const source = extractPayloadObject(raw);
   const items = Array.isArray(source.items) ? source.items : [];
+  const pageSize = pickNumber(source, ["pageSize", "size"]) || items.length || 10;
+  const totalItems = pickNumber(source, ["totalItems", "totalCount", "count"]) || items.length;
+  const totalPages = pickNumber(source, ["totalPages"]) || Math.max(1, Math.ceil(totalItems / pageSize));
+
   return {
-    pageNumber: pickNumber(source, ["pageNumber", "page"]),
-    pageSize: pickNumber(source, ["pageSize", "size"]),
-    totalItems: pickNumber(source, ["totalItems"]),
-    totalPages: pickNumber(source, ["totalPages"]),
+    pageNumber: pickNumber(source, ["pageNumber", "page"]) || 1,
+    pageSize,
+    totalItems,
+    totalPages,
     items: items.map(normalizeAdminReport),
   };
 }
