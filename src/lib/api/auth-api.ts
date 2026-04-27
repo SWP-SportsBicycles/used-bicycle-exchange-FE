@@ -103,7 +103,7 @@ export const authApi = {
     return http.post<unknown>("/api/Auth/resend-otp", { email });
   },
 
-  async googleLogin(idToken: string, role: AuthRole) {
+  async googleLogin(idToken: string, role?: AuthRole) {
     const response = await http.post<unknown>("/api/Auth/google-login", { idToken, role });
     return normalizeAuthSession(response);
   },

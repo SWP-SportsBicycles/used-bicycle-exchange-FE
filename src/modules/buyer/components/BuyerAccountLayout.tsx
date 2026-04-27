@@ -12,12 +12,30 @@ export function BuyerAccountLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname()
   const { user } = useAuth()
 
-  const navItems = [
+  let navItems = [
     { name: 'Tổng quan', href: '/buyer', icon: LayoutDashboard },
     { name: 'Đơn hàng của tôi', href: '/buyer/orders', icon: ShoppingBag },
     { name: 'Xe đạp yêu thích', href: '/buyer/wishlist', icon: Heart },
     { name: 'Cài đặt tài khoản', href: '/profile', icon: Settings },
   ]
+
+  if (user?.role === 'seller') {
+    navItems = [
+      { name: 'Tổng quan', href: '/seller', icon: LayoutDashboard },
+      { name: 'Tin đăng', href: '/seller/listings', icon: ShoppingBag },
+      { name: 'Cài đặt tài khoản', href: '/profile', icon: Settings },
+    ]
+  } else if (user?.role === 'admin') {
+    navItems = [
+      { name: 'Bảng điều khiển', href: '/admin', icon: LayoutDashboard },
+      { name: 'Cài đặt tài khoản', href: '/profile', icon: Settings },
+    ]
+  } else if (user?.role === 'inspector') {
+    navItems = [
+      { name: 'Cổng kiểm định', href: '/inspector', icon: LayoutDashboard },
+      { name: 'Cài đặt tài khoản', href: '/profile', icon: Settings },
+    ]
+  }
 
   const firstName = user?.name?.split(' ').pop() || user?.name || 'Bạn'
 

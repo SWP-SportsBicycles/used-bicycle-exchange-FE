@@ -23,17 +23,17 @@ interface LocationResponse<T> {
 
 export const locationApi = {
   async getProvinces(): Promise<Province[]> {
-    const res = await http.get<LocationResponse<Province>>('/api/location/provinces')
-    return res?.data || []
+    const res = await http.get<Province[]>('/api/location/provinces')
+    return res || []
   },
 
   async getDistricts(provinceId: number): Promise<District[]> {
-    const res = await http.get<LocationResponse<District>>(`/api/location/districts?provinceId=${provinceId}`)
-    return res?.data || []
+    const res = await http.get<District[]>(`/api/location/districts?provinceId=${provinceId}`)
+    return res || []
   },
 
   async getWards(districtId: number): Promise<Ward[]> {
-    const res = await http.get<LocationResponse<Ward>>(`/api/location/wards?districtId=${districtId}`)
-    return res?.data || []
+    const res = await http.get<Ward[]>(`/api/location/wards?districtId=${districtId}`)
+    return res || []
   }
 }
