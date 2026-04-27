@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { buyerApi, type BuyerListingPage } from "@/lib/api/buyer-api";
-import { MOCK_LISTINGS } from "@/lib/mock-data";
 
 /**
  * D4/D5 — Hook lấy danh sách listing từ buyer API (phân trang).
@@ -12,13 +11,6 @@ export function useListings(page = 1, pageSize = 10) {
   return useQuery<BuyerListingPage>({
     queryKey: ["buyer-listings", page, pageSize],
     queryFn: () => buyerApi.getListings(page, pageSize),
-    placeholderData: {
-      items: MOCK_LISTINGS.slice(0, pageSize) as unknown as BuyerListingPage["items"],
-      totalCount: MOCK_LISTINGS.length,
-      pageNumber: page,
-      pageSize,
-      totalPages: Math.ceil(MOCK_LISTINGS.length / pageSize),
-    },
     staleTime: 1000 * 30, // 30s
   });
 }

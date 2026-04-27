@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* VeloTrust - Professional Sporty Light Theme
+/* SBE - Professional Sporty Light Theme
    Design Vision: "Strava meets Specialized"
    High contrast, Electric Blue accent, glassmorphism, dynamic shadows */
 :root {
@@ -147,6 +147,14 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-status-draft: var(--color-slate-500);
+  --color-status-paid: var(--color-amber-500);
+  --color-status-shipping: var(--color-blue-500);
+  --color-status-delivered: var(--color-teal-500);
+  --color-status-completed: var(--color-success);
+  --color-status-cancelled: var(--color-destructive);
+  --color-status-disputed: var(--color-rose-600);
 }
 
 @layer base {
@@ -160,6 +168,19 @@
 
 /* Professional Sporty Glass Utilities */
 @layer utilities {
+  .bg-page {
+    @apply bg-background;
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .glass-card {
     @apply bg-card/85 backdrop-blur-md border border-border/60 shadow-sm;
   }
@@ -243,7 +264,7 @@
       0 10px 20px -18px rgba(37, 50, 24, 0.28);
   }
 
-  /* Trust / Why VeloTrust card */
+  /* Trust / Why SBETrust card */
   .trust-card {
     @apply rounded-2xl border border-border/50 bg-card/85 p-6
            backdrop-blur-md transition-all duration-300;
@@ -331,4 +352,11 @@
 }
 .animate-pulse-glow {
   animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* PayOS QR Scan Animation */
+@keyframes scan {
+  0%, 100% { top: 0%; opacity: 0; }
+  10%, 90% { opacity: 1; }
+  50% { top: 100%; opacity: 1; }
 }

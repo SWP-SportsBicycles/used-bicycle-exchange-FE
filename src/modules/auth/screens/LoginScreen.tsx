@@ -340,23 +340,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
 
   return (
     <section className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-10 md:px-10">
-      <Link href="/" className="fixed left-4 top-4 z-30 inline-flex items-center gap-2.5 group sm:left-6 sm:top-6 md:left-10 md:top-8">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-athletic transition-all duration-300 group-hover:scale-105">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            className="h-5 w-5 text-primary-foreground"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <circle cx="5.5" cy="17.5" r="3.5" />
-            <circle cx="18.5" cy="17.5" r="3.5" />
-            <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-          </svg>
-        </div>
-        <span className="text-xl font-extrabold tracking-tight text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>
-          SBE
-        </span>
+      <Link href="/" className="fixed left-4 top-4 z-30 inline-flex items-center gap-2.5 group sm:left-6 sm:top-6 md:left-10 md:top-8 bg-white/90 p-1.5 rounded-lg shadow-sm transition-opacity hover:opacity-80">
+        <Image src="/logoSBE.jpg" alt="SBE Logo" width={120} height={40} className="h-8 w-auto object-contain mix-blend-multiply" priority />
       </Link>
 
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">

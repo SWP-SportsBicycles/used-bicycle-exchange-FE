@@ -239,8 +239,10 @@ function setAccessTokenCookie(accessToken: string) {
 
 function clearAuthCookies() {
   if (typeof document === 'undefined') return
-  document.cookie = 'role=; path=/; max-age=0; samesite=lax'
-  document.cookie = 'accessToken=; path=/; max-age=0; samesite=lax'
+  // Use expires=past-date — more reliable than max-age=0 across browsers
+  const past = 'Thu, 01 Jan 1970 00:00:00 GMT'
+  document.cookie = `role=; path=/; expires=${past}; samesite=lax`
+  document.cookie = `accessToken=; path=/; expires=${past}; samesite=lax`
 }
 
 function clearAuthStorage() {
@@ -302,11 +304,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const bootstrapAuth = async () => {
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
       if (!accessToken) {
+        // Sync: clear any stale cookies left from a previous session so
+        // middleware does not redirect /auth/login back to / when localStorage is empty.
+        clearAuthCookies()
         if (mounted) {
           setUser(GUEST_USER)
           setIsInitializing(false)
         }
         return
+
       }
 
       try {

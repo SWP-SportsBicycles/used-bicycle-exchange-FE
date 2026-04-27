@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   CircleCheckBig,
@@ -10,7 +11,11 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
+  Package,
+  ShoppingCart,
   Shield,
+  Sun,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +31,9 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth, type UserRole } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
+import { useTheme } from '@/lib/theme-context'
 import { cn } from '@/lib/utils'
+import { useCart } from '@/modules/buyer/hooks/useCart'
 
 const roleLabels: Record<UserRole, { vi: string; en: string }> = {
   guest: { vi: 'Khách', en: 'Guest' },
@@ -47,10 +54,13 @@ const roleColors: Record<UserRole, string> = {
 export function Header() {
   const { user, isAuthenticated, logout } = useAuth()
   const { language, setLanguage, t } = useLanguage()
+  const { theme, toggleTheme } = useTheme()
   const pathname = usePathname()
   const isHome = pathname === '/'
   const authRedirect = encodeURIComponent(pathname || '/')
   const isBuyer = user.role === 'buyer'
+  const { data: cart } = useCart({ enabled: isBuyer })
+  const cartCount = isBuyer ? (cart?.items?.length ?? 0) : 0
   const showPostListingCta = (user.role === 'seller' || user.role === 'guest') && (!isHome || isAuthenticated)
   const postListingHref =
     user.role === 'seller'
@@ -59,6 +69,8 @@ export function Header() {
 
   const getDashboardLink = () => {
     switch (user.role) {
+      case 'buyer':
+        return '/buyer'
       case 'seller':
         return '/seller'
       case 'inspector':
@@ -71,26 +83,18 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-athletic">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-card/85 backdrop-blur-xl shadow-sm">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-athletic transition-all duration-300 group-hover:shadow-athletic-lg group-hover:scale-105">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-5 w-5 text-primary-foreground"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <circle cx="5.5" cy="17.5" r="3.5" />
-              <circle cx="18.5" cy="17.5" r="3.5" />
-              <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
-            </svg>
-          </div>
-          <span className="hidden text-xl font-extrabold tracking-tight text-foreground sm:inline-block" style={{ fontFamily: 'var(--font-archivo)' }}>
-            SBE
-          </span>
+        <Link href="/" className="flex items-center gap-3 group transition-opacity hover:opacity-80">
+          <Image 
+            src="/logoSBE.jpg" 
+            alt="SBE Logo" 
+            width={120} 
+            height={40} 
+            className="h-10 w-auto object-contain mix-blend-multiply rounded-lg" 
+            priority
+          />
         </Link>
 
         {/* Assurance Marquee */}
@@ -110,13 +114,48 @@ export function Header() {
           </Button>
 
           {isBuyer && (
-            <Button variant={pathname.startsWith('/wishlist') ? 'secondary' : 'ghost'} size="sm" className="relative" asChild>
-              <Link href="/wishlist">
+            <Button variant={pathname.startsWith('/buyer/orders') ? 'secondary' : 'ghost'} size="sm" className="relative" asChild>
+              <Link href="/buyer/orders">
+                <Package className="h-4 w-4" />
+                <span className="sr-only">Đơn hàng</span>
+              </Link>
+            </Button>
+          )}
+
+          {isBuyer && (
+            <Button variant={pathname.startsWith('/buyer/wishlist') ? 'secondary' : 'ghost'} size="sm" className="relative" asChild>
+              <Link href="/buyer/wishlist">
                 <Heart className="h-4 w-4" />
                 <span className="sr-only">{t('nav.wishlist')}</span>
               </Link>
             </Button>
           )}
+
+          {isBuyer && (
+            <Button variant={pathname.startsWith('/buyer/cart') ? 'secondary' : 'ghost'} size="sm" className="relative" asChild>
+              <Link href="/buyer/cart">
+                <ShoppingCart className="h-4 w-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {cartCount > 9 ? '9+' : cartCount}
+                  </span>
+                )}
+                <span className="sr-only">{t('nav.cart')}</span>
+              </Link>
+            </Button>
+          )}
+
+          {/* Dark Mode Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="relative h-9 w-9 p-0"
+            aria-label={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all duration-300 dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all duration-300 dark:rotate-0 dark:scale-100" />
+          </Button>
 
           {/* Language Toggle */}
           <DropdownMenu>
@@ -171,6 +210,15 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
+                {isBuyer && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/buyer" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      {language === 'vi' ? 'Tổng quan' : 'Dashboard'}
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+
                 {user.role === 'seller' && (
                   <DropdownMenuItem asChild>
                     <Link href="/seller" className="flex items-center gap-2">
@@ -203,7 +251,7 @@ export function Header() {
                 </DropdownMenuItem>
                 {isBuyer && (
                   <DropdownMenuItem asChild>
-                    <Link href="/orders">{t('nav.myOrders')}</Link>
+                    <Link href="/buyer/orders">{t('nav.myOrders')}</Link>
                   </DropdownMenuItem>
                 )}
 
@@ -268,7 +316,16 @@ export function Header() {
                   <>
                     {isBuyer && (
                       <Button variant="ghost" className="justify-start" asChild>
-                        <Link href="/wishlist">
+                        <Link href="/buyer/cart">
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          {t('nav.cart')}
+                        </Link>
+                      </Button>
+                    )}
+
+                    {isBuyer && (
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link href="/buyer/wishlist">
                           <Heart className="mr-2 h-4 w-4" />
                           {t('nav.wishlist')}
                         </Link>
@@ -282,7 +339,7 @@ export function Header() {
                     </Button>
                     {isBuyer && (
                       <Button variant="ghost" className="justify-start" asChild>
-                        <Link href="/orders">{t('nav.myOrders')}</Link>
+                        <Link href="/buyer/orders">{t('nav.myOrders')}</Link>
                       </Button>
                     )}
                     <Button variant="ghost" className="justify-start" asChild>

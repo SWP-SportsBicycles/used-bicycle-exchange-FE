@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/lib/auth-context";
 import { LanguageProvider } from "@/lib/language-context";
+import { ThemeProvider } from "@/lib/theme-context";
 import { createQueryClient } from "@/lib/query-client";
 
 interface ProvidersProps {
@@ -15,9 +16,11 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LanguageProvider>{children}</LanguageProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <LanguageProvider>{children}</LanguageProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
