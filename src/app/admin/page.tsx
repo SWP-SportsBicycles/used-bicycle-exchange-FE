@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/purity */
 'use client'
 
 import { motion } from 'framer-motion'
@@ -27,20 +26,15 @@ export default function AdminDashboardPage() {
     queryFn: adminApi.getUsers,
     refetchInterval: 60000,
   })
-  const listingsQuery = useQuery({
-    queryKey: ['admin-listings-dashboard'],
-    queryFn: adminApi.getAllListings,
-    refetchInterval: 60000,
+  const revenueQuery = useQuery({
+    queryKey: ['admin-revenue-analytics'],
+    queryFn: () => adminApi.getRevenueAnalytics(6),
+    refetchInterval: 30000,
   })
-  const pendingListingsQuery = useQuery({
-    queryKey: ['admin-pending-listings-dashboard'],
-    queryFn: adminApi.getListings,
-    refetchInterval: 60000,
-  })
-  const ordersQuery = useQuery({
-    queryKey: ['admin-orders-dashboard'],
-    queryFn: () => adminApi.getOrders({ page: 1, size: 200 }),
-    refetchInterval: 60000,
+  const listingAnalyticsQuery = useQuery({
+    queryKey: ['admin-listing-analytics'],
+    queryFn: adminApi.getListingAnalytics,
+    refetchInterval: 30000,
   })
   const sellerCountQuery = useQuery({
     queryKey: ['admin-seller-count-dashboard'],
@@ -59,50 +53,24 @@ export default function AdminDashboardPage() {
   })
 
   const users = usersQuery.data ?? []
-  const listings = listingsQuery.data ?? []
-  const orders = ordersQuery.data ?? []
   const dashboard = dashboardQuery.data
 
   const sellerCount = sellerCountQuery.data ?? dashboard?.totalSellers ?? users.filter((u) => u.role === 'SELLER').length
   const buyerCount = buyerCountQuery.data ?? dashboard?.totalBuyers ?? users.filter((u) => u.role === 'BUYER').length
-  const pendingListingsCount =
-    pendingListingsQuery.data?.length ??
-    dashboard?.pendingListings ??
-    listings.filter((l) => l.status === 'pending').length
-
-  const totalListings = dashboard?.totalListings && dashboard.totalListings > 0 ? dashboard.totalListings : listings.length
   const totalUsers = usersTotalCountQuery.data ?? sellerCount + buyerCount
-  const totalOrders = dashboard?.totalOrders && dashboard.totalOrders > 0 ? dashboard.totalOrders : orders.length
-  const lockedOrders = dashboard?.lockedOrders && dashboard.lockedOrders > 0
-    ? dashboard.lockedOrders
-    : orders.filter((o) => o.status === 'Locked').length
-  const confirmedOrders = dashboard?.confirmedOrders && dashboard.confirmedOrders > 0
-    ? dashboard.confirmedOrders
-    : orders.filter((o) => o.status === 'Confirmed').length
-  const completedOrders = dashboard?.completedOrders && dashboard.completedOrders > 0
-    ? dashboard.completedOrders
-    : orders.filter((o) => o.status === 'Completed').length
 
-  const userChartData = [
-    { role: language === 'vi' ? 'Người mua' : 'Buyers', count: buyerCount, fill: '#3b82f6' },
-    { role: language === 'vi' ? 'Người bán' : 'Sellers', count: sellerCount, fill: '#10b981' },
-  ]
+  const listingAnalytics = listingAnalyticsQuery.data
+  const pendingListingsCount = listingAnalytics?.pending ?? dashboard?.pendingListings ?? 0
+  const totalListings = listingAnalytics?.total ?? dashboard?.totalListings ?? 0
 
-  const orderStatusData = [
-    { name: language === 'vi' ? 'Locked' : 'Locked', value: lockedOrders, fill: '#ef4444' },
-    { name: language === 'vi' ? 'Confirmed' : 'Confirmed', value: confirmedOrders, fill: '#f59e0b' },
-    { name: language === 'vi' ? 'Completed' : 'Completed', value: completedOrders, fill: '#22c55e' },
-  ]
+  const totalOrders = dashboard?.totalOrders ?? 0
+  const completedOrders = dashboard?.completedOrders ?? 0
 
   const listingOverviewData = [
     { name: language === 'vi' ? 'Chờ duyệt' : 'Pending', value: pendingListingsCount, fill: '#f59e0b' },
-    { name: language === 'vi' ? 'Đã duyệt' : 'Approved', value: Math.max(totalListings - pendingListingsCount, 0), fill: '#22c55e' },
-    { name: language === 'vi' ? 'Từ chối' : 'Rejected', value: listings.filter((l) => l.status === 'rejected').length, fill: '#ef4444' },
+    { name: language === 'vi' ? 'Đã duyệt' : 'Approved', value: listingAnalytics?.approved ?? Math.max(totalListings - pendingListingsCount, 0), fill: '#22c55e' },
+    { name: language === 'vi' ? 'Từ chối' : 'Rejected', value: listingAnalytics?.rejected ?? 0, fill: '#ef4444' },
   ]
-
-  const userChartConfig = {
-    count: { label: language === 'vi' ? 'Số lượng' : 'Count', color: '#3b82f6' },
-  } satisfies ChartConfig
 
   const listingChartConfig = {
     pending: { label: language === 'vi' ? 'Chờ duyệt' : 'Pending', color: '#f59e0b' },
@@ -110,26 +78,22 @@ export default function AdminDashboardPage() {
     rejected: { label: language === 'vi' ? 'Từ chối' : 'Rejected', color: '#ef4444' },
   } satisfies ChartConfig
 
-  const payoutCompletedOrders = orders.filter((order) => order.status === 'Completed' && Boolean(order.paidOutAt))
-  const revenueByMonthMap = new Map<number, number>()
-  orders.forEach((order) => {
-    if (!order.completedAt || order.status !== 'Completed' || !order.paidOutAt) return
-    const date = new Date(order.completedAt)
-    if (Number.isNaN(date.getTime())) return
-    const month = date.getMonth()
-    revenueByMonthMap.set(
-      month,
-      (revenueByMonthMap.get(month) ?? 0) + order.totalAmount * ADMIN_COMMISSION_RATE,
-    )
-  })
-  const revenueLineData = Array.from({ length: 12 }, (_, monthIndex) => ({
-    month:
-      language === 'vi'
-        ? `T${monthIndex + 1}`
-        : new Date(2026, monthIndex, 1).toLocaleString('en-US', { month: 'short' }),
-    revenue: revenueByMonthMap.get(monthIndex) ?? 0,
+  const revenueDataRaw = revenueQuery.data ?? []
+  const formatMonth = (monthStr: string) => {
+    if (!monthStr) return ''
+    const parts = monthStr.split('-')
+    if (parts.length < 2) return monthStr
+    const m = parseInt(parts[1], 10)
+    return language === 'vi' ? `Tháng ${m}` : new Date(2026, m - 1, 1).toLocaleString('en-US', { month: 'short' })
+  }
+
+  const gmvData = revenueDataRaw.map((item) => ({
+    month: formatMonth(item.month),
+    gmv: item.gmv,
+    revenue: item.revenue,
   }))
-  const totalRevenueFromLine = revenueLineData.reduce((sum, item) => sum + item.revenue, 0)
+
+  const totalRevenueFromLine = revenueDataRaw.reduce((sum, item) => sum + item.revenue, 0)
   const cityStats = dashboard?.cities ?? []
 
   const formatRevenueTick = (value: number) => {
@@ -140,27 +104,14 @@ export default function AdminDashboardPage() {
     return `${Math.round(value)}`
   }
 
-  // --- NEW ADVANCED CHARTS DATA ---
-  const currentMonth = new Date().getMonth();
-  const gmvData = Array.from({ length: 6 }, (_, i) => {
-    const m = (currentMonth - 5 + i + 12) % 12;
-    const monthName = language === 'vi' ? `Tháng ${m + 1}` : new Date(2026, m, 1).toLocaleString('en-US', { month: 'short' });
-    const revenue = revenueByMonthMap.get(m) || Math.floor(Math.random() * 2500000) + 500000;
-    const gmv = revenue / ADMIN_COMMISSION_RATE; 
-    return { month: monthName, gmv, revenue };
-  });
-
-  // --------------------------------
-
   const isLoading =
     dashboardQuery.isLoading ||
     usersQuery.isLoading ||
-    listingsQuery.isLoading ||
-    pendingListingsQuery.isLoading ||
-    ordersQuery.isLoading ||
     sellerCountQuery.isLoading ||
     buyerCountQuery.isLoading ||
-    usersTotalCountQuery.isLoading
+    usersTotalCountQuery.isLoading ||
+    revenueQuery.isLoading ||
+    listingAnalyticsQuery.isLoading
 
   return (
     <div className="space-y-6">
@@ -228,8 +179,8 @@ export default function AdminDashboardPage() {
               <div className="text-3xl font-extrabold text-success" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(totalRevenueFromLine)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {language === 'vi'
-                  ? `${payoutCompletedOrders.length} đơn đã giải ngân x 5% hoa hồng`
-                  : `${payoutCompletedOrders.length} paid-out orders x 5% commission`}
+                  ? `Cập nhật từ 6 tháng gần nhất`
+                  : `Based on last 6 months`}
               </p>
             </CardContent>
           </Card>

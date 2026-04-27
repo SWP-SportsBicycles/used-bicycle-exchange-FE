@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import type React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, Filter, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, Filter, SlidersHorizontal, Bike, MapPin, Tag, Ruler, Settings2, CheckCircle2, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
@@ -29,22 +30,24 @@ interface FilterSidebarProps {
 }
 
 const filterSections = [
-  { key: 'categories', title: 'Loại Xe', options: CATEGORIES.map(c => ({ value: c.value, label: c.label })) },
-  { key: 'cities', title: 'Thành Phố', options: CITIES },
-  { key: 'brands', title: 'Thương Hiệu', options: BRANDS.map(b => ({ value: b, label: b })) },
-  { key: 'frameSizes', title: 'Size Khung', options: FRAME_SIZES.map(s => ({ value: s, label: s })) },
-  { key: 'groupsets', title: 'Groupset', options: GROUPSETS.map(g => ({ value: g, label: g })) },
-  { key: 'conditions', title: 'Tình Trạng', options: CONDITIONS },
+  { key: 'categories', title: 'Loại Xe',     icon: Bike,         options: CATEGORIES.map(c => ({ value: c.value, label: c.label })) },
+  { key: 'cities',     title: 'Thành Phố',   icon: MapPin,       options: CITIES },
+  { key: 'brands',     title: 'Thương Hiệu', icon: Tag,          options: BRANDS.map(b => ({ value: b, label: b })) },
+  { key: 'frameSizes', title: 'Size Khung',  icon: Ruler,        options: FRAME_SIZES.map(s => ({ value: s, label: s })) },
+  { key: 'groupsets',  title: 'Groupset',    icon: Settings2,    options: GROUPSETS.map(g => ({ value: g, label: g })) },
+  { key: 'conditions', title: 'Tình Trạng',  icon: CheckCircle2, options: CONDITIONS },
 ]
 
 function FilterSection({ 
   title, 
+  icon: Icon,
   options, 
   selected, 
   onChange,
   defaultOpen = false 
 }: { 
   title: string
+  icon?: React.ElementType
   options: { value: string; label: string; description?: string }[]
   selected: string[]
   onChange: (values: string[]) => void
@@ -67,9 +70,18 @@ function FilterSection({
         className="flex w-full items-center justify-between py-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
       >
         <span className="flex items-center gap-2">
-          {title}
+          {Icon && (
+            <Icon className={cn(
+              'h-3.5 w-3.5 transition-colors duration-200',
+              selected.length > 0 ? 'text-primary' : 'text-muted-foreground'
+            )} />
+          )}
+          <span className={cn(
+            'text-sm font-medium transition-colors duration-200',
+            selected.length > 0 ? 'text-primary' : 'text-foreground'
+          )}>{title}</span>
           {selected.length > 0 && (
-            <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+            <Badge className="h-5 px-1.5 text-xs bg-primary text-primary-foreground">
               {selected.length}
             </Badge>
           )}
@@ -167,7 +179,20 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
           {/* Price Range */}
           <div className="border-b border-border pb-4">
             <div className="flex items-center justify-between py-2">
-              <span className="text-sm font-medium text-foreground">Khoảng Giá</span>
+              <span className="flex items-center gap-2">
+                <DollarSign className={cn(
+                  'h-3.5 w-3.5 transition-colors duration-200',
+                  (filters.priceRange[0] > 0 || filters.priceRange[1] < 100000000)
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                )} />
+                <span className={cn(
+                  'text-sm font-medium transition-colors duration-200',
+                  (filters.priceRange[0] > 0 || filters.priceRange[1] < 100000000)
+                    ? 'text-primary'
+                    : 'text-foreground'
+                )}>Khoảng Giá</span>
+              </span>
             </div>
             <div className="pt-2 pb-4 px-1">
               <Slider
@@ -192,6 +217,7 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
             <FilterSection
               key={section.key}
               title={section.title}
+              icon={section.icon}
               options={section.options}
               selected={filters[section.key as keyof FilterState] as string[]}
               onChange={(values) => 

@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
@@ -27,13 +28,14 @@ import { BuyerAccountLayout } from '../components/BuyerAccountLayout'
 // ── Status helpers ──────────────────────────────────────────────────────────
 
 const statusColorMap: Record<BuyerOrder['status'], string> = {
-  pending: 'bg-amber-500',
-  paid: 'bg-blue-500',
-  shipping: 'bg-indigo-500',
-  delivered: 'bg-teal-500',
-  completed: 'bg-emerald-500',
-  cancelled: 'bg-slate-400',
-  disputed: 'bg-rose-500',
+  pending: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  paid: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  shipping: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+  delivered: 'bg-teal-500/10 text-teal-600 border-teal-500/20',
+  completed: 'bg-success/10 text-success border-success/20',
+  cancelled: 'bg-destructive/10 text-destructive border-destructive/20',
+  disputed: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
+  refunded: 'bg-gray-500/10 text-gray-600 border-gray-500/20',
 }
 
 const statusLabelMap: Record<BuyerOrder['status'], string> = {
@@ -44,6 +46,7 @@ const statusLabelMap: Record<BuyerOrder['status'], string> = {
   completed: 'Hoàn tất',
   cancelled: 'Đã hủy',
   disputed: 'Khiếu nại',
+  refunded: 'Đã hoàn tiền',
 }
 
 // ── Greeting helper ─────────────────────────────────────────────────────────
@@ -101,9 +104,21 @@ function StatCard({
 }
 
 function OrderRowMini({ order }: { order: BuyerOrder }) {
+  const router = useRouter()
   const isPending = order.status === 'pending'
   return (
-    <Link href={`/buyer/orders/${order.id}`} className="group block">
+    <div 
+      onClick={() => router.push(`/buyer/orders/${order.id}`)} 
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          router.push(`/buyer/orders/${order.id}`)
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+    >
       <div className="flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border/40 bg-secondary">
           <Image
@@ -111,6 +126,10 @@ function OrderRowMini({ order }: { order: BuyerOrder }) {
             alt={order.listing.title}
             fill
             className="object-cover"
+            onError={(e) => {
+              const t = e.target as HTMLImageElement
+              t.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=SBE'
+            }}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -119,7 +138,7 @@ function OrderRowMini({ order }: { order: BuyerOrder }) {
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
-              className={`${statusColorMap[order.status]} hover:${statusColorMap[order.status]} text-white border-0 text-[10px] px-2 py-0.5 rounded-full`}
+              className={`${statusColorMap[order.status]} hover:${statusColorMap[order.status].split(' ')[0]} border text-[10px] px-2 py-0.5 rounded-full font-bold`}
             >
               {statusLabelMap[order.status]}
             </Badge>
@@ -130,14 +149,14 @@ function OrderRowMini({ order }: { order: BuyerOrder }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {isPending && (
-            <Button asChild size="sm" className="h-8 rounded-lg text-xs font-bold px-3 animate-pulse-glow shadow-sm">
+            <Button asChild size="sm" className="h-8 rounded-lg text-xs font-bold px-3 animate-pulse-glow shadow-sm" onClick={(e) => e.stopPropagation()}>
               <Link href={`/buyer/checkout?orderId=${order.id}`}>Thanh toán</Link>
             </Button>
           )}
           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </div>
       </div>
-    </Link>
+    </div>
   )
 }
 
@@ -151,7 +170,14 @@ function WishlistCardMini({ listing }: { listing: { id: string; title: string; i
             alt={listing.title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => {
+              const t = e.target as HTMLImageElement
+              t.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=SBE'
+            }}
           />
+          <div className="absolute top-2 right-2 rounded-full bg-black/50 p-1 backdrop-blur-sm">
+            <Heart className="h-3 w-3 fill-rose-500 text-rose-500" />
+          </div>
         </div>
         <div className="p-3">
           <p className="text-sm font-semibold text-foreground line-clamp-1 mb-1">{listing.title}</p>
@@ -241,12 +267,12 @@ export default function BuyerDashboardScreen() {
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
               <div className="flex-1">
                 <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                  Bạn có {needsActionCount} đơn hàng cần xử lý
+                  Bạn có {needsActionCount} đơn hàng cần xử lý <span className="font-normal text-xs opacity-70">(trong 10 giao dịch gần nhất)</span>
                 </p>
                 <p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-400/80">
                   {pendingCount > 0 && `${pendingCount} đơn đang chờ thanh toán`}
                   {pendingCount > 0 && deliveredCount > 0 && ' · '}
-                  {deliveredCount > 0 && `${deliveredCount} đơn cần xác nhận đã nhận hàng`}
+                  {deliveredCount > 0 && `${deliveredCount} đơn cần xác nhận`}
                 </p>
               </div>
               <Button asChild size="sm" className="rounded-xl text-xs font-bold shrink-0 h-8">
@@ -322,7 +348,16 @@ export default function BuyerDashboardScreen() {
             {isOrdersLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-[82px] rounded-2xl border border-border/40 bg-card animate-pulse" />
+                  <div key={i} className="flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-4">
+                    <div className="h-14 w-14 rounded-xl bg-muted animate-pulse shrink-0" />
+                    <div className="flex-1 space-y-2.5">
+                      <div className="h-4 w-3/4 rounded-md bg-muted animate-pulse" />
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-16 rounded-full bg-muted animate-pulse" />
+                        <div className="h-4 w-20 rounded-md bg-muted animate-pulse" />
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : recentOrders.length === 0 ? (
@@ -375,7 +410,13 @@ export default function BuyerDashboardScreen() {
             {isWishlistLoading ? (
               <div className="grid grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-44 rounded-2xl border border-border/40 bg-card animate-pulse" />
+                  <div key={i} className="overflow-hidden rounded-2xl border border-border/40 bg-card">
+                    <div className="h-32 w-full bg-muted animate-pulse" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-4 w-full rounded-md bg-muted animate-pulse" />
+                      <div className="h-4 w-1/2 rounded-md bg-muted animate-pulse" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : wishlistItems.length === 0 ? (

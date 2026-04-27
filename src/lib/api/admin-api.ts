@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { http } from "@/lib/api/http";
 
 type ListingStatus = "pending" | "approved" | "rejected";
@@ -117,6 +118,19 @@ export interface AdminReportDetail {
   bankAccountNumber: string;
   bankAccountName: string;
   canRefund: boolean;
+}
+
+export interface AdminRevenueAnalytics {
+  month: string;
+  gmv: number;
+  revenue: number;
+}
+
+export interface AdminListingAnalytics {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
 }
 
 export interface AdminReportListResponse {
@@ -603,6 +617,27 @@ export const adminApi = {
   async getDashboardSummary(): Promise<AdminDashboardSummary> {
     const response = await http.get<unknown>("/api/AdminDashboard");
     return normalizeAdminDashboardSummary(response);
+  },
+
+  async getRevenueAnalytics(months = 6): Promise<AdminRevenueAnalytics[]> {
+    const response = await http.get<unknown>(`/api/AdminDashboard/revenue?months=${months}`);
+    const items = extractArray(response);
+    return items.map((item: any) => ({
+      month: typeof item.month === 'string' ? item.month : '',
+      gmv: Number(item.gmv) || 0,
+      revenue: Number(item.revenue) || 0,
+    }));
+  },
+
+  async getListingAnalytics(): Promise<AdminListingAnalytics> {
+    const response = await http.get<unknown>("/api/AdminDashboard/listings");
+    const data = extractPayloadObject(response);
+    return {
+      total: Number(data.total) || 0,
+      pending: Number(data.pending) || 0,
+      approved: Number(data.approved) || 0,
+      rejected: Number(data.rejected) || 0,
+    };
   },
 
   async getReports(params?: {

@@ -8,7 +8,7 @@ import Image from 'next/image'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X, Lock } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Header } from '@/components/header'
@@ -33,8 +33,11 @@ const checkoutSchema = z.object({
   receiverName: z.string().min(2, 'Vui lòng nhập họ tên hợp lệ'),
   receiverPhone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, 'Số điện thoại không hợp lệ'),
   provinceId: z.number({ required_error: 'Vui lòng chọn Tỉnh/Thành phố' }).optional(),
+  toProvinceName: z.string().optional(),
   toDistrictId: z.number({ required_error: 'Vui lòng chọn Quận/Huyện' }),
+  toDistrictName: z.string().optional(),
   toWardCode: z.string({ required_error: 'Vui lòng chọn Phường/Xã' }).min(1, 'Vui lòng chọn Phường/Xã'),
+  toWardName: z.string().optional(),
   receiverAddress: z.string().min(5, 'Vui lòng nhập chi tiết số nhà, tên đường'),
 })
 
@@ -81,8 +84,7 @@ export default function CheckoutScreen() {
   const timerExpiresAt = checkoutData?.expiresAt ?? (
     existingOrder?.status === 'pending' ? existingOrder?.expiresAt : undefined
   )
-  const showInspectionFeeFree =
-    summaryListing && 'isVeloSafeVerified' in summaryListing && Boolean(summaryListing.isVeloSafeVerified)
+  const showInspectionFeeFree = true // All listings on SBE platform are certified by default
   // Task 2.3: nút hủy hiện ngay cả khi chưa bấm "Tiếp tục thanh toán" (chưa có checkoutData)
   const canCancelActivePayment = Boolean(
     checkoutData?.orderId ||
@@ -121,8 +123,11 @@ export default function CheckoutScreen() {
       receiverPhone: '',
       receiverAddress: '',
       toWardCode: '',
+      toWardName: '',
       toDistrictId: undefined as unknown as number,
+      toDistrictName: '',
       provinceId: undefined,
+      toProvinceName: '',
     },
   })
 
@@ -162,8 +167,12 @@ export default function CheckoutScreen() {
           receiverName: data.receiverName,
           receiverPhone: data.receiverPhone,
           receiverAddress: data.receiverAddress,
+          toProvinceId: data.provinceId || 0,
+          toProvinceName: data.toProvinceName || '',
           toDistrictId: data.toDistrictId,
+          toDistrictName: data.toDistrictName || '',
           toWardCode: data.toWardCode,
+          toWardName: data.toWardName || '',
         },
         {
           onSuccess: (res) => {
@@ -184,8 +193,12 @@ export default function CheckoutScreen() {
         receiverName: data.receiverName,
         receiverPhone: data.receiverPhone,
         receiverAddress: data.receiverAddress,
+        toProvinceId: data.provinceId || 0,
+        toProvinceName: data.toProvinceName || '',
         toDistrictId: data.toDistrictId,
+        toDistrictName: data.toDistrictName || '',
         toWardCode: data.toWardCode,
+        toWardName: data.toWardName || '',
       },
       {
         onSuccess: (res) => {
@@ -326,19 +339,32 @@ export default function CheckoutScreen() {
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 lg:px-6">
         <div className="mb-8">
-          <div className="mb-6 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-              onClick={() => router.push(backRedirect)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Quay lại
-            </Button>
-            <h1 className="text-2xl font-extrabold lg:text-3xl" style={{ fontFamily: 'var(--font-archivo)' }}>
-              {checkoutData ? 'Thanh toán an toàn' : isOrderPaymentMode ? 'Tiếp tục thanh toán' : 'Xác nhận đơn hàng'}
-            </h1>
-            <div className="w-24" />
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                className="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground shrink-0"
+                onClick={() => router.push(backRedirect)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Quay lại
+              </Button>
+              <h1 className="text-2xl font-extrabold lg:text-3xl" style={{ fontFamily: 'var(--font-archivo)' }}>
+                {checkoutData ? 'Thanh toán an toàn' : isOrderPaymentMode ? 'Tiếp tục thanh toán' : 'Xác nhận đơn hàng'}
+              </h1>
+            </div>
+            
+            {isOrderPaymentMode && existingOrder && (
+              <div className="flex items-center gap-3 self-start sm:self-auto ml-18 sm:ml-0">
+                <div className="hidden sm:flex flex-col items-end">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mã đơn hàng</span>
+                  <span className="text-sm font-bold text-foreground">#{existingOrder.id.split('-')[0]}</span>
+                </div>
+                <div className="px-3 py-1 rounded-full text-xs font-bold border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                  {existingOrder.statusLabel || 'Chờ thanh toán'}
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -360,20 +386,39 @@ export default function CheckoutScreen() {
                   </form>
                 </FormProvider>
               ) : (
-                <div className="space-y-3 rounded-2xl border border-border/40 bg-secondary/30 p-5">
-                  <div className="flex items-start justify-between">
-                    <p className="text-base font-bold">{existingOrder?.receiverName || methods.getValues('receiverName')}</p>
-                    <p className="font-medium text-primary">{existingOrder?.receiverPhone || methods.getValues('receiverPhone')}</p>
+                <div className="rounded-2xl border border-border/40 bg-muted/20 overflow-hidden">
+                  {/* Name + Phone row */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-border/30">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                        <span className="text-sm font-bold text-primary">
+                          {(existingOrder?.receiverName || methods.getValues('receiverName')).substring(0, 1).toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="font-bold text-foreground">
+                        {existingOrder?.receiverName || methods.getValues('receiverName') || '—'}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-primary tabular-nums">
+                      {existingOrder?.receiverPhone || methods.getValues('receiverPhone') || '—'}
+                    </p>
                   </div>
-                  <p className="leading-relaxed text-muted-foreground">
-                    {existingOrder?.receiverAddress || methods.getValues('receiverAddress')}
-                  </p>
-                  <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {isOrderPaymentMode
-                      ? 'Đơn hàng này đã có địa chỉ nhận hàng cố định. Bạn chỉ có thể tiếp tục thanh toán.'
-                      : 'Không thể thay đổi địa chỉ sau khi xác nhận'}
-                  </p>
+                  {/* Address row */}
+                  <div className="flex items-start gap-3 px-5 py-4">
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <p className="text-sm text-foreground leading-relaxed">
+                      {existingOrder?.receiverAddress || methods.getValues('receiverAddress') || 'Chưa có địa chỉ'}
+                    </p>
+                  </div>
+                  {/* Locked note */}
+                  <div className="flex items-center gap-2 border-t border-border/30 bg-muted/30 px-5 py-2.5">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      {isOrderPaymentMode
+                        ? 'Địa chỉ đã cố định — chỉ có thể tiếp tục thanh toán'
+                        : 'Địa chỉ không thể thay đổi sau khi xác nhận'}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -382,115 +427,125 @@ export default function CheckoutScreen() {
           </div>
 
           <div className="lg:col-span-5 space-y-6">
-            <Card className="sticky top-24">
-              <CardHeader>
-                <CardTitle className="text-lg">Tổng quan đơn hàng</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 flex gap-4">
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-secondary">
-                    <Image
-                      src={summaryListing.images[0] || '/placeholder.png'}
-                      alt={summaryListing.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col justify-between">
-                    <p className="line-clamp-2 text-sm font-semibold leading-tight">{summaryListing.title}</p>
-                    <p className="text-sm font-bold text-primary">{formatVND(summaryListing.price)}</p>
-                    {selectedCartItems.length > 1 && (
-                      <p className="text-xs text-muted-foreground">Đang checkout {selectedCartItems.length} sản phẩm đã chọn</p>
-                    )}
-                  </div>
+            <div className="sticky top-24 rounded-3xl border border-border/50 bg-card p-6 shadow-sm">
+              <h2 className="text-base font-bold mb-5">Tổng quan đơn hàng</h2>
+
+              {/* Product summary */}
+              <div className="flex gap-4 mb-5">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border/50 bg-secondary">
+                  <Image
+                    src={summaryListing.images[0] || '/placeholder.png'}
+                    alt={summaryListing.title}
+                    fill
+                    className="object-cover"
+                    onError={(e) => {
+                      const t = e.target as HTMLImageElement
+                      t.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=SBE'
+                    }}
+                  />
                 </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tạm tính</span>
-                    <span className="font-medium">{formatVND(summaryPrice)}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="flex items-center gap-1 text-muted-foreground">
-                      <Truck className="h-3.5 w-3.5" /> Phí vận chuyển (GHN)
-                    </span>
-                    <span className="font-medium">
-                      {checkoutData
-                        ? formatVND(checkoutData.shippingFee)
-                        : existingOrder
-                          ? formatVND(existingOrder.shippingFee)
-                          : 'Tính ở bước sau'}
+                <div className="flex flex-col justify-between min-w-0">
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug">{summaryListing.title}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#aee86c]/20 border border-[#aee86c]/40 px-2 py-0.5 text-[10px] font-semibold text-[#2a4a10] dark:text-[#aee86c]">
+                      <ShieldCheck className="h-3 w-3" />
+                      SBESafe
                     </span>
                   </div>
-
-                  {showInspectionFeeFree && (
-                    <div className="flex justify-between text-success">
-                      <span className="flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5" /> Phí kiểm định
-                      </span>
-                      <span>Miễn phí</span>
-                    </div>
+                  <p className="text-sm font-bold text-primary">{formatVND(summaryListing.price)}</p>
+                  {selectedCartItems.length > 1 && (
+                    <p className="text-xs text-muted-foreground">+{selectedCartItems.length - 1} sản phẩm khác</p>
                   )}
                 </div>
+              </div>
 
-                <Separator className="my-4" />
+              <div className="my-4 border-t border-border/40" />
 
-                <div className="mb-6 flex items-end justify-between">
-                  <span className="font-bold text-foreground">Tổng thanh toán (100%)</span>
-                  <span className="text-2xl font-extrabold text-primary" style={{ fontFamily: 'var(--font-archivo)' }}>
-                    {checkoutData ? formatVND(checkoutData.totalPrice) : formatVND(summaryPrice)}
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tạm tính</span>
+                  <span className="font-medium">{formatVND(summaryPrice)}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Truck className="h-3.5 w-3.5" /> Phí vận chuyển (GHN)
+                  </span>
+                  <span className="font-medium">
+                    {checkoutData
+                      ? formatVND(checkoutData.shippingFee)
+                      : existingOrder
+                        ? formatVND(existingOrder.shippingFee)
+                        : 'Tính ở bước sau'}
                   </span>
                 </div>
 
-                {!checkoutData && (
-                  <>
-                    {isOrderPaymentMode ? (
-                      <Button
-                        type="button"
-                        className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
-                        disabled={paymentLinkMutation.isPending || !canSubmitCheckout || isExistingOrderLocked}
-                        onClick={handleOpenPendingOrderPayment}
-                      >
-                        {paymentLinkMutation.isPending ? 'Đang tải mã thanh toán...' : 'Tiếp tục thanh toán đơn hàng'}
-                      </Button>
-                    ) : (
-                      <Button
-                        type="submit"
-                        form="checkout-form"
-                        className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
-                        disabled={checkoutMutation.isPending || createOrderDirectMutation.isPending || !canSubmitCheckout}
-                      >
+
+              </div>
+
+              <div className="my-4 border-t border-border/40" />
+
+              <div className="mb-5 flex items-end justify-between">
+                <span className="font-bold text-foreground">Tổng thanh toán</span>
+                <span className="text-2xl font-extrabold text-primary" style={{ fontFamily: 'var(--font-archivo)' }}>
+                  {checkoutData ? formatVND(checkoutData.totalPrice) : formatVND(summaryPrice)}
+                </span>
+              </div>
+
+              {!checkoutData && (
+                <>
+                  {isOrderPaymentMode ? (
+                    <Button
+                      type="button"
+                      className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
+                      disabled={paymentLinkMutation.isPending || !canSubmitCheckout || isExistingOrderLocked}
+                      onClick={handleOpenPendingOrderPayment}
+                    >
+                      {paymentLinkMutation.isPending ? 'Đang tải mã thanh toán...' : 'Tiếp tục thanh toán đơn hàng'}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      form="checkout-form"
+                      className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
+                      disabled={checkoutMutation.isPending || createOrderDirectMutation.isPending || !canSubmitCheckout}
+                    >
                       {checkoutMutation.isPending || createOrderDirectMutation.isPending ? 'Đang xử lý...' : 'Xác nhận và chuyển tới thanh toán'}
-                      </Button>
-                    )}
+                    </Button>
+                  )}
 
-                    {!canSubmitCheckout && (
-                      <p className="mt-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                        {isOrderPaymentMode
-                          ? 'Đơn hàng này không còn ở trạng thái chờ thanh toán.'
-                          : 'Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng trước khi checkout.'}
-                      </p>
-                    )}
-                  </>
-                )}
+                  {!canSubmitCheckout && (
+                    <p className="mt-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                      {isOrderPaymentMode
+                        ? 'Đơn hàng này không còn ở trạng thái chờ thanh toán.'
+                        : 'Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng trước khi checkout.'}
+                    </p>
+                  )}
+                </>
+              )}
 
-                {/* Task 2.3: canCancelActivePayment cũng true khi order mode + pending, dù chưa có checkoutData */}
-                {canCancelActivePayment && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-3 w-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                    disabled={cancelOrderMutation.isPending || isExistingOrderLocked}
-                    onClick={handleCancelOrder}
-                  >
-                    {cancelOrderMutation.isPending ? 'Đang hủy đơn...' : 'Hủy thanh toán'}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+              {canCancelActivePayment && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 w-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                  disabled={cancelOrderMutation.isPending || isExistingOrderLocked}
+                  onClick={handleCancelOrder}
+                >
+                  {cancelOrderMutation.isPending ? 'Đang hủy đơn...' : 'Hủy thanh toán'}
+                </Button>
+              )}
+
+              {/* Escrow trust note */}
+              <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-primary/5 border border-primary/15 px-4 py-3">
+                <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Thanh toán bảo mật qua{' '}
+                  <span className="font-semibold text-foreground">Escrow SBESafe</span>
+                  . Tiền chỉ giải phóng khi bạn xác nhận nhận xe.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -536,10 +591,10 @@ export default function CheckoutScreen() {
         </div>
 
         {/* Escrow note */}
-        <div className="mx-6 mb-4 flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-900/60">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-[#407F3E] mt-0.5" />
+        <div className="mx-6 mb-4 flex gap-3 rounded-2xl bg-primary/5 border border-primary/15 p-4 text-xs text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-primary mt-0.5" />
           <p className="leading-relaxed">
-            Tiền của bạn được giữ an toàn trong Escrow VeloTrust. Người bán nhận tiền sau khi bạn xác nhận hài lòng.
+            Tiền của bạn được giữ an toàn trong <strong className="text-foreground">Escrow SBESafe</strong>. Người bán nhận tiền sau khi bạn xác nhận hài lòng.
           </p>
         </div>
       </DialogContent>

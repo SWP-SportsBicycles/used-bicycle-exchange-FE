@@ -102,10 +102,14 @@ export interface BuyerOrder {
     | "delivered"
     | "completed"
     | "cancelled"
-    | "disputed";
+    | "disputed"
+    | "refunded";  // FE-only: derived from report.transactionStatus === 'Refunded'
+  statusLabel?: string;
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  toDistrictId?: number;
+  toWardCode?: string;
   shippingFee: number;
   totalPrice: number;
   payosQrUrl?: string;
@@ -134,8 +138,12 @@ export interface CheckoutPayload {
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  toProvinceId: number;
+  toProvinceName: string;
   toDistrictId: number;
+  toDistrictName: string;
   toWardCode: string;
+  toWardName: string;
 }
 
 export interface CheckoutResponse {
@@ -507,6 +515,7 @@ function normalizeOrderStatus(value: unknown): BuyerOrder["status"] {
     "completed",
     "cancelled",
     "disputed",
+    "refunded",
   ];
 
   if (allowedStatuses.includes(normalized as BuyerOrder["status"])) {
@@ -717,9 +726,21 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
       price: listingPrice,
     },
     status,
+    statusLabel: (src.statusLabel as string) || {
+      pending: 'Chờ thanh toán',
+      paid: 'Đã thanh toán',
+      shipping: 'Đang vận chuyển',
+      delivered: 'Đã giao hàng',
+      completed: 'Hoàn tất',
+      cancelled: 'Đã hủy',
+      disputed: 'Đang khiếu nại',
+      refunded: 'Đã hoàn tiền',
+    }[status as string] || 'Chờ thanh toán',
     receiverName: (src.receiverName as string) || "",
     receiverPhone: (src.receiverPhone as string) || "",
-    receiverAddress: (src.receiverAddress as string) || "",
+    receiverAddress: ((src.address as Record<string, unknown>)?.fullAddress as string) || ((src.address as Record<string, unknown>)?.detail as string) || (src.receiverAddress as string) || "",
+    toDistrictId: (src.address as Record<string, unknown>)?.districtId ? parseNumber((src.address as Record<string, unknown>).districtId) : (src.toDistrictId ? parseNumber(src.toDistrictId) : undefined),
+    toWardCode: ((src.address as Record<string, unknown>)?.wardCode as string) || (src.toWardCode as string) || undefined,
     shippingFee: parseNumber(src.shippingFee ?? src.shipFee
       ?? (src.shipment && typeof src.shipment === "object"
           ? (src.shipment as Record<string, unknown>).fee
@@ -792,8 +813,12 @@ export const buyerApi = {
       receiverName: data.receiverName,
       receiverPhone: data.receiverPhone,
       receiverAddress: data.receiverAddress,
+      toProvinceId: data.toProvinceId,
+      toProvinceName: data.toProvinceName,
       toDistrictId: data.toDistrictId,
+      toDistrictName: data.toDistrictName,
       toWardCode: data.toWardCode,
+      toWardName: data.toWardName,
     });
     return normalizeCheckoutPreview(unwrap(raw));
   },
@@ -807,8 +832,12 @@ export const buyerApi = {
       receiverName: data.receiverName,
       receiverPhone: data.receiverPhone,
       receiverAddress: data.receiverAddress,
+      toProvinceId: data.toProvinceId,
+      toProvinceName: data.toProvinceName,
       toDistrictId: data.toDistrictId,
+      toDistrictName: data.toDistrictName,
       toWardCode: data.toWardCode,
+      toWardName: data.toWardName,
     });
     return normalizeCheckoutResponse(unwrap(raw));
   },
@@ -823,8 +852,12 @@ export const buyerApi = {
       receiverName: data.receiverName,
       receiverPhone: data.receiverPhone,
       receiverAddress: data.receiverAddress,
+      toProvinceId: data.toProvinceId,
+      toProvinceName: data.toProvinceName,
       toDistrictId: data.toDistrictId,
+      toDistrictName: data.toDistrictName,
       toWardCode: data.toWardCode,
+      toWardName: data.toWardName,
       distanceKm: 0,
     });
     return normalizeCheckoutResponse(unwrap(raw));
@@ -866,11 +899,25 @@ export const buyerApi = {
 
   // ---------- Orders ----------
 
-  getOrders: async (page = 1, size = 10) => {
-    const raw = await http.get<unknown>(
-      `/api/buyer-order?pageNumber=${page}&pageSize=${size}`
-    );
-    return normalizeOrderPage(unwrap(raw));
+  getOrders: async (page = 1, size = 10, status?: string) => {
+    const params = new URLSearchParams({
+      pageNumber: String(page),
+      pageSize: String(size),
+    })
+    // Map FE status names to BE status names where they differ
+    const beStatus: Record<string, string> = {
+      shipping: 'Shipping',
+      delivered: 'Delivered',
+      completed: 'Completed',
+      cancelled: 'Cancelled',
+      paid: 'Paid',
+      pending: 'Pending',
+    }
+    if (status && status !== 'all' && status !== 'disputed') {
+      params.set('status', beStatus[status] ?? status)
+    }
+    const raw = await http.get<unknown>(`/api/buyer-order?${params.toString()}`)
+    return normalizeOrderPage(unwrap(raw))
   },
 
   getOrderDetail: async (orderId: string) => {

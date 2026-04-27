@@ -38,8 +38,12 @@ export function AddressForm() {
             disabled={isLoadingProvinces} 
             onValueChange={(val) => {
               setValue('provinceId', Number(val))
+              const prov = provinces?.find(p => p.ProvinceID.toString() === val)
+              if (prov) setValue('toProvinceName', prov.ProvinceName)
               setValue('toDistrictId', undefined as unknown as number) // reset cascade
+              setValue('toDistrictName', '')
               setValue('toWardCode', '')
+              setValue('toWardName', '')
             }}
           >
             <SelectTrigger>
@@ -60,7 +64,10 @@ export function AddressForm() {
             disabled={!provinceId || isLoadingDistricts} 
             onValueChange={(val) => {
               setValue('toDistrictId', Number(val))
+              const dist = districts?.find(d => d.DistrictID.toString() === val)
+              if (dist) setValue('toDistrictName', dist.DistrictName)
               setValue('toWardCode', '')
+              setValue('toWardName', '')
             }}
           >
             <SelectTrigger>
@@ -81,7 +88,11 @@ export function AddressForm() {
           <Label>Phường/Xã <span className="text-destructive">*</span></Label>
           <Select 
             disabled={!districtId || isLoadingWards} 
-            onValueChange={(val) => setValue('toWardCode', val)}
+            onValueChange={(val) => {
+              setValue('toWardCode', val)
+              const ward = wards?.find(w => w.WardCode === val)
+              if (ward) setValue('toWardName', ward.WardName)
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Chọn Phường/Xã" />
