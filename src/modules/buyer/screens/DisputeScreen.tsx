@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { ArrowLeft, UploadCloud, AlertTriangle, ShieldCheck, PlayCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, UploadCloud, AlertTriangle, ShieldCheck, PlayCircle, Loader2, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
 import { Header } from '@/components/header'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 
 import { useOrderDetail } from '../hooks/useOrders'
 import { useDisputeMutation, useUploadMedia, useMyReports } from '../hooks/useDispute'
@@ -21,6 +22,9 @@ const disputeSchema = z.object({
   type: z.string().min(1, 'Vui long chon loai khieu nai'),
   reason: z.string().min(20, "Vui lòng mô tả chi tiết ít nhất 20 ký tự"),
   mediaUrls: z.array(z.string()).min(1, "Bắt buộc phải tải lên ít nhất 1 video unbox"),
+  bankName: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankAccountName: z.string().optional(),
 })
 
 type DisputeFormValues = z.infer<typeof disputeSchema>
@@ -51,7 +55,7 @@ export default function DisputeScreen({ params }: PageProps) {
 
   const { control, register, handleSubmit, setValue, formState: { errors } } = useForm<DisputeFormValues>({
     resolver: zodResolver(disputeSchema),
-    defaultValues: { type: '1', reason: '', mediaUrls: [] }
+    defaultValues: { type: '1', reason: '', mediaUrls: [], bankName: '', bankAccountNumber: '', bankAccountName: '' }
   })
 
   const mediaUrls = useWatch({ control, name: 'mediaUrls' }) ?? []
@@ -77,7 +81,17 @@ export default function DisputeScreen({ params }: PageProps) {
 
   const onSubmit = (data: DisputeFormValues) => {
     if (!order) return
-    disputeMutation.mutate({ orderId: order.id, data: { type: String(Number(data.type)), reason: data.reason, mediaUrls: data.mediaUrls } }, {
+    disputeMutation.mutate({
+      orderId: order.id,
+      data: {
+        type: String(Number(data.type)),
+        reason: data.reason,
+        mediaUrls: data.mediaUrls,
+        bankName: data.bankName || undefined,
+        bankAccountNumber: data.bankAccountNumber || undefined,
+        bankAccountName: data.bankAccountName || undefined,
+      }
+    }, {
       onSuccess: () => {
         toast.success('Đã gửi yêu cầu khiếu nại thành công. VeloTrust sẽ phản hồi trong 24h.')
         router.push(`/buyer/orders/${order.id}`)
@@ -140,7 +154,9 @@ export default function DisputeScreen({ params }: PageProps) {
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-muted-foreground">Loại khiếu nại</Label>
                       <p className="font-medium text-foreground text-lg">
-                        {reportTypeOptions.find(o => o.value === existingReport.type?.toString())?.label || 'Khác'}
+                        {typeof existingReport.type === 'string' && isNaN(Number(existingReport.type))
+                          ? existingReport.type
+                          : reportTypeOptions.find(o => o.value === existingReport.type?.toString())?.label || 'Khác'}
                       </p>
                     </div>
 
@@ -171,10 +187,16 @@ export default function DisputeScreen({ params }: PageProps) {
 
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-muted-foreground">Trạng thái xử lý</Label>
-                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/30">
-                        <p className="font-bold text-amber-700 dark:text-amber-400 capitalize">
-                          {existingReport.status?.replace(/_/g, ' ') || 'Đang xử lý'}
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/30 space-y-2">
+                        <p className="font-bold text-amber-700 dark:text-amber-400">
+                          {existingReport.statusDisplay || existingReport.status?.replace(/_/g, ' ') || 'Đang xử lý'}
                         </p>
+                        {existingReport.nextAction && (
+                          <p className="text-sm text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                            {existingReport.nextAction}
+                          </p>
+                        )}
                         {existingReport.resolution && (
                           <div className="mt-3 pt-3 border-t border-amber-200/50 dark:border-amber-800/50">
                             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">Quyết định từ VeloTrust:</p>
@@ -183,6 +205,29 @@ export default function DisputeScreen({ params }: PageProps) {
                         )}
                       </div>
                     </div>
+
+                    {existingReport.hasBankInfo && existingReport.bankInfo && (
+                      <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/10 p-5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-bold">Thông tin hoàn tiền đã cung cấp</span>
+                        </div>
+                        <div className="grid sm:grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Ngân hàng</p>
+                            <p className="font-semibold">{existingReport.bankInfo.bankName || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Số tài khoản</p>
+                            <p className="font-semibold font-mono">{existingReport.bankInfo.bankAccountNumber || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Chủ tài khoản</p>
+                            <p className="font-semibold">{existingReport.bankInfo.bankAccountName || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-8">
@@ -275,6 +320,47 @@ export default function DisputeScreen({ params }: PageProps) {
                   {...register('reason')}
                 />
                 {errors.reason && <p className="text-sm text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/> {errors.reason.message}</p>}
+              </div>
+
+              {/* Bank refund info */}
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-secondary/10 p-5">
+                <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-base font-bold">Thông tin hoàn tiền</span>
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">(không bắt buộc)</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Điền thông tin nếu bạn muốn được hoàn tiền qua chuyển khoản ngân hàng trong trường hợp khiếu nại được chấp thuận.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="bankName" className="text-sm font-semibold">Tên ngân hàng</Label>
+                    <Input
+                      id="bankName"
+                      placeholder="VD: Vietcombank, BIDV, Techcombank..."
+                      className="h-11 rounded-xl bg-background border-border/60"
+                      {...register('bankName')}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bankAccountNumber" className="text-sm font-semibold">Số tài khoản</Label>
+                    <Input
+                      id="bankAccountNumber"
+                      placeholder="VD: 0123456789"
+                      className="h-11 rounded-xl bg-background border-border/60"
+                      {...register('bankAccountNumber')}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountName" className="text-sm font-semibold">Tên chủ tài khoản</Label>
+                  <Input
+                    id="bankAccountName"
+                    placeholder="VD: NGUYEN VAN A (viết hoa, không dấu)"
+                    className="h-11 rounded-xl bg-background border-border/60"
+                    {...register('bankAccountName')}
+                  />
+                </div>
               </div>
 
               <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-2xl p-5 flex gap-4 text-sm text-blue-800 dark:text-blue-300">
