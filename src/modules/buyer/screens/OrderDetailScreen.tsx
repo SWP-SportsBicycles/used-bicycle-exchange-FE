@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, User, Phone, MapPin, ExternalLink, ShieldAlert, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, ExternalLink, ShieldAlert, CheckCircle2, Lock, Clock, XCircle } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { GhnTracker } from '../components/GhnTracker'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
 import { OrderDetailSkeleton } from '../components/skeletons/OrderDetailSkeleton'
 import { formatVND } from '@/lib/mock-data'
+import { cn } from '@/lib/utils'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -31,29 +32,76 @@ export default function OrderDetailScreen({ params }: PageProps) {
   }
 
   if (!order) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-50">Không tìm thấy đơn hàng.</div>
+    return (
+      <div className="bg-page flex min-h-screen flex-col">
+        <Header />
+        <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-20 text-center">
+          <h2 className="text-2xl font-bold">Không tìm thấy đơn hàng</h2>
+          <p className="mt-2 text-muted-foreground">Mã đơn không tồn tại hoặc không thuộc tài khoản của bạn.</p>
+          <Button asChild className="mt-6">
+            <Link href="/buyer/orders">Quay lại danh sách đơn hàng</Link>
+          </Button>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   const showCreateDisputeButton = ['delivered', 'completed'].includes(order.status)
   const showViewDisputeButton = order.status === 'disputed'
-  const showCancelButton = ['pending', 'paid'].includes(order.status)
+  // Bug fix: cancel chỉ cho phép khi 'pending' — đơn đã paid không thể cancel từ FE
+  const showCancelButton = order.status === 'pending'
   const isAwaitingPayment = order.status === 'pending'
-  const paymentStatusLabel = isAwaitingPayment ? 'Chờ thanh toán Escrow' : 'Đã thanh toán Escrow'
+  
+  let paymentStatusLabel = 'Đã thanh toán Escrow'
+  let paymentStatusColor = 'border-success/20 bg-success/10 text-success'
+  let PaymentIcon = CheckCircle2
+
+  if (order.status === 'pending') {
+    paymentStatusLabel = 'Chờ thanh toán Escrow'
+    paymentStatusColor = 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    PaymentIcon = Clock
+  } else if (order.status === 'cancelled') {
+    paymentStatusLabel = 'Chưa thanh toán (Đơn đã hủy)'
+    paymentStatusColor = 'border-destructive/20 bg-destructive/10 text-destructive'
+    PaymentIcon = XCircle
+  } else if (order.status === 'disputed') {
+    paymentStatusLabel = 'Thanh toán đang bị tạm giữ (Khiếu nại)'
+    paymentStatusColor = 'border-rose-500/20 bg-rose-500/10 text-rose-600'
+    PaymentIcon = ShieldAlert
+  }
 
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-page">
       <Header />
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 lg:px-6">
         <nav className="mb-6 flex items-center justify-between">
           <Link
             href="/buyer/orders"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Trở lại danh sách đơn hàng
           </Link>
-          <span className="text-sm font-semibold uppercase text-foreground">Đơn hàng #{order.id.split('-')[0]}</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mã đơn hàng</span>
+              <span className="text-sm font-bold text-foreground">#{order.id.split('-')[0]}</span>
+            </div>
+            <div className={cn(
+              "px-3 py-1 rounded-full text-xs font-bold border",
+              order.status === 'pending' && "bg-amber-500/10 text-amber-600 border-amber-500/20",
+              order.status === 'paid' && "bg-blue-500/10 text-blue-600 border-blue-500/20",
+              order.status === 'shipping' && "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+              order.status === 'delivered' && "bg-teal-500/10 text-teal-600 border-teal-500/20",
+              order.status === 'completed' && "bg-success/10 text-success border-success/20",
+              order.status === 'cancelled' && "bg-destructive/10 text-destructive border-destructive/20",
+              order.status === 'disputed' && "bg-rose-500/10 text-rose-600 border-rose-500/20"
+            )}>
+              {order.statusLabel}
+            </div>
+          </div>
         </nav>
 
         <Card className="mb-8 overflow-visible">
@@ -144,10 +192,29 @@ export default function OrderDetailScreen({ params }: PageProps) {
                 <MapPin className="h-5 w-5 text-primary" />
                 Địa chỉ nhận hàng
               </h3>
-              <div className="space-y-2 rounded-2xl bg-secondary/30 p-4">
-                <p className="text-base font-bold text-foreground">{order.receiverName}</p>
-                <p className="font-medium text-primary">{order.receiverPhone}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{order.receiverAddress}</p>
+              <div className="rounded-2xl border border-border/40 bg-muted/20 overflow-hidden">
+                {/* Name + Phone */}
+                <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/30">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                      <span className="text-sm font-bold text-primary">
+                        {order.receiverName.substring(0, 1).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="font-bold text-foreground">{order.receiverName}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-primary tabular-nums">{order.receiverPhone}</p>
+                </div>
+                {/* Address */}
+                <div className="flex items-start gap-3 px-4 py-3.5">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-sm text-foreground leading-relaxed">{order.receiverAddress}</p>
+                </div>
+                {/* Lock note */}
+                <div className="flex items-center gap-2 border-t border-border/30 bg-muted/30 px-4 py-2.5">
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <p className="text-xs text-muted-foreground">Địa chỉ giao hàng cố định theo đơn</p>
+                </div>
               </div>
             </div>
 
@@ -160,13 +227,12 @@ export default function OrderDetailScreen({ params }: PageProps) {
                 </span>
               </div>
               <div
-                className={`flex items-center justify-center gap-2 rounded-xl py-3 font-bold ${
-                  isAwaitingPayment
-                    ? 'border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                    : 'border border-success/20 bg-success/10 text-success'
-                }`}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl py-3 font-bold border",
+                  paymentStatusColor
+                )}
               >
-                <CheckCircle2 className="h-5 w-5" />
+                <PaymentIcon className="h-5 w-5" />
                 {paymentStatusLabel}
               </div>
             </div>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { useState } from 'react'
@@ -78,15 +79,13 @@ export function ListingGallery({ images, videoUrls = [], title, isVeloSafeVerifi
           </>
         )}
 
-        {/* VeloSafe Badge */}
-        {isVeloSafeVerified && (
-          <div className="absolute top-4 left-4">
-            <Badge className="bg-success text-success-foreground border-0 gap-1.5 shadow-lg px-3 py-1.5">
-              <ShieldCheck className="h-4 w-4" />
-              VeloSafe Verified
-            </Badge>
-          </div>
-        )}
+        {/* SBESafe Badge — all listings are certified */}
+        <div className="absolute top-4 left-4">
+          <Badge className="bg-success text-success-foreground border-0 gap-1.5 shadow-lg px-3 py-1.5">
+            <ShieldCheck className="h-4 w-4" />
+            SBESafe
+          </Badge>
+        </div>
 
         {/* Image Counter */}
         <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-full bg-background/80 backdrop-blur-sm text-sm font-medium">

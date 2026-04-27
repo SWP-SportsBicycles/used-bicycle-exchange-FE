@@ -6,28 +6,36 @@ import { toast } from "sonner";
 
 /**
  * D12 — Hook lấy danh sách đơn hàng của buyer.
+ * status: 'all' | 'disputed' → fetch all then filter client-side
+ *         other values → pass to server for filtering
  */
-export function useOrders(page = 1, pageSize = 10) {
+export function useOrders(page = 1, pageSize = 10, status?: string) {
   return useQuery<BuyerOrderPage>({
-    queryKey: ["buyer-orders", page, pageSize],
+    queryKey: ['buyer-orders', page, pageSize, status ?? 'all'],
     queryFn: async () => {
       const [orderPage, reports] = await Promise.all([
-        buyerApi.getOrders(page, pageSize),
+        buyerApi.getOrders(page, pageSize, status),
         buyerApi.getMyReports().catch(() => [])
       ])
-      
-      const disputedOrderIds = new Set(reports.map(r => r.orderId))
-      
+
+      // Build a map: orderId → report (to access transactionStatus)
+      const reportByOrderId = new Map(
+        reports.map((r: { orderId: string; transactionStatus?: string }) => [r.orderId, r])
+      )
+
       return {
         ...orderPage,
-        items: orderPage.items.map(order => ({
-          ...order,
-          status: disputedOrderIds.has(order.id) ? 'disputed' : order.status
-        }))
+        items: orderPage.items.map(order => {
+          const report = reportByOrderId.get(order.id)
+          if (!report) return order
+          // If the dispute was resolved with a refund → show green "Đã hoàn tiền"
+          if (report.transactionStatus === 'Refunded') return { ...order, status: 'refunded' as const }
+          return { ...order, status: 'disputed' as const }
+        })
       }
     },
     staleTime: 1000 * 30,
-  });
+  })
 }
 
 /**
