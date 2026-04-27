@@ -3,7 +3,6 @@
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -52,7 +51,6 @@ function mapMockToSellerListings(): SellerListingItem[] {
 
 export default function SellerListingsPage() {
   const { language } = useLanguage()
-  const router = useRouter()
   const { data, isLoading, isError, error } = useSellerListings({ pageNumber: 1, pageSize: 10 })
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
