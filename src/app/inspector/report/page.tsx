@@ -80,7 +80,7 @@ export default function InspectorReportPage() {
     refetchOnMount: "always",
   });
 
-  const reports = reportsQuery.data ?? [];
+  const reports = useMemo(() => reportsQuery.data ?? [], [reportsQuery.data]);
   const filteredReports = useMemo(() => {
     if (activeFilter === "approved") {
       return reports.filter((report) => approvedStatuses.has(report.status));

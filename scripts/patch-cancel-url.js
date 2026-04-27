@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const filePath = require('path').join(__dirname, '..', 'src', 'lib', 'api', 'buyer-api.ts');
 let c = fs.readFileSync(filePath, 'utf8');

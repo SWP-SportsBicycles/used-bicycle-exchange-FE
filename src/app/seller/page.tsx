@@ -11,8 +11,6 @@ import {
 import { 
   Package, 
   ShoppingCart, 
-  Wallet, 
-  TrendingUp, 
   Eye,
   CheckCircle2,
   ArrowUpRight,
@@ -27,7 +25,6 @@ import { useLanguage } from '@/lib/language-context'
 import { useSellerListings } from '@/modules/seller/hooks/useSellerListings'
 import { useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
 import { 
-  MOCK_WALLET_TRANSACTIONS,
   formatVND,
   ORDER_STATUS_LABELS
 } from '@/lib/mock-data'
@@ -62,7 +59,6 @@ export default function SellerDashboardPage() {
   const normalizedListings = useMemo(() => normalizeListingsPayload(listingsData), [listingsData])
   const myListings = useMemo(() => normalizedListings.slice(0, 3), [normalizedListings])
   const myOrders = useMemo(() => normalizeOrdersPayload(ordersData).slice(0, 3), [ordersData])
-  const recentTransactions = MOCK_WALLET_TRANSACTIONS.slice(0, 3)
 
   const stats = {
     totalListings: normalizedListings.length,
