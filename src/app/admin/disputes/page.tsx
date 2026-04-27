@@ -1,15 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import {
-  CheckCircle2,
-  Clock3,
-  FileWarning,
-  PlayCircle,
-  XCircle,
-} from "lucide-react";
+import { Calendar, Eye, FileWarning, User, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,11 +26,7 @@ const STATUS_BADGE_TONE: Record<string, string> = {
 
 export default function DisputesPage() {
   const { language } = useLanguage();
-  const queryClient = useQueryClient();
   const [page] = useState(1);
-  const [processingReportId, setProcessingReportId] = useState<string | null>(
-    null,
-  );
 
   const reportsQuery = useQuery({
     queryKey: ["admin-reports", page],
@@ -45,46 +36,17 @@ export default function DisputesPage() {
         size: 10,
       }),
     refetchInterval: 30000,
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: adminApi.approveReport,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
-    },
-    onSettled: () => {
-      setProcessingReportId(null);
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: adminApi.rejectReport,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
-    },
-    onSettled: () => {
-      setProcessingReportId(null);
-    },
+    refetchOnMount: "always",
   });
 
   const reportData = reportsQuery.data;
   const reports = reportData?.items ?? [];
 
-  const handleApprove = (reportId: string) => {
-    setProcessingReportId(reportId);
-    approveMutation.mutate(reportId);
-  };
-
-  const handleReject = (reportId: string) => {
-    setProcessingReportId(reportId);
-    rejectMutation.mutate(reportId);
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          {language === "vi" ? "Quản Lý Báo Cáo" : "Report Management"}
+          {language === "vi" ? "Quản Lý Khiếu Nại" : "Complaint Management"}
         </h1>
         <p className="text-muted-foreground">
           {language === "vi"
@@ -99,11 +61,6 @@ export default function DisputesPage() {
             <FileWarning className="h-5 w-5 text-primary" />
             {language === "vi" ? "Danh sách báo cáo" : "Report list"}
           </CardTitle>
-          <CardDescription>
-            {language === "vi"
-              ? "Thiết kế tối ưu để xử lý nhanh và dễ đọc."
-              : "Optimized for readability and fast decision making."}
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {reportsQuery.isLoading ? (
@@ -118,11 +75,6 @@ export default function DisputesPage() {
             </div>
           ) : (
             reports.map((report, index) => {
-              const actionLoading = processingReportId === report.reportId;
-              const isActionDisabled =
-                actionLoading ||
-                approveMutation.isPending ||
-                rejectMutation.isPending;
               const badgeTone =
                 STATUS_BADGE_TONE[report.status] ??
                 "bg-muted text-muted-foreground border-border";
@@ -142,67 +94,21 @@ export default function DisputesPage() {
                           variant="outline"
                           className={cn("text-xs", badgeTone)}
                         >
-                          {report.statusDisplay || report.status}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {report.type ||
-                            (language === "vi"
-                              ? "Không rõ loại"
-                              : "Unknown type")}
+                          {report.status || "-"}
                         </Badge>
                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock3 className="h-3.5 w-3.5" />
+                          <Calendar className="h-3.5 w-3.5" />
                           {new Date(report.createdAt).toLocaleString("vi-VN")}
                         </span>
-                        {report.videoUrl ? (
-                          <Badge
-                            variant="outline"
-                            className="border-primary/30 text-primary"
-                          >
-                            <PlayCircle className="mr-1 h-3.5 w-3.5" />
-                            {language === "vi" ? "Có video" : "Video attached"}
-                          </Badge>
-                        ) : null}
                       </div>
 
-                      <div className="grid gap-2 text-sm sm:grid-cols-2">
-                        <p>
+                      <div className="grid gap-2 text-sm">
+                        <p className="inline-flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
                           <span className="text-muted-foreground">
-                            {language === "vi" ? "Người báo cáo: " : "Buyer: "}
+                            {language === "vi" ? "Người mua:" : "Buyer:"}
                           </span>
-                          <span className="font-medium">
-                            {report.buyerName || "-"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-muted-foreground">
-                            {language === "vi"
-                              ? "Trạng thái đơn: "
-                              : "Order status: "}
-                          </span>
-                          <span className="font-medium">
-                            {report.orderStatus || "-"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-muted-foreground">
-                            {language === "vi"
-                              ? "Giao dịch: "
-                              : "Transaction: "}
-                          </span>
-                          <span className="font-medium">
-                            {report.transactionStatus || "-"}
-                          </span>
-                        </p>
-                        <p>
-                          <span className="text-muted-foreground">
-                            {language === "vi"
-                              ? "Hành động tiếp theo: "
-                              : "Next action: "}
-                          </span>
-                          <span className="font-medium">
-                            {report.nextAction || "-"}
-                          </span>
+                          <span className="font-medium">{report.buyerName || "-"}</span>
                         </p>
                       </div>
 
@@ -246,21 +152,11 @@ export default function DisputesPage() {
                     </div>
 
                     <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
-                      <Button
-                        className="bg-rose-600 text-white hover:bg-rose-700"
-                        onClick={() => handleReject(report.reportId)}
-                        disabled={isActionDisabled}
-                      >
-                        <XCircle className="mr-1 h-4 w-4" />
-                        {language === "vi" ? "Từ chối" : "Reject"}
-                      </Button>
-                      <Button
-                        className="bg-emerald-600 text-white hover:bg-emerald-700"
-                        onClick={() => handleApprove(report.reportId)}
-                        disabled={isActionDisabled}
-                      >
-                        <CheckCircle2 className="mr-1 h-4 w-4" />
-                        {language === "vi" ? "Chấp nhận" : "Approve"}
+                      <Button asChild>
+                        <Link href={`/admin/disputes/${report.reportId}`}>
+                          <Eye className="mr-1 h-4 w-4" />
+                          {language === "vi" ? "Chi tiết" : "Detail"}
+                        </Link>
                       </Button>
                     </div>
                   </div>

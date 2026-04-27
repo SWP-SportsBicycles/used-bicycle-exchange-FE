@@ -1,27 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { FileWarning, User, Package, CreditCard, Video, Calendar, CheckCircle2, XCircle } from "lucide-react";
+import { FileWarning, User, Package, CreditCard, Calendar, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/language-context";
-import { inspectorApi } from "@/lib/api/inspector-api";
+import { inspectorApi, type InspectorReportItem } from "@/lib/api/inspector-api";
 import { cn } from "@/lib/utils";
 
-interface ReportItem {
-  reportId: string;
-  buyerName: string;
-  orderStatus: string;
-  transactionStatus: string;
-  status: string;
-  reason: string;
-  description: string;
-  videoUrl: string | null;
-  createdAt: string;
-}
+type ReportFilter = "all" | "approved" | "rejected";
 
 const statusColors: Record<string, string> = {
   Pending: "bg-amber-500/15 text-amber-700 border-amber-500/25",
@@ -59,7 +50,13 @@ const statusLabels: Record<string, { vi: string; en: string }> = {
   Reviewing: { vi: "Đang xem xét", en: "Reviewing" },
   Resolved: { vi: "Đã giải quyết", en: "Resolved" },
   Rejected: { vi: "Đã từ chối", en: "Rejected" },
+  Approved: { vi: "Đã chấp thuận", en: "Approved" },
+  Confirmed: { vi: "Đã chấp thuận", en: "Confirmed" },
+  Accepted: { vi: "Đã chấp thuận", en: "Accepted" },
 };
+
+const approvedStatuses = new Set(["Resolved", "Approved", "Confirmed", "Accepted"]);
+const rejectedStatuses = new Set(["Rejected", "Declined"]);
 
 function formatDate(dateString: string, language: "vi" | "en"): string {
   const date = new Date(dateString);
@@ -74,45 +71,42 @@ function formatDate(dateString: string, language: "vi" | "en"): string {
 
 export default function InspectorReportPage() {
   const { language } = useLanguage();
-  const queryClient = useQueryClient();
-  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<ReportFilter>("all");
 
   const reportsQuery = useQuery({
     queryKey: ["inspector-reports"],
     queryFn: inspectorApi.getReports,
     refetchInterval: 30000,
+    refetchOnMount: "always",
   });
 
-  const confirmMutation = useMutation({
-    mutationFn: inspectorApi.confirmReport,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["inspector-reports"] });
-    },
-    onSettled: () => {
-      setProcessingReportId(null);
-    },
-  });
+  const reports = reportsQuery.data ?? [];
+  const filteredReports = useMemo(() => {
+    if (activeFilter === "approved") {
+      return reports.filter((report) => approvedStatuses.has(report.status));
+    }
 
-  const rejectMutation = useMutation({
-    mutationFn: inspectorApi.rejectReport,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["inspector-reports"] });
-    },
-    onSettled: () => {
-      setProcessingReportId(null);
-    },
-  });
+    if (activeFilter === "rejected") {
+      return reports.filter((report) => rejectedStatuses.has(report.status));
+    }
 
-  const reports = (reportsQuery.data ?? []) as ReportItem[];
+    return reports;
+  }, [activeFilter, reports]);
 
-  const handleConfirm = (reportId: string) => {
-    setProcessingReportId(reportId);
-    confirmMutation.mutate(reportId);
-  };
+  const countByFilter = useMemo(() => {
+    const approved = reports.filter((report) => approvedStatuses.has(report.status)).length;
+    const rejected = reports.filter((report) => rejectedStatuses.has(report.status)).length;
+    return {
+      all: reports.length,
+      approved,
+      rejected,
+    };
+  }, [reports]);
 
-  const handleReject = (reportId: string) => {
-    setProcessingReportId(reportId);
-    rejectMutation.mutate(reportId);
+  const filterLabel: Record<ReportFilter, { vi: string; en: string }> = {
+    all: { vi: "Tất cả", en: "All" },
+    approved: { vi: "Chấp thuận", en: "Approved" },
+    rejected: { vi: "Bác bỏ", en: "Rejected" },
   };
 
   return (
@@ -140,9 +134,29 @@ export default function InspectorReportPage() {
           </div>
           <Badge variant="outline" className="w-fit">
             <FileWarning className="h-3.5 w-3.5 mr-1" />
-            {reports.length} {language === "vi" ? "báo cáo" : "reports"}
+            {filteredReports.length} {language === "vi" ? "báo cáo" : "reports"}
           </Badge>
         </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-2">
+            {(["all", "approved", "rejected"] as const).map((filter) => {
+              const isActive = activeFilter === filter;
+
+              return (
+                <Button
+                  key={filter}
+                  type="button"
+                  variant={isActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter(filter)}
+                  className={cn(!isActive && "bg-background")}
+                >
+                  {filterLabel[filter][language]} ({countByFilter[filter]})
+                </Button>
+              );
+            })}
+          </div>
+        </CardContent>
       </Card>
 
       <div className="space-y-4">
@@ -152,16 +166,14 @@ export default function InspectorReportPage() {
               {language === "vi" ? "Đang tải dữ liệu..." : "Loading..."}
             </CardContent>
           </Card>
-        ) : reports.length === 0 ? (
+        ) : filteredReports.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              {language === "vi" ? "Không có báo cáo nào." : "No reports found."}
+              {language === "vi" ? "Không có báo cáo nào phù hợp bộ lọc." : "No reports matched the selected filter."}
             </CardContent>
           </Card>
         ) : (
-          reports.map((report, index) => {
-            const actionLoading = processingReportId === report.reportId;
-            const isActionDisabled = actionLoading || confirmMutation.isPending || rejectMutation.isPending;
+          filteredReports.map((report: InspectorReportItem, index) => {
             return (
             <motion.div
               key={report.reportId}
@@ -221,35 +233,12 @@ export default function InspectorReportPage() {
                     </div>
                   </div>
 
-                  {report.videoUrl && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                        <Video className="h-3.5 w-3.5" />
-                        {language === "vi" ? "Video bằng chứng" : "Evidence Video"}
-                      </p>
-                      <video controls className="max-h-72 w-full rounded-lg border border-border/60 bg-black/80">
-                        <source src={report.videoUrl} />
-                        {language === "vi" ? "Trình duyệt không hỗ trợ video." : "Your browser does not support video."}
-                      </video>
-                    </div>
-                  )}
-
                   <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
-                    <Button
-                      className="bg-rose-600 text-white hover:bg-rose-700"
-                      onClick={() => handleReject(report.reportId)}
-                      disabled={isActionDisabled}
-                    >
-                      <XCircle className="mr-1 h-4 w-4" />
-                      {language === "vi" ? "Từ chối" : "Reject"}
-                    </Button>
-                    <Button
-                      className="bg-emerald-600 text-white hover:bg-emerald-700"
-                      onClick={() => handleConfirm(report.reportId)}
-                      disabled={isActionDisabled}
-                    >
-                      <CheckCircle2 className="mr-1 h-4 w-4" />
-                      {language === "vi" ? "Chấp nhận" : "Confirm"}
+                    <Button asChild>
+                      <Link href={`/inspector/report/${report.reportId}`}>
+                        <Eye className="mr-1 h-4 w-4" />
+                        {language === "vi" ? "Chi tiết" : "Detail"}
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>
