@@ -187,6 +187,8 @@ export interface OrderStatusResponse {
 export interface DisputePayload {
   type: string;               // BE expects ReportTypeEnum
   reason: string;
+  description?: string;
+  evidenceFile?: File;
   mediaUrls?: string[];       // Video evidence URLs (uploaded via /api/Upload/video)
   bankName?: string;
   bankAccountNumber?: string;
@@ -197,6 +199,7 @@ export interface BuyerReport {
   id: string;
   reportId?: string;           // BE may return reportId instead of id
   orderId: string;
+  orderStatus?: string;
   type: number | string;       // BE returns display string e.g. "Thiếu phụ kiện / Sai hàng"
   reason: string;
   description?: string;
@@ -207,6 +210,9 @@ export interface BuyerReport {
   nextAction?: string;         // BE next action hint
   createdAt: string;
   resolution?: string;
+  transactionStatus?: string;
+  refundStatus?: string;
+  refundAmount?: number;
   hasBankInfo?: boolean;
   bankInfo?: {
     bankName?: string;
@@ -478,6 +484,53 @@ function parseBoolean(value: unknown) {
 
   const normalized = String(value ?? "").trim().toLowerCase();
   return normalized === "true" || normalized === "1" || normalized === "locked";
+}
+
+function normalizeBuyerReport(raw: unknown): BuyerReport {
+  const data =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : {};
+
+  const reason = parseOptionalString(data.reason) ?? "";
+  const normalizedVideo =
+    parseOptionalString(data.videoUrl) ??
+    parseOptionalString(data.evidenceVideo);
+
+  return {
+    ...data,
+    id: String(data.id ?? data.reportId ?? ""),
+    reportId: parseOptionalString(data.reportId),
+    orderId: String(data.orderId ?? ""),
+    orderStatus: parseOptionalString(data.orderStatus),
+    type: (data.type as BuyerReport["type"]) ?? "",
+    reason,
+    description: parseOptionalString(data.description) ?? reason,
+    videoUrl: normalizedVideo,
+    evidenceVideo: normalizedVideo,
+    status: String(data.status ?? ""),
+    statusDisplay: parseOptionalString(data.statusDisplay),
+    nextAction: parseOptionalString(data.nextAction),
+    createdAt: String(data.createdAt ?? ""),
+    resolution: parseOptionalString(data.resolution),
+    transactionStatus: parseOptionalString(data.transactionStatus),
+    refundStatus: parseOptionalString(data.refundStatus),
+    refundAmount:
+      typeof data.refundAmount === "number"
+        ? data.refundAmount
+        : Number.isFinite(Number(data.refundAmount))
+          ? Number(data.refundAmount)
+          : undefined,
+    hasBankInfo: Boolean(data.hasBankInfo),
+    bankInfo:
+      data.bankInfo && typeof data.bankInfo === "object"
+        ? {
+            bankName: parseOptionalString((data.bankInfo as Record<string, unknown>).bankName),
+            bankAccountName: parseOptionalString((data.bankInfo as Record<string, unknown>).bankAccountName),
+            bankAccountNumber: parseOptionalString((data.bankInfo as Record<string, unknown>).bankAccountNumber),
+          }
+        : undefined,
+  };
 }
 
 function normalizeListingStatus(value: unknown): BuyerListing["status"] {
@@ -943,12 +996,15 @@ export const buyerApi = {
    * Tạo báo cáo/khiếu nại.
    * Swagger: POST /api/buyer-report/{orderId} — multipart/form-data { type (int), reason, description?, mediaUrls? }
    */
-  createDispute: async (orderId: string, data: DisputePayload): Promise<unknown> => {
+  createDispute: async (orderId: string, data: DisputePayload): Promise<BuyerReport> => {
     const formData = new FormData()
     formData.append('type', String(parseInt(data.type, 10)))
     formData.append('reason', data.reason)
-    // Swagger field name is 'evidenceVideo' (string/$binary). We send the pre-uploaded URL string.
-    if (data.mediaUrls && data.mediaUrls.length > 0) {
+    if (data.description) formData.append('description', data.description)
+    if (data.evidenceFile) {
+      formData.append('evidenceVideo', data.evidenceFile)
+    } else if (data.mediaUrls && data.mediaUrls.length > 0) {
+      // Compatibility fallback for any older callers still sending URL strings.
       formData.append('evidenceVideo', data.mediaUrls[0])
     }
     if (data.bankName) formData.append('bankName', data.bankName)
@@ -969,13 +1025,15 @@ export const buyerApi = {
       } catch { msg = errText || msg }
       throw new Error(msg)
     }
-    return res.json().catch(() => null)
+    const raw = await res.json().catch(() => null)
+    return normalizeBuyerReport(unwrap(raw))
   },
 
   /** Lấy danh sách report của buyer */
   getMyReports: async (): Promise<BuyerReport[]> => {
     const raw = await http.get<unknown>("/api/buyer-report/my");
-    return unwrap<BuyerReport[]>(raw);
+    const data = unwrap<unknown>(raw);
+    return Array.isArray(data) ? data.map(normalizeBuyerReport) : [];
   },
 
   // ---------- Wishlist ----------

@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
@@ -14,13 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { formatVND } from '@/lib/mock-data'
 
 import { useOrderDetail } from '../hooks/useOrders'
-import { useDisputeMutation, useUploadMedia, useMyReports } from '../hooks/useDispute'
+import { useDisputeMutation, useMyReports } from '../hooks/useDispute'
 
 const disputeSchema = z.object({
   type: z.string().min(1, 'Vui long chon loai khieu nai'),
   reason: z.string().min(20, "Vui lòng mô tả chi tiết ít nhất 20 ký tự"),
+  description: z.string().optional(),
   mediaUrls: z.array(z.string()).min(1, "Bắt buộc phải tải lên ít nhất 1 video unbox"),
   bankName: z.string().optional(),
   bankAccountNumber: z.string().optional(),
@@ -48,17 +50,26 @@ export default function DisputeScreen({ params }: PageProps) {
   const { data: reports, isLoading: isReportsLoading } = useMyReports()
   
   const disputeMutation = useDisputeMutation()
-  const uploadMutation = useUploadMedia()
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
 
   const existingReport = reports?.find(r => r.orderId === id)
   const isViewMode = order?.status === 'disputed' || existingReport
 
   const { control, register, handleSubmit, setValue, formState: { errors } } = useForm<DisputeFormValues>({
     resolver: zodResolver(disputeSchema),
-    defaultValues: { type: '1', reason: '', mediaUrls: [], bankName: '', bankAccountNumber: '', bankAccountName: '' }
+    defaultValues: { type: '1', reason: '', description: '', mediaUrls: [], bankName: '', bankAccountNumber: '', bankAccountName: '' }
   })
 
   const mediaUrls = useWatch({ control, name: 'mediaUrls' }) ?? []
+
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => {
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+      })
+    }
+  }, [previewUrls])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -70,13 +81,11 @@ export default function DisputeScreen({ params }: PageProps) {
       return
     }
 
-    try {
-      const res = await uploadMutation.mutateAsync(file)
-      setValue('mediaUrls', [...mediaUrls, res.url], { shouldValidate: true })
-      toast.success('Đã tải lên video thành công')
-    } catch {
-      toast.error('Lỗi khi tải video lên')
-    }
+    const previewUrl = URL.createObjectURL(file)
+    setEvidenceFile(file)
+    setPreviewUrls([previewUrl])
+    setValue('mediaUrls', [previewUrl], { shouldValidate: true })
+    toast.success('Đã chọn video thành công')
   }
 
   const onSubmit = (data: DisputeFormValues) => {
@@ -86,6 +95,8 @@ export default function DisputeScreen({ params }: PageProps) {
       data: {
         type: String(Number(data.type)),
         reason: data.reason,
+        description: data.description || undefined,
+        evidenceFile: evidenceFile || undefined,
         mediaUrls: data.mediaUrls,
         bankName: data.bankName || undefined,
         bankAccountNumber: data.bankAccountNumber || undefined,
@@ -163,8 +174,8 @@ export default function DisputeScreen({ params }: PageProps) {
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold text-muted-foreground">Video bằng chứng (Unbox Video)</Label>
                       <div className="flex gap-4 overflow-x-auto pb-2">
-                        {existingReport.videoUrl || existingReport.evidenceVideo || existingReport.description ? (
-                          (existingReport.videoUrl || existingReport.evidenceVideo || existingReport.description || '').split(',').map((url, i) => (
+                        {existingReport.videoUrl || existingReport.evidenceVideo ? (
+                          (existingReport.videoUrl || existingReport.evidenceVideo || '').split(',').map((url, i) => (
                             <a href={url} target="_blank" rel="noopener noreferrer" key={i} className="relative h-28 w-40 bg-black rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-md group cursor-pointer hover:ring-2 hover:ring-primary transition-all">
                               <PlayCircle className="h-10 w-10 text-white/70 group-hover:text-white transition-colors" />
                               <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-2 text-xs font-medium text-white text-center">
@@ -179,9 +190,16 @@ export default function DisputeScreen({ params }: PageProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-muted-foreground">Mô tả chi tiết</Label>
+                      <Label className="text-sm font-semibold text-muted-foreground">Lý do khiếu nại</Label>
                       <div className="p-4 bg-secondary/10 rounded-2xl border border-border/60">
                         <p className="text-base whitespace-pre-wrap leading-relaxed">{existingReport.reason}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">Mô tả chi tiết</Label>
+                      <div className="p-4 bg-secondary/10 rounded-2xl border border-border/60">
+                        <p className="text-base whitespace-pre-wrap leading-relaxed">{existingReport.description || existingReport.reason}</p>
                       </div>
                     </div>
 
@@ -205,6 +223,35 @@ export default function DisputeScreen({ params }: PageProps) {
                         )}
                       </div>
                     </div>
+
+                    {(existingReport.orderStatus || existingReport.transactionStatus || existingReport.refundStatus || typeof existingReport.refundAmount === 'number') && (
+                      <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/10 p-5">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+                          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-bold">Thông tin xử lý giao dịch</span>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Trạng thái đơn hàng</p>
+                            <p className="font-semibold">{existingReport.orderStatus || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Trạng thái giao dịch</p>
+                            <p className="font-semibold">{existingReport.transactionStatus || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Trạng thái hoàn tiền</p>
+                            <p className="font-semibold">{existingReport.refundStatus || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs mb-0.5">Số tiền hoàn</p>
+                            <p className="font-semibold">
+                              {typeof existingReport.refundAmount === 'number' ? formatVND(existingReport.refundAmount) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {existingReport.hasBankInfo && existingReport.bankInfo && (
                       <div className="space-y-3 rounded-2xl border border-border/60 bg-secondary/10 p-5">
@@ -272,13 +319,13 @@ export default function DisputeScreen({ params }: PageProps) {
                     id="video-upload"
                     className="hidden"
                     onChange={handleFileUpload}
-                    disabled={uploadMutation.isPending}
+                    disabled={disputeMutation.isPending}
                   />
                   <Label htmlFor="video-upload" className="cursor-pointer flex flex-col items-center">
-                    {uploadMutation.isPending ? (
+                    {disputeMutation.isPending ? (
                       <>
                         <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-                        <span className="font-semibold text-lg">Đang tải lên...</span>
+                        <span className="font-semibold text-lg">Đang gửi...</span>
                         <span className="text-sm text-muted-foreground mt-2">Vui lòng không đóng trang</span>
                       </>
                     ) : (
@@ -311,15 +358,27 @@ export default function DisputeScreen({ params }: PageProps) {
 
               <div className="space-y-4">
                 <Label htmlFor="reason" className="text-base font-bold flex items-center gap-1.5">
-                  Mô tả chi tiết vấn đề <span className="text-destructive">*</span>
+                  Lý do khiếu nại <span className="text-destructive">*</span>
                 </Label>
-                <Textarea 
-                  id="reason" 
-                  placeholder="Ví dụ: Xe bị móp khung ở sườn trái, không giống như mô tả ban đầu..." 
-                  className="min-h-[160px] resize-none rounded-2xl bg-secondary/10 p-4 border-border/60 focus:border-primary/50 text-base"
+                <Input
+                  id="reason"
+                  placeholder="Ví dụ: Xe đơm không đúng mô tả"
+                  className="h-12 rounded-2xl bg-secondary/10 border-border/60"
                   {...register('reason')}
                 />
                 {errors.reason && <p className="text-sm text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/> {errors.reason.message}</p>}
+              </div>
+
+              <div className="space-y-4">
+                <Label htmlFor="description" className="text-base font-bold flex items-center gap-1.5">
+                  Mô tả chi tiết vấn đề
+                </Label>
+                <Textarea 
+                  id="description" 
+                  placeholder="Ví dụ: Xe sai kích thước, có dấu hiệu móp khung ở sườn trái..." 
+                  className="min-h-[160px] resize-none rounded-2xl bg-secondary/10 p-4 border-border/60 focus:border-primary/50 text-base"
+                  {...register('description')}
+                />
               </div>
 
               {/* Bank refund info */}
@@ -375,7 +434,7 @@ export default function DisputeScreen({ params }: PageProps) {
                 <Button variant="outline" type="button" onClick={() => router.back()} className="rounded-xl h-12 px-6 font-semibold">
                   Hủy bỏ
                 </Button>
-                <Button type="submit" variant="destructive" disabled={disputeMutation.isPending || uploadMutation.isPending} className="rounded-xl h-12 px-8 font-bold shadow-lg shadow-rose-500/20">
+                <Button type="submit" variant="destructive" disabled={disputeMutation.isPending} className="rounded-xl h-12 px-8 font-bold shadow-lg shadow-rose-500/20">
                   {disputeMutation.isPending ? 'Đang gửi...' : 'Gửi yêu cầu khiếu nại'}
                 </Button>
               </div>

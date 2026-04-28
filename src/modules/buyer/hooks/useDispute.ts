@@ -8,10 +8,24 @@ export function useDisputeMutation() {
   return useMutation({
     mutationFn: ({ orderId, data }: { orderId: string; data: DisputePayload }) => 
       buyerApi.createDispute(orderId, data),
-    onSuccess: (_, { orderId }) => {
+    onSuccess: (createdReport, { orderId }) => {
+      queryClient.setQueryData<BuyerReport[]>(['buyer-reports'], (current) => {
+        const safeCurrent = Array.isArray(current) ? current : []
+        const next = createdReport
+          ? {
+              ...createdReport,
+              id: createdReport.id ?? createdReport.reportId ?? '',
+              orderId: createdReport.orderId ?? orderId,
+            }
+          : null
+
+        if (!next) return safeCurrent
+
+        const filtered = safeCurrent.filter((report) => report.orderId !== orderId)
+        return [next, ...filtered]
+      })
       queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
       queryClient.invalidateQueries({ queryKey: ['buyer-order-detail', orderId] })
-      queryClient.invalidateQueries({ queryKey: ['buyer-reports'] })
     },
   })
 }
