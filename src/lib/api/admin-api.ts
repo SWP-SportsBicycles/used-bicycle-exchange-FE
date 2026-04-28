@@ -53,6 +53,11 @@ export interface AdminOrder {
   sellerName: string;
   completedAt: string | null;
   paidOutAt: string | null;
+  isRefunded: boolean;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  payoutAmount: number | null;
 }
 
 export interface AdminDashboardSummary {
@@ -377,6 +382,8 @@ function normalizeUser(raw: unknown): AdminUser {
 
 function normalizeOrder(raw: unknown): AdminOrder {
   const source = extractPayloadObject(raw);
+  const rawPayoutAmount =
+    typeof source.payoutAmount === "number" ? source.payoutAmount : Number(source.payoutAmount);
   return {
     orderId: pickString(source, ["orderId", "id"]) || crypto.randomUUID(),
     status: pickString(source, ["status"]) || "Locked",
@@ -386,6 +393,11 @@ function normalizeOrder(raw: unknown): AdminOrder {
     sellerName: pickString(source, ["sellerName", "seller"]),
     completedAt: pickString(source, ["completedAt"]) || null,
     paidOutAt: pickString(source, ["paidOutAt"]) || null,
+    isRefunded: typeof source.isRefunded === "boolean" ? source.isRefunded : false,
+    bankName: pickString(source, ["bankName"]) || null,
+    bankAccountNumber: pickString(source, ["bankAccountNumber"]) || null,
+    bankAccountName: pickString(source, ["bankAccountName"]) || null,
+    payoutAmount: Number.isFinite(rawPayoutAmount) ? rawPayoutAmount : null,
   };
 }
 
