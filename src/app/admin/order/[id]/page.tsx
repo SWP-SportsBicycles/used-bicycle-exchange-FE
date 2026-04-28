@@ -171,6 +171,31 @@ export default function AdminOrderDetailPage() {
                 <span className="text-muted-foreground">{language === 'vi' ? 'Thời gian giải ngân' : 'Paid out at'}</span>
                 <span>{order.paidOutAt ? new Date(order.paidOutAt).toLocaleString('vi-VN') : '-'}</span>
               </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Đã hoàn tiền' : 'Refunded'}</span>
+                <Badge
+                  variant="outline"
+                  className={cn('text-xs', order.isRefunded ? 'bg-amber-500/15 text-amber-700 border-amber-500/30' : 'bg-muted')}
+                >
+                  {order.isRefunded ? (language === 'vi' ? 'Có' : 'Yes') : language === 'vi' ? 'Không' : 'No'}
+                </Badge>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Ngân hàng' : 'Bank name'}</span>
+                <span>{order.bankName || '-'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Số tài khoản' : 'Bank account number'}</span>
+                <span>{order.bankAccountNumber || '-'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Chủ tài khoản' : 'Bank account name'}</span>
+                <span>{order.bankAccountName || '-'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{language === 'vi' ? 'Số tiền giải ngân' : 'Payout amount'}</span>
+                <span className="font-semibold">{order.payoutAmount !== null ? formatVND(order.payoutAmount) : '-'}</span>
+              </div>
             </CardContent>
           </Card>
 
