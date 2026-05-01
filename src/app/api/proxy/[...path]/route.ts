@@ -1,6 +1,17 @@
 import { type NextRequest } from "next/server";
 
-const DEFAULT_API_BASE = "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const DEFAULT_API_BASE = "https://localhost:7001";
+
+function shouldAllowInsecureTls(baseUrl: string) {
+  try {
+    const url = new URL(baseUrl);
+    if (process.env.NODE_ENV !== "development") return false;
+    if (url.protocol !== "https:") return false;
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
 
 function resolveApiBase() {
   const raw = process.env.NEXT_PUBLIC_API_URL;
@@ -51,6 +62,10 @@ async function forward(req: NextRequest, context: RouteContext, method: string) 
   const { path } = await context.params;
   const targetUrl = buildTargetUrl(req, path);
   const headers = copyRequestHeaders(req);
+  if (shouldAllowInsecureTls(API_BASE)) {
+    // Allow self-signed localhost certs in dev for local BE.
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  }
 
   const bodyBuffer = method === "GET" || method === "HEAD" ? undefined : await req.arrayBuffer();
 

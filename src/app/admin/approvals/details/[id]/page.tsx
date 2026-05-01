@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ImageIcon, Loader2, MapPin, PlayCircle, Tag } from "lucide-react";
+import { ArrowLeft, ImageIcon, Loader2, MapPin, PlayCircle, Tag, X } from "lucide-react";
 import { adminApi } from "@/lib/api/admin-api";
 import { useLanguage } from "@/lib/language-context";
 import { formatVND } from "@/lib/mock-data";
@@ -12,11 +13,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export default function ApprovalDetailPage() {
   const { language } = useLanguage();
   const params = useParams<{ id: string }>();
   const listingId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["admin-listing-detail-page", listingId],
@@ -123,7 +126,12 @@ export default function ApprovalDetailPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 {imageUrls.length > 0 ? (
                   imageUrls.map((image, index) => (
-                    <div key={`${image}-${index}`} className="group relative overflow-hidden rounded-xl border bg-muted/20">
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => setSelectedImage(image)}
+                      className="group relative overflow-hidden rounded-xl border bg-muted/20 transition-transform hover:-translate-y-0.5"
+                    >
                       <Image
                         src={image}
                         alt={`${detail.title} image ${index + 1}`}
@@ -132,7 +140,8 @@ export default function ApprovalDetailPage() {
                         className="h-56 w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         unoptimized
                       />
-                    </div>
+                      <span className="sr-only">Open image</span>
+                    </button>
                   ))
                 ) : (
                   <div className="col-span-full flex h-56 items-center justify-center rounded-xl border border-dashed text-muted-foreground">
@@ -183,11 +192,6 @@ export default function ApprovalDetailPage() {
               </div>
 
               <div className="rounded-lg border p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Serial</p>
-                <p className="mt-1 font-medium">{detail.serial || "-"}</p>
-              </div>
-
-              <div className="rounded-lg border p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   {language === "vi" ? "Thông số xe" : "Bike specs"}
                 </p>
@@ -226,6 +230,39 @@ export default function ApprovalDetailPage() {
           </Card>
         </div>
       )}
+
+      <Dialog open={Boolean(selectedImage)} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent
+          showCloseButton={false}
+          className="w-[92vw] max-w-4xl border-border/60 bg-white p-4 sm:p-5"
+        >
+          <DialogTitle className="sr-only">{language === "vi" ? "Xem ảnh" : "Image preview"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {language === "vi" ? "Phóng to ảnh tin đăng" : "Preview listing image"}
+          </DialogDescription>
+          <div className="relative flex max-h-[80vh] w-full items-center justify-center">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setSelectedImage(null)}
+              className="absolute right-2 top-2 z-10 h-9 w-9 rounded-full bg-black/70 text-white hover:bg-black/85"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+            {selectedImage && (
+              <Image
+                src={selectedImage}
+                alt={language === "vi" ? "Xem ảnh" : "Preview image"}
+                width={2000}
+                height={1500}
+                className="max-h-[70vh] w-auto max-w-full object-contain"
+                unoptimized
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
