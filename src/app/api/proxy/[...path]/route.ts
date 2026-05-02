@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 
-const DEFAULT_API_BASE = "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net";
+const DEFAULT_API_BASE = "https://sportsbicycles-api9-e5bjfdcqcfagcgg6.southeastasia-01.azurewebsites.net";
 
 function resolveApiBase() {
   const raw = process.env.NEXT_PUBLIC_API_URL;

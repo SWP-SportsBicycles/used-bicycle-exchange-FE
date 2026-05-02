@@ -10,7 +10,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const RAW_API_BASE_URL =
   process.env.API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net/swagger/index.html";
+  "https://sportsbicycles-api9-e5bjfdcqcfagcgg6.southeastasia-01.azurewebsites.net/swagger/index.html";
 
 const SENSITIVE_FIELDS = new Set([
   "email",
