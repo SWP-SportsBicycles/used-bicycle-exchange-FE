@@ -50,7 +50,7 @@ function normalizeApiBaseUrl(raw: string): string {
 
 const API_BASE_URL = normalizeApiBaseUrl(RAW_API_BASE_URL);
 
-const SYSTEM_PROMPT = `You are VeloTrust virtual assistant.
+const SYSTEM_PROMPT = `You are SBE virtual assistant.
 Primary language: Vietnamese (natural, polite, modern tone). Use English only if the user asks in English.
 
 Core behavior:
