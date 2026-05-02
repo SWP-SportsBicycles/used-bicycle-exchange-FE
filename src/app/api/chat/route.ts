@@ -10,7 +10,7 @@ const DEFAULT_PAGE_SIZE = 50;
 const RAW_API_BASE_URL =
   process.env.API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "https://sportsbicycles-api-cva3a4fgdgavfkbz.southeastasia-01.azurewebsites.net/swagger/index.html";
+  "https://sportsbicycles-api9-e5bjfdcqcfagcgg6.southeastasia-01.azurewebsites.net/swagger/index.html";
 
 const SENSITIVE_FIELDS = new Set([
   "email",
@@ -50,8 +50,11 @@ function normalizeApiBaseUrl(raw: string): string {
 
 const API_BASE_URL = normalizeApiBaseUrl(RAW_API_BASE_URL);
 
-const SYSTEM_PROMPT = `You are VeloTrust virtual assistant.
+const SYSTEM_PROMPT = `You are SBE virtual assistant.
 Primary language: Vietnamese (natural, polite, modern tone). Use English only if the user asks in English.
+
+Brand name usage:
+- Use "SBE" as the system name in all responses. Do not use "VeloTrust".
 
 Core behavior:
 - Be friendly, intelligent, concise, and practical.

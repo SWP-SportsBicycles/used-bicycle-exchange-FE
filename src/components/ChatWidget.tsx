@@ -18,7 +18,7 @@ export function ChatWidget() {
       id: makeId(),
       role: 'assistant',
       content:
-        'Xin chào! Mình là trợ lý ảo của hệ thống VeloTrust, tui có thể giúp gì cho bạn?',
+        'Xin chào! Mình là trợ lý ảo của hệ thống SBE, tui có thể giúp gì cho bạn?',
     },
   ])
 

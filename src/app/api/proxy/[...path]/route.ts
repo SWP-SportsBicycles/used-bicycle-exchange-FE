@@ -1,6 +1,6 @@
 import { type NextRequest } from "next/server";
 
-const DEFAULT_API_BASE = "https://localhost:7001";
+const DEFAULT_API_BASE = "https://sportsbicycles-api9-e5bjfdcqcfagcgg6.southeastasia-01.azurewebsites.net";
 
 function shouldAllowInsecureTls(baseUrl: string) {
   try {

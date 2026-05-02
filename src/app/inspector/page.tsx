@@ -1,53 +1,25 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import Link from 'next/link'
-import Image from 'next/image'
 import { 
   ClipboardCheck, 
   Calendar,
   CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  ArrowUpRight,
-  ChevronRight,
   AlertCircle
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
-import { 
-  MOCK_INSPECTOR_ASSIGNMENTS, 
-  formatVND
-} from '@/lib/mock-data'
-import { cn } from '@/lib/utils'
-
-const statusColors: Record<string, string> = {
-  assigned: 'bg-muted text-muted-foreground',
-  scheduled: 'bg-primary/20 text-primary',
-  in_progress: 'bg-accent/20 text-accent-foreground',
-  completed: 'bg-success/20 text-success',
-  cancelled: 'bg-destructive/20 text-destructive',
-}
-
-const statusLabels: Record<string, { vi: string; en: string }> = {
-  assigned: { vi: 'Đã giao', en: 'Assigned' },
-  scheduled: { vi: 'Đã lên lịch', en: 'Scheduled' },
-  in_progress: { vi: 'Đang kiểm', en: 'In Progress' },
-  completed: { vi: 'Hoàn thành', en: 'Completed' },
-  cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
-}
 
 export default function InspectorDashboardPage() {
   const { user } = useAuth()
   const { language } = useLanguage()
 
-  const assignments = MOCK_INSPECTOR_ASSIGNMENTS
-  const todayAssignments = assignments.filter(a => a.scheduledDate === '2024-01-14' || a.scheduledDate === '2024-01-15')
-  const pendingCount = assignments.filter(a => ['assigned', 'scheduled', 'in_progress'].includes(a.status)).length
+  const pendingCount = 0
+  const todayCount = 0
+  const completedCount = 0
+  const ratingValue = 0
 
   return (
     <div className="space-y-6">
@@ -81,9 +53,6 @@ export default function InspectorDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{pendingCount}</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'xe cần kiểm định' : 'bikes to inspect'}
-              </p>
             </CardContent>
           </Card>
         </motion.div>
@@ -101,10 +70,7 @@ export default function InspectorDashboardPage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{todayAssignments.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'lịch hẹn' : 'appointments'}
-              </p>
+              <div className="text-2xl font-bold">{todayCount}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -122,10 +88,7 @@ export default function InspectorDashboardPage() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{user.completedInspections || 47}</div>
-              <p className="text-xs text-success flex items-center gap-1">
-                +8 {language === 'vi' ? 'tháng này' : 'this month'}
-              </p>
+              <div className="text-2xl font-bold">{completedCount}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -145,110 +108,17 @@ export default function InspectorDashboardPage() {
               </svg>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4.9</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'từ 47 đánh giá' : 'from 47 reviews'}
-              </p>
+              <div className="text-2xl font-bold">{ratingValue}</div>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      {/* Upcoming Inspections */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{language === 'vi' ? 'Lịch Kiểm Định Sắp Tới' : 'Upcoming Inspections'}</CardTitle>
-              <CardDescription>
-                {language === 'vi' ? 'Các xe được giao để kiểm định' : 'Bikes assigned for inspection'}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/inspector/assigned" className="gap-1">
-                {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {assignments.map((assignment) => (
-                <div 
-                  key={assignment.id} 
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  {/* Bike Image & Info */}
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
-                      <Image 
-                        src={assignment.listing.images[0]} 
-                        alt={assignment.listing.title}
-                        width={64}
-                        height={64}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{assignment.listing.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {assignment.listing.brand} {assignment.listing.model}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={cn('text-xs', statusColors[assignment.status])}>
-                          {statusLabels[assignment.status][language]}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {formatVND(assignment.listing.price)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Schedule & Location */}
-                  <div className="flex flex-col sm:items-end gap-1 sm:text-right">
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{assignment.scheduledDate} - {assignment.scheduledTime}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-50">{assignment.seller.address}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5" />
-                      <span>{assignment.seller.phone}</span>
-                    </div>
-                  </div>
-
-                  {/* Action */}
-                  <div className="flex sm:flex-col gap-2">
-                    <Button size="sm" className="flex-1 sm:flex-none" asChild>
-                      <Link href={`/inspector/assigned/${assignment.id}`}>
-                        {assignment.status === 'in_progress' 
-                          ? (language === 'vi' ? 'Tiếp tục' : 'Continue')
-                          : (language === 'vi' ? 'Bắt đầu' : 'Start')
-                        }
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
       {/* Quick Tips */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
+        transition={{ delay: 0.5 }}
       >
         <Card className="bg-primary/5 border-primary/20">
           <CardHeader>

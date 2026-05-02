@@ -9,7 +9,6 @@ import {
   LayoutDashboard, 
   ClipboardCheck, 
   FileWarning,
-  CheckCircle2,
   ChevronRight 
 } from 'lucide-react'
 import { Header } from '@/components/header'
@@ -45,11 +44,6 @@ const sidebarItems: SidebarItem[] = [
     href: '/inspector/report', 
     icon: FileWarning, 
     label: { vi: 'Báo Cáo', en: 'Reports' }
-  },
-  { 
-    href: '/inspector/completed', 
-    icon: CheckCircle2, 
-    label: { vi: 'Đã Hoàn Thành', en: 'Completed' }
   },
 ]
 
