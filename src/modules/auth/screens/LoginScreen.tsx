@@ -345,7 +345,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
 
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
         <div className="grid w-full overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_24px_64px_rgba(0,0,0,0.22)] md:grid-cols-[1.55fr_1fr]">
-          <div className="relative min-h-[300px] md:min-h-[680px]">
+          <div className="relative min-h-75 md:min-h-170">
             <Image src={AUTH_DECOR_IMAGE} alt="" fill priority className="object-cover object-center" sizes="(max-width: 1024px) 100vw, 62vw" />
             <div className="absolute inset-0 bg-black/35" />
           </div>
