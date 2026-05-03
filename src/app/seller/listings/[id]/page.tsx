@@ -18,6 +18,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Dialog,
   DialogContent,
@@ -263,7 +274,7 @@ function normalizeListingDetail(payload: unknown): SellerListingDetail | null {
     id,
     title,
     status: normalizeStatus(pickString(records, ['status'])),
-    serialNumber: pickString(records, ['serialNumber', 'serial', 'frameNumber']),
+    serialNumber: pickString(records, ['serialNumber', 'serial', 'frameNumber']).toUpperCase(),
     brand: pickString(records, ['brand']),
     category: pickString(records, ['category']),
     condition: pickString(records, ['condition']),
@@ -310,6 +321,14 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   const resubmitMutation = useResubmitListing()
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+  const [confirmAction, setConfirmAction] = React.useState<'submit' | 'resubmit' | null>(null)
+  const [termsAccepted, setTermsAccepted] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!confirmAction) {
+      setTermsAccepted(false)
+    }
+  }, [confirmAction])
 
   const listing = normalizeListingDetail(rawData)
 
@@ -333,6 +352,12 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
       console.error(error)
       // handle error notification if needed
     }
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+    await handleAction(confirmAction)
+    setConfirmAction(null)
   }
 
   if (isLoading) {
@@ -393,14 +418,14 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         
         <div className="flex flex-wrap gap-2">
           {currentStatus === 'draft' && (
-            <Button onClick={() => handleAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
+            <Button onClick={() => setConfirmAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               Gửi duyệt
             </Button>
           )}
 
           {currentStatus === 'rejected' && (
-            <Button onClick={() => handleAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
+            <Button onClick={() => setConfirmAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
             </Button>
@@ -573,6 +598,56 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'resubmit'
+                ? language === 'vi' ? 'Xác nhận gửi duyệt lại' : 'Confirm resubmission'
+                : language === 'vi' ? 'Xác nhận gửi duyệt' : 'Confirm submission'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'vi'
+                ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán. Tin đăng sẽ được chuyển tới quản trị viên xét duyệt. Hãy đọc kỹ điều khoản người dùng trước khi xác nhận.'
+                : 'Please review all information, photos, and pricing. Your listing will be sent for admin review. Read the user terms carefully before confirming.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <label
+            htmlFor={`detail-terms-ack-${confirmAction ?? 'submit'}`}
+            className="flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/30 p-3 text-sm text-foreground"
+          >
+            <Checkbox
+              id={`detail-terms-ack-${confirmAction ?? 'submit'}`}
+              checked={termsAccepted}
+              onCheckedChange={(value) => setTermsAccepted(Boolean(value))}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-2 border-primary/50 bg-background data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <span>
+              {language === 'vi'
+                ? 'Tôi đã đọc và đồng ý với điều khoản người dùng.'
+                : 'I have read and agree to the user terms.'}
+            </span>
+          </label>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitMutation.isPending || resubmitMutation.isPending}>
+              {language === 'vi' ? 'Hủy' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAction}
+              disabled={
+                !termsAccepted ||
+                submitMutation.isPending ||
+                resubmitMutation.isPending
+              }
+            >
+              {submitMutation.isPending || resubmitMutation.isPending
+                ? language === 'vi' ? 'Đang gửi...' : 'Submitting...'
+                : language === 'vi' ? 'Xác nhận' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>

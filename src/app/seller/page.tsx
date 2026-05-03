@@ -158,63 +158,6 @@ export default function SellerDashboardPage() {
 
       {/* Recent Orders & Listings */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Orders */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>{language === 'vi' ? 'Đơn Hàng Gần Đây' : 'Recent Orders'}</CardTitle>
-                <CardDescription>
-                  {language === 'vi' ? 'Cập nhật mới nhất' : 'Latest updates'}
-                </CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/seller/orders" className="gap-1">
-                  {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {myOrders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    {language === 'vi' ? 'Chưa có đơn hàng nào' : 'No orders yet'}
-                  </p>
-                ) : (
-                  myOrders.map((order) => (
-                    <div 
-                      key={order.id} 
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
-                        <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{order.listing.title}</p>
-                        <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="outline" className={cn('text-xs', statusColors[order.status] || 'bg-muted')}>
-                          {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]?.[language] || order.status}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatVND(order.depositAmount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {/* My Listings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -289,7 +232,75 @@ export default function SellerDashboardPage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Recent Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>{language === 'vi' ? 'Đơn Hàng Gần Đây' : 'Recent Orders'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi' ? 'Cập nhật mới nhất' : 'Latest updates'}
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/seller/orders" className="gap-1">
+                  {language === 'vi' ? 'Xem tất cả' : 'View all'}
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {myOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {language === 'vi' ? 'Chưa có đơn hàng nào' : 'No orders yet'}
+                  </p>
+                ) : (
+                  myOrders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
+                        <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{order.listing.title}</p>
+                        <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className={cn('text-xs', statusColors[order.status] || 'bg-muted')}>
+                          {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]?.[language] || order.status}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatVND(order.depositAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      <Card className="border-border/60 bg-muted/40">
+        <CardHeader>
+          <CardTitle>{language === 'vi' ? 'Điều khoản dịch vụ' : 'Service Terms'}</CardTitle>
+          <CardDescription>
+            {language === 'vi'
+              ? 'Phí kiểm định: 100.000đ sẽ được cộng thêm cho mỗi giao dịch thành công.'
+              : 'Inspection fee: 100,000 VND is added for each successful transaction.'}
+          </CardDescription>
+        </CardHeader>
+      </Card>
     </div>
   )
 }

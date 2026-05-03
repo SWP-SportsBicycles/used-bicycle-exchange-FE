@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,8 +61,15 @@ export default function SellerListingsPage() {
   const resubmitMutation = useResubmitListing()
   const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; listing: SellerListingItem } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
+
+  useEffect(() => {
+    if (!confirmState) {
+      setTermsAccepted(false)
+    }
+  }, [confirmState])
 
   const myListings = useMemo(() => {
     if (isError) {
@@ -282,19 +290,47 @@ export default function SellerListingsPage() {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmState?.action === 'submit'
-                  ? language === 'vi' ? 'Bạn có chắc chắn muốn gửi tin đăng này cho quản trị viên phê duyệt không?' : 'Are you sure you want to submit this listing for admin approval?'
+                  ? language === 'vi'
+                    ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán trước khi gửi duyệt.'
+                    : 'Please review all information, photos, and pricing before submission.'
                   : confirmState?.action === 'withdraw'
                     ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không?' : 'Are you sure you want to withdraw this listing?'
                     : confirmState?.action === 'resubmit'
-                      ? language === 'vi' ? 'Bạn có muốn gửi lại tin đăng này để quản trị viên xem xét lại không?' : 'Do you want to resubmit this listing for admin review?'
+                      ? language === 'vi'
+                        ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán trước khi gửi duyệt lại.'
+                        : 'Please review all information, photos, and pricing before resubmitting.'
                       : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
               </AlertDialogDescription>
+              {(confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && (
+                <label
+                  htmlFor={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                  className="mt-4 flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/30 p-3 text-sm text-foreground"
+                >
+                  <Checkbox
+                    id={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                    checked={termsAccepted}
+                    onCheckedChange={(value) => setTermsAccepted(Boolean(value))}
+                    className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-2 border-primary/50 bg-background data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                  <span>
+                    {language === 'vi'
+                      ? 'Tôi đã đọc và đồng ý với điều khoản người dùng.'
+                      : 'I have read and agree to the user terms.'}
+                  </span>
+                </label>
+              )}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isActionPending}>
                 {language === 'vi' ? 'Hủy' : 'Cancel'}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={executeAction} disabled={isActionPending}>
+              <AlertDialogAction
+                onClick={executeAction}
+                disabled={
+                  isActionPending ||
+                  ((confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && !termsAccepted)
+                }
+              >
                 {isActionPending ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />

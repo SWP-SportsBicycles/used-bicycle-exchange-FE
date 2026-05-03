@@ -146,15 +146,22 @@ export function normalizeListingsPayload(payload: unknown): SellerListingItem[] 
         .map((media) => {
           if (!media || typeof media !== 'object') return ''
           const record = media as Record<string, unknown>
-          return typeof record.image === 'string' ? record.image : ''
+          return pickString([record], ['image', 'url', 'path', 'thumbnail'])
         })
         .filter(Boolean)
 
-      const images = (Array.isArray(raw.images) ? raw.images : mediaImages).filter(
-        (entry): entry is string => typeof entry === 'string',
-      )
+      const rawImages = Array.isArray(raw.images) ? raw.images : []
+      const images = rawImages
+        .map((entry) => {
+          if (typeof entry === 'string') return entry
+          if (entry && typeof entry === 'object') {
+            return pickString([entry as Record<string, unknown>], ['image', 'url', 'path', 'thumbnail'])
+          }
+          return ''
+        })
+        .filter((entry): entry is string => Boolean(entry))
       const thumbnail = typeof raw.thumbnail === 'string' ? raw.thumbnail : ''
-      const resolvedImages = images.length > 0 ? images : thumbnail ? [thumbnail] : []
+      const resolvedImages = images.length > 0 ? images : mediaImages.length > 0 ? mediaImages : thumbnail ? [thumbnail] : []
 
       const id =
         (typeof raw.id === 'string' && raw.id) ||
@@ -330,7 +337,7 @@ export function normalizeOrderDetail(item: unknown, idFromUrl?: string): SellerO
   if (thumbnail && images.length === 0) images.push(thumbnail)
 
   // Serial Number — check root-level first (API returns serialNumber directly)
-  const serialNumber = pickString([root, ...records], ['serialNumber', 'SerialNumber', 'serial', 'frameNumber']) || 'N/A'
+  const serialNumber = (pickString([root, ...records], ['serialNumber', 'SerialNumber', 'serial', 'frameNumber']) || 'N/A').toUpperCase()
 
   // Buyer Info
   const buyerName = pickString(records, ['buyerName', 'BuyerName', 'receiverName', 'fullName', 'name']) || 'Anonymous Buyer'
