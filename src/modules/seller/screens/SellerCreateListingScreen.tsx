@@ -4,8 +4,7 @@ import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { sellerApi } from '@/lib/api/seller-api'
-import { useCreateListing, useSubmitListing, useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useCreateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,13 +26,43 @@ const steps = [
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
 
-const DRAFT_LISTING_ID_KEY = 'seller:draftListingId'
+const REQUIRED_FIELD_LABELS: Record<string, string> = {
+  Title: 'tiêu đề',
+  Description: 'mô tả',
+  SerialNumber: 'số serial',
+  Category: 'loại xe',
+  Brand: 'thương hiệu',
+  FrameSize: 'kích cỡ khung',
+  Condition: 'tình trạng',
+  Groupset: 'bộ truyền động',
+  TireRim: 'cỡ bánh',
+  BrakeType: 'loại phanh',
+  Paint: 'màu sơn',
+  Overall: 'khấu hao / đánh giá',
+  Price: 'giá bán',
+  City: 'thành phố',
+  Weight: 'trọng lượng',
+}
+
+const formatApiErrorMessage = (message: string): string => {
+  const parts = message.split(' | ').map((part) => part.trim()).filter(Boolean)
+  const mapped = parts.map((part) => {
+    const match = part.match(/The\s+([A-Za-z0-9_]+)\s+field\s+is\s+required\.?/i)
+    if (match) {
+      const key = match[1]
+      const label = REQUIRED_FIELD_LABELS[key]
+      if (label) {
+        return `Vui lòng nhập ${label}.`
+      }
+    }
+    return part
+  })
+  return mapped.join(' ')
+}
 
 export default function SellerCreateListingScreen() {
   const { language } = useLanguage()
   const createListingMutation = useCreateListing()
-  const submitListingMutation = useSubmitListing()
-  const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
   
   const [currentStep, setCurrentStep] = useState(0)
@@ -86,7 +115,8 @@ export default function SellerCreateListingScreen() {
   }, [imageUrls, videoUrl, groupsetPhotoUrl])
 
   const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    const nextValue = field === 'serial' ? value.toUpperCase() : value
+    setFormData((prev) => ({ ...prev, [field]: nextValue }))
   }
 
   const handleFileChange = (
@@ -144,9 +174,9 @@ export default function SellerCreateListingScreen() {
     if (
       !formData.title || !formData.category || !formData.brand || !formData.price ||
       !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
-      !formData.weight
+      !formData.weight || !formData.frameSize || !formData.condition || !formData.groupset || !formData.wheelSize
     ) {
-      setSubmitError(language === 'vi' ? 'Vui lòng điền đầy đủ các trường bắt buộc (*).' : 'Please fill all required fields (*).')
+      setSubmitError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
       return
     }
 
@@ -158,7 +188,7 @@ export default function SellerCreateListingScreen() {
     setIsSubmitting(true)
 
     try {
-      // 1. Tạo listing hoặc cập nhật draft hiện có
+      // 1. Tạo listing nháp
       const priceVal = Number(String(formData.price).replace(/,/g, ''))
       const payload = {
         title: formData.title,
@@ -180,37 +210,14 @@ export default function SellerCreateListingScreen() {
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      let listingId = ''
-      const storedId = typeof window !== 'undefined' ? window.localStorage.getItem(DRAFT_LISTING_ID_KEY) : null
-
-      if (storedId) {
-        try {
-          await sellerApi.getListingDetail(storedId)
-          await updateListingMutation.mutateAsync({ listingId: storedId, data: payload })
-          listingId = storedId
-        } catch {
-          if (typeof window !== 'undefined') {
-            window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
-          }
-          listingId = ''
-        }
-      }
+      const createRes = await createListingMutation.mutateAsync(payload)
+      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+      const rawId = nested.id ?? nested.listingId
+      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
 
       if (!listingId) {
-        const createRes = await createListingMutation.mutateAsync(payload)
-        const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
-        const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
-        const rawId = nested.id ?? nested.listingId
-        const createdId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
-
-        if (!createdId) {
-          throw new Error('Failed to retrieve listingId from response')
-        }
-
-        listingId = createdId
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(DRAFT_LISTING_ID_KEY, createdId)
-        }
+        throw new Error('Không lấy được ID tin đăng')
       }
 
       // 2. Upload media
@@ -219,30 +226,20 @@ export default function SellerCreateListingScreen() {
         await uploadMediaMutation.mutateAsync({ listingId, files: allMediaFiles })
       }
 
-      // 3. Gửi duyệt (submit)
-      await submitListingMutation.mutateAsync(listingId)
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
-      }
-
       setSubmitSuccess(
-        language === 'vi'
-          ? 'Đã gửi tin đăng lên hệ thống, vui lòng chờ admin duyệt.'
-          : 'Listing submitted successfully and is awaiting admin review.'
+        'Tạo tin nháp thành công. Vui lòng cập nhật và gửi duyệt tại trang chi tiết.'
       )
       
       // Reset form on success
       setTimeout(() => {
-        window.location.href = '/seller/listings'
+        window.location.href = `/seller/listings/${listingId}`
       }, 2000)
 
     } catch (error) {
       setSubmitError(
         error instanceof Error
-          ? error.message
-          : language === 'vi'
-            ? 'Không thể gửi tin lúc này. Vui lòng thử lại.'
-            : 'Unable to submit listing right now. Please try again.'
+          ? formatApiErrorMessage(error.message)
+          : 'Không thể tạo tin lúc này. Vui lòng thử lại.'
       )
     } finally {
       setIsSubmitting(false)
@@ -459,9 +456,9 @@ export default function SellerCreateListingScreen() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="carbon">Carbon</SelectItem>
-                        <SelectItem value="alloy">Alloy</SelectItem>
-                        <SelectItem value="steel">Steel</SelectItem>
-                        <SelectItem value="titanium">Titanium</SelectItem>
+                        <SelectItem value="alloy">Hợp kim</SelectItem>
+                        <SelectItem value="steel">Thép</SelectItem>
+                        <SelectItem value="titanium">Titan</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -487,7 +484,9 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="wheelSize">{language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'}</Label>
+                    <Label htmlFor="wheelSize">
+                      {language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.wheelSize} onValueChange={(value) => updateField('wheelSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn cỡ bánh' : 'Select wheel size'} />
@@ -819,7 +818,7 @@ export default function SellerCreateListingScreen() {
             ) : (
               <Button className="gap-2" onClick={handleSubmitForReview} disabled={isSubmitting}>
                 {isSubmitting ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isSubmitting ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
+                {isSubmitting ? 'Đang tạo...' : 'Tạo bản nháp'}
               </Button>
             )}
           </div>

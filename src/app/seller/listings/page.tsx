@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -51,6 +52,7 @@ function mapMockToSellerListings(): SellerListingItem[] {
 
 export default function SellerListingsPage() {
   const { language } = useLanguage()
+  const router = useRouter()
   const { data, isLoading, isError, error } = useSellerListings({ pageNumber: 1, pageSize: 10 })
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
@@ -159,12 +161,19 @@ export default function SellerListingsPage() {
         ) : (
         <div className="space-y-4">
           {myListings.map((listing) => (
-            <Link
+            <div
               key={listing.id}
-              href={`/seller/listings/${listing.id}`}
-              className="block"
+              role="button"
+              tabIndex={0}
+              className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+              onClick={() => router.push(`/seller/listings/${listing.id}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  router.push(`/seller/listings/${listing.id}`)
+                }
+              }}
             >
-              <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer">
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                   <Image
                     src={listing.images[0] ?? '/placeholder.svg'}
@@ -193,19 +202,17 @@ export default function SellerListingsPage() {
                   </Badge>
 
                   {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      asChild 
-                      onClick={(e) => { 
-                        e.preventDefault(); 
-                        e.stopPropagation(); 
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        router.push(`/seller/listings/${listing.id}/edit`)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
-                      <Link href={`/seller/listings/${listing.id}/edit`}>
-                        {language === 'vi' ? 'Sửa' : 'Edit'}
-                      </Link>
+                      {language === 'vi' ? 'Sửa' : 'Edit'}
                     </Button>
                   )}
 
@@ -256,8 +263,7 @@ export default function SellerListingsPage() {
 
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-              </div>
-            </Link>
+            </div>
           ))}
         </div>
         )}

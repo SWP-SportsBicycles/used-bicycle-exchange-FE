@@ -392,6 +392,13 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {currentStatus === 'draft' && (
+            <Button onClick={() => handleAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
+              <Send className="h-4 w-4 mr-2" />
+              Gửi duyệt
+            </Button>
+          )}
+
           {currentStatus === 'rejected' && (
             <Button onClick={() => handleAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />

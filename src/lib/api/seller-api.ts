@@ -15,7 +15,7 @@ export interface SellerListingFormData {
   paint: string;
   groupset: string;
   operating?: string;
-  tireRim?: string;
+  tireRim: string;
   brakeType: string;
   overall: string;
   price: number;
