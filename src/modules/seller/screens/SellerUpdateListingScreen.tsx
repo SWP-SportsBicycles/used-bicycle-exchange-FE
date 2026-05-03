@@ -4,8 +4,7 @@ import Image from 'next/image'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { sellerApi } from '@/lib/api/seller-api'
-import { useUpdateListing, useUploadMedia, useSubmitListing, useResubmitListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +26,54 @@ const steps = [
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
 
-const DRAFT_LISTING_ID_KEY = 'seller:draftListingId'
+const FRAME_MATERIAL_OPTIONS = [
+  { value: 'carbon', label: 'Carbon' },
+  { value: 'alloy', label: 'Hợp kim' },
+  { value: 'steel', label: 'Thép' },
+  { value: 'titanium', label: 'Titan' },
+]
+
+const BRAKE_TYPES = [
+  'Rim Brake',
+  'Mechanical Disc Brake',
+  'Hydraulic Disc Brake',
+]
+
+const WHEEL_SIZES = ['700c', '650b', '29', '27.5', '26']
+
+const REQUIRED_FIELD_LABELS: Record<string, string> = {
+  Title: 'tiêu đề',
+  Description: 'mô tả',
+  SerialNumber: 'số serial',
+  Category: 'loại xe',
+  Brand: 'thương hiệu',
+  FrameSize: 'kích cỡ khung',
+  Condition: 'tình trạng',
+  Groupset: 'bộ truyền động',
+  TireRim: 'cỡ bánh',
+  BrakeType: 'loại phanh',
+  Paint: 'màu sơn',
+  Overall: 'khấu hao / đánh giá',
+  Price: 'giá bán',
+  City: 'thành phố',
+  Weight: 'trọng lượng',
+}
+
+const formatApiErrorMessage = (message: string): string => {
+  const parts = message.split(' | ').map((part) => part.trim()).filter(Boolean)
+  const mapped = parts.map((part) => {
+    const match = part.match(/The\s+([A-Za-z0-9_]+)\s+field\s+is\s+required\.?/i)
+    if (match) {
+      const key = match[1]
+      const label = REQUIRED_FIELD_LABELS[key]
+      if (label) {
+        return `Vui lòng nhập ${label}.`
+      }
+    }
+    return part
+  })
+  return mapped.join(' ')
+}
 
 interface SellerUpdateListingScreenProps {
   listingId: string
@@ -92,6 +138,19 @@ function pickString(records: Record<string, unknown>[], keys: string[]): string 
     }
   }
   return ''
+}
+
+function pickNumber(records: Record<string, unknown>[], keys: string[]): number {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = getValueByKey(record, key)
+      const parsed = typeof value === 'number' ? value : Number(value)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+  return 0
 }
 
 function isVideoUrl(url: string): boolean {
@@ -161,16 +220,49 @@ function extractMediaSeed(initialData: unknown): MediaSeed {
   }
 }
 
-function str(v: unknown): string {
-  return typeof v === 'string' ? v : v != null ? String(v) : ''
+function normalizeValue(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[._/-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
+function normalizeOptionValue(input: string, options: Array<{ value: string; label: string }>): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  const match = options.find((option) =>
+    normalizeValue(option.value) === normalized || normalizeValue(option.label) === normalized
+  )
+  return match ? match.value : input
+}
+
+function normalizeStringOption(input: string, options: string[]): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  const match = options.find((option) => normalizeValue(option) === normalized)
+  return match ?? input
+}
+
+function normalizeCityValue(input: string): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  if (normalized.includes('ho chi minh') || normalized.includes('tp hcm') || normalized.includes('tphcm')) {
+    return 'TP.HCM'
+  }
+  if (normalized.includes('ha noi')) {
+    return 'Hà Nội'
+  }
+  if (normalized.includes('da nang')) {
+    return 'Đà Nẵng'
+  }
+  return input
 }
 
 export default function SellerUpdateListingScreen({ listingId, initialData }: SellerUpdateListingScreenProps) {
   const { language } = useLanguage()
   const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
-  const submitListingMutation = useSubmitListing()
-  const resubmitListingMutation = useResubmitListing()
   const mediaSeed = useMemo(() => extractMediaSeed(initialData), [initialData])
   
   // Track original status to determine which API to call after update
@@ -198,28 +290,50 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   // Combined loading state
   const isLoading = isSubmitting || 
     updateListingMutation.isPending || 
-    uploadMediaMutation.isPending ||
-    submitListingMutation.isPending ||
-    resubmitListingMutation.isPending
+    uploadMediaMutation.isPending
   
-  const [formData, setFormData] = useState({
-    title: str(initialData?.title),
-    category: str(initialData?.category),
-    brand: str(initialData?.brand),
-    condition: str(initialData?.condition),
-    description: str(initialData?.description),
-    frameSize: str(initialData?.frameSize),
-    weight: str(initialData?.weight),
-    frameMaterial: str(initialData?.frameMaterial),
-    groupset: str(initialData?.groupset),
-    wheelSize: str(initialData?.wheelSize) || str(initialData?.tireRim),
-    usageHistory: str(initialData?.usageHistory) || str(initialData?.operating),
-    serial: str(initialData?.serialNumber) || str(initialData?.serial),
-    city: str(initialData?.city),
-    price: str(initialData?.price),
-    paint: str(initialData?.paint),
-    brakeType: str(initialData?.brakeType),
-    overall: str(initialData?.overall),
+  const [formData, setFormData] = useState(() => {
+    const records = collectNestedRecords(initialData)
+    const root = toRecord(initialData) || {}
+    const sources = [root, ...records]
+
+    const rawCategory = pickString(sources, ['category', 'bikeType', 'type'])
+    const rawCondition = pickString(sources, ['condition', 'bikeCondition'])
+    const rawCity = pickString(sources, ['city', 'cityName', 'location'])
+    const rawFrameMaterial = pickString(sources, ['frameMaterial', 'material'])
+    const rawFrameSize = pickString(sources, ['frameSize', 'size'])
+    const rawGroupset = pickString(sources, ['groupset'])
+    const rawWheelSize = pickString(sources, ['wheelSize', 'tireRim', 'rimSize'])
+    const rawBrakeType = pickString(sources, ['brakeType', 'brake'])
+    const rawBrand = pickString(sources, ['brand', 'brandName'])
+    const rawTitle = pickString(sources, ['title', 'listingTitle', 'name'])
+    const rawDescription = pickString(sources, ['description', 'desc'])
+    const rawSerial = pickString(sources, ['serialNumber', 'serial', 'frameNumber'])
+    const rawUsageHistory = pickString(sources, ['usageHistory', 'operating'])
+    const rawPaint = pickString(sources, ['paint', 'color'])
+    const rawOverall = pickString(sources, ['overall', 'rating', 'depreciation'])
+    const rawPrice = pickNumber(sources, ['price', 'listingPrice'])
+    const rawWeight = pickNumber(sources, ['weight'])
+
+    return {
+      title: rawTitle,
+      category: normalizeOptionValue(rawCategory, CATEGORIES),
+      brand: normalizeStringOption(rawBrand, BRANDS),
+      condition: normalizeOptionValue(rawCondition, CONDITIONS),
+      description: rawDescription,
+      frameSize: normalizeStringOption(rawFrameSize, FRAME_SIZES),
+      weight: rawWeight ? String(rawWeight) : '',
+      frameMaterial: normalizeOptionValue(rawFrameMaterial, FRAME_MATERIAL_OPTIONS),
+      groupset: normalizeStringOption(rawGroupset, GROUPSETS),
+      wheelSize: normalizeStringOption(rawWheelSize, WHEEL_SIZES),
+      usageHistory: rawUsageHistory,
+      serial: rawSerial ? rawSerial.toUpperCase() : '',
+      city: normalizeOptionValue(normalizeCityValue(rawCity), CITIES),
+      price: rawPrice ? String(rawPrice) : '',
+      paint: rawPaint,
+      brakeType: normalizeStringOption(rawBrakeType, BRAKE_TYPES),
+      overall: rawOverall,
+    }
   })
 
   // State for files
@@ -252,7 +366,8 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const displayImageUrls = [...existingImageUrls, ...imageUrls]
 
   const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    const nextValue = field === 'serial' ? value.toUpperCase() : value
+    setFormData((prev) => ({ ...prev, [field]: nextValue }))
   }
 
   const handleFileChange = (
@@ -322,9 +437,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     if (
       !formData.title || !formData.category || !formData.brand || !formData.price ||
       !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
-      !formData.weight
+      !formData.weight || !formData.frameSize || !formData.condition || !formData.groupset || !formData.wheelSize
     ) {
-      setSubmitError(language === 'vi' ? 'Vui lòng điền đầy đủ các trường bắt buộc (*).' : 'Please fill all required fields (*).')
+      setSubmitError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
       return
     }
 
@@ -336,18 +451,6 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     setIsSubmitting(true)
 
     try {
-      try {
-        await sellerApi.getListingDetail(listingId)
-      } catch (fetchError) {
-        setSubmitError(
-          language === 'vi'
-            ? 'Không tìm thấy tin đăng để cập nhật. Vui lòng tải lại trang.'
-            : 'Unable to load listing for update. Please refresh the page.'
-        )
-        setIsSubmitting(false)
-        return
-      }
-
       // Prepare payload for update
       const priceVal = Number(String(formData.price).replace(/,/g, ''))
       const payload = {
@@ -370,88 +473,16 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      // Different flows based on original status
-      if (originalStatus === 'rejected') {
-        // FLOW 1: Resubmit first, then update (only for rejected listings)
-        try {
-          await resubmitListingMutation.mutateAsync(listingId)
-          if (typeof window !== 'undefined') {
-            const storedId = window.localStorage.getItem(DRAFT_LISTING_ID_KEY)
-            if (storedId === listingId) {
-              window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
-            }
-          }
-          
-          // Update listing after resubmit succeeds
-          await updateListingMutation.mutateAsync({
-            listingId,
-            data: payload
-          })
-          
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Gửi lại tin đăng thành công! Tin đang chờ duyệt.'
-              : 'Listing resubmitted successfully! Waiting for approval.'
-          )
-        } catch (resubmitError) {
-          // If resubmit fails, don't try to update
-          throw resubmitError
-        }
-      } else if (originalStatus === 'withdrawn') {
-        // FLOW 2: Only update (withdrawn listings cannot be resubmitted)
-        await updateListingMutation.mutateAsync({
-          listingId,
-          data: payload
-        })
-        
-        setSubmitSuccess(
-          language === 'vi'
-            ? 'Cập nhật tin đăng thành công! Tin vẫn ở trạng thái đã rút.'
-            : 'Listing updated successfully! Listing remains withdrawn.'
-        )
-      } else if (originalStatus === 'draft') {
-        // FLOW 2: Update first, then submit
-        try {
-          await updateListingMutation.mutateAsync({
-            listingId,
-            data: payload
-          })
-          
-          await submitListingMutation.mutateAsync(listingId)
-          if (typeof window !== 'undefined') {
-            const storedId = window.localStorage.getItem(DRAFT_LISTING_ID_KEY)
-            if (storedId === listingId) {
-              window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
-            }
-          }
-          
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Gửi tin đăng thành công! Tin đang chờ duyệt.'
-              : 'Listing submitted successfully! Waiting for approval.'
-          )
-        } catch (submitError) {
-          // If submit fails, listing is still updated
-          console.warn('Submit failed:', submitError)
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Cập nhật tin đăng thành công! (Chưa gửi duyệt)'
-              : 'Listing updated successfully! (Not submitted)'
-          )
-        }
-      } else {
-        // FLOW 3: Just update
-        await updateListingMutation.mutateAsync({
-          listingId,
-          data: payload
-        })
-        
-        setSubmitSuccess(
-          language === 'vi'
-            ? 'Cập nhật tin đăng thành công!'
-            : 'Listing updated successfully!'
-        )
-      }
+      await updateListingMutation.mutateAsync({
+        listingId,
+        data: payload
+      })
+
+      setSubmitSuccess(
+        originalStatus === 'draft'
+          ? 'Cập nhật bản nháp thành công. Vui lòng gửi duyệt tại trang chi tiết.'
+          : 'Cập nhật tin đăng thành công.'
+      )
 
       // Upload new media files if any (common for all flows)
       const newMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
@@ -467,10 +498,8 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     } catch (error) {
       setSubmitError(
         error instanceof Error
-          ? error.message
-          : language === 'vi'
-            ? 'Không thể cập nhật tin lúc này. Vui lòng thử lại.'
-            : 'Unable to update listing right now. Please try again.'
+          ? formatApiErrorMessage(error.message)
+          : 'Không thể cập nhật tin lúc này. Vui lòng thử lại.'
       )
     } finally {
       setIsSubmitting(false)
@@ -686,10 +715,11 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                         <SelectValue placeholder={language === 'vi' ? 'Chọn chất liệu' : 'Select material'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="carbon">Carbon</SelectItem>
-                        <SelectItem value="alloy">Alloy</SelectItem>
-                        <SelectItem value="steel">Steel</SelectItem>
-                        <SelectItem value="titanium">Titanium</SelectItem>
+                        {FRAME_MATERIAL_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -715,7 +745,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="wheelSize">{language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'}</Label>
+                    <Label htmlFor="wheelSize">
+                      {language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.wheelSize} onValueChange={(value) => updateField('wheelSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn cỡ bánh' : 'Select wheel size'} />
@@ -1063,7 +1095,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
             ) : (
               <Button className="gap-2" onClick={handleSubmitForReview} disabled={isLoading}>
                 {isLoading ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isLoading ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
+                {isLoading ? 'Đang cập nhật...' : 'Lưu cập nhật'}
               </Button>
             )}
           </div>

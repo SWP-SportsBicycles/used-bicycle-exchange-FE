@@ -13,7 +13,7 @@ export const listingSchema = z.object({
   paint: z.string().optional(),
   groupset: z.string().min(1, "Thong tin groupset bat buoc"),
   operating: z.string().optional(),
-  tireRim: z.string().optional(),
+  tireRim: z.string().min(1, "Vui long chon co banh"),
   brakeType: z.string().optional(),
   overall: z.string().optional(),
   price: z.coerce.number().positive("Gia phai lon hon 0"),
