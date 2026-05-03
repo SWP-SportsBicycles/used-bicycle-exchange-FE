@@ -188,7 +188,7 @@ export default function SellerCreateListingScreen() {
           await sellerApi.getListingDetail(storedId)
           await updateListingMutation.mutateAsync({ listingId: storedId, data: payload })
           listingId = storedId
-        } catch (storedError) {
+        } catch {
           if (typeof window !== 'undefined') {
             window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
           }

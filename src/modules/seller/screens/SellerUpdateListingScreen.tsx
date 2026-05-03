@@ -338,7 +338,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     try {
       try {
         await sellerApi.getListingDetail(listingId)
-      } catch (fetchError) {
+      } catch {
         setSubmitError(
           language === 'vi'
             ? 'Không tìm thấy tin đăng để cập nhật. Vui lòng tải lại trang.'
