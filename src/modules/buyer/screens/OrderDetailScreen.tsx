@@ -47,7 +47,7 @@ export default function OrderDetailScreen({ params }: PageProps) {
     )
   }
 
-  const showCreateDisputeButton = ['delivered', 'completed'].includes(order.status)
+  const showCreateDisputeButton = order.status === 'delivered'
   const showViewDisputeButton = order.status === 'disputed'
   // Bug fix: cancel chỉ cho phép khi 'pending' — đơn đã paid không thể cancel từ FE
   const showCancelButton = order.status === 'pending'

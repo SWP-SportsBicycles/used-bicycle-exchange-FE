@@ -113,6 +113,7 @@ export interface BuyerOrder {
   shippingFee: number;
   totalPrice: number;
   payosQrUrl?: string;
+  orderCode?: string;
   waybillCode?: string;         // GHN tracking code
   expiresAt?: string;           // timer_draft expiry (ISO 8601)
   seller?: {                    // Full PII — hiện sau khi thanh toán
@@ -219,6 +220,27 @@ export interface BuyerReport {
     bankAccountName?: string;
     bankAccountNumber?: string;
   };
+}
+
+/**
+ * Helper to derive the UI status of an order based on its backend status and any associated reports.
+ * This ensures consistency between list and detail views.
+ */
+export function deriveOrderStatus(orderStatus: BuyerOrder["status"], report?: BuyerReport): BuyerOrder["status"] {
+  if (!report) return orderStatus;
+
+  // If the dispute was resolved with a refund -> show as "refunded"
+  if (report.transactionStatus === 'Refunded' || report.refundStatus === 'Success') {
+    return 'refunded';
+  }
+
+  // If the report is rejected, we revert to the original status
+  if (report.status === 'Rejected') {
+    return orderStatus;
+  }
+
+  // Any other active report (Pending, Reviewing, Resolved but not refunded) is considered "disputed"
+  return 'disputed';
 }
 
 export interface WishlistPage {
@@ -802,6 +824,7 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     payosQrUrl: parseOptionalString(
       paymentSource?.paymentLink ?? paymentSource?.checkoutUrl ?? src.checkoutUrl ?? src.payosQrUrl
     ),
+    orderCode: src.orderCode ? String(src.orderCode) : undefined,
     waybillCode: (src.waybillCode as string) || undefined,
     expiresAt: (src.expiresAt as string) || undefined,
     seller:

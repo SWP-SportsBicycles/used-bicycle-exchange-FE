@@ -273,8 +273,8 @@ export default function ListingDetailScreen({ params }: PageProps) {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <WishlistButton
-                    key={listing.bikeId ?? listing.id}
-                    listingId={listing.bikeId ?? listing.id}
+                    key={listing.bikeId || listing.id}
+                    listingId={listing.bikeId || listing.id}
                     initialIsWishlisted={Boolean(listing.isWishlisted)}
                   />
                   <Button

@@ -377,29 +377,27 @@ export default function OrderListScreen() {
                           </Button>
                         )}
 
-                        {/* delivered: complete order */}
+                        {/* delivered: complete order & dispute */}
                         {order.status === 'delivered' && (
-                          <Button
-                            className="w-full h-11 rounded-xl font-bold text-sm bg-success hover:bg-success/90 text-white shadow-lg shadow-success/20 animate-pulse-glow"
-                            disabled={completingOrderId === order.id}
-                            onClick={() => setPendingCompleteId(order.id)}
-                          >
-                            {completingOrderId === order.id ? (
-                              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Đang xử lý...</>
-                            ) : (
-                              <><CheckCircle className="h-4 w-4 mr-2" />Đã nhận được hàng</>
-                            )}
-                          </Button>
-                        )}
-
-                        {/* completed: dispute button */}
-                        {order.status === 'completed' && (
-                          <Button asChild variant="outline" className="w-full h-11 rounded-xl font-semibold text-sm border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-400">
-                            <Link href={`/buyer/orders/${order.id}/dispute`}>
-                              <ShieldAlert className="h-4 w-4 mr-2" />
-                              Khiếu nại
-                            </Link>
-                          </Button>
+                          <>
+                            <Button
+                              className="w-full h-11 rounded-xl font-bold text-sm bg-success hover:bg-success/90 text-white shadow-lg shadow-success/20 animate-pulse-glow"
+                              disabled={completingOrderId === order.id}
+                              onClick={() => setPendingCompleteId(order.id)}
+                            >
+                              {completingOrderId === order.id ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Đang xử lý...</>
+                              ) : (
+                                <><CheckCircle className="h-4 w-4 mr-2" />Đã nhận được hàng</>
+                              )}
+                            </Button>
+                            <Button asChild variant="outline" className="w-full h-11 rounded-xl font-semibold text-sm border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-400">
+                              <Link href={`/buyer/orders/${order.id}/dispute`}>
+                                <ShieldAlert className="h-4 w-4 mr-2" />
+                                Khiếu nại
+                              </Link>
+                            </Button>
+                          </>
                         )}
 
                         {/* View detail — always shown */}

@@ -34,6 +34,8 @@
 - [ ] Seller flow can open create listing page
 - [ ] Admin/Inspector routes are blocked for wrong roles
 - [ ] Chat endpoint works from client through server route
+- [ ] All payments (sandbox/mock) + order flow (UI + state)
+- [ ] Login/Auth persistence + profile updates + seller registration
 
 ## Risks & Rollback
 - Risks:

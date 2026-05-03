@@ -136,8 +136,8 @@ export function ListingCard({ listing, index = 0, promoTag }: ListingCardProps) 
             {/* Wishlist — moves up when CTA appears */}
             <div className="absolute bottom-3 right-3 z-10 transition-transform duration-300 group-hover:-translate-y-10">
               <WishlistButton
-                key={`${listing.bikeId ?? listing.id}-${listing.isWishlisted ? '1' : '0'}`}
-                listingId={listing.bikeId ?? listing.id}
+                key={`${listing.bikeId || listing.id}-${listing.isWishlisted ? '1' : '0'}`}
+                listingId={listing.bikeId || listing.id}
                 initialIsWishlisted={Boolean(listing.isWishlisted)}
                 variant="ghost"
                 className="h-9 w-9 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-white shadow-md hover:bg-black/40 hover:scale-110"

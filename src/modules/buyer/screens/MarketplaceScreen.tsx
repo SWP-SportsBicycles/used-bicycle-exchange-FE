@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select'
 import { useMarketplaceListings } from '@/modules/marketplace/hooks/useMarketplaceListings'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
+import { BRANDS, FRAME_SIZES, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
 import { formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
@@ -28,7 +28,6 @@ const initialFilters: FilterState = {
   categories: [],
   brands: [],
   frameSizes: [],
-  groupsets: [],
   conditions: [],
   cities: [],
   priceRange: [0, 100000000],
@@ -216,22 +215,19 @@ function MarketplacePageContent({
   const activeChips = useMemo(() => {
     const chips: { id: string; label: string; onRemove: () => void }[] = []
     filters.categories.forEach(v =>
-      chips.push({ id: `cat-${v}`, label: CATEGORY_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, categories: p.categories.filter(x => x !== v) })) })
+      chips.push({ id: `cat-${v}`, label: CATEGORY_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, categories: [] })) })
     )
     filters.brands.forEach(v =>
-      chips.push({ id: `brand-${v}`, label: v, onRemove: () => setFilters(p => ({ ...p, brands: p.brands.filter(x => x !== v) })) })
+      chips.push({ id: `brand-${v}`, label: v, onRemove: () => setFilters(p => ({ ...p, brands: [] })) })
     )
     filters.conditions.forEach(v =>
-      chips.push({ id: `cond-${v}`, label: CONDITION_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, conditions: p.conditions.filter(x => x !== v) })) })
+      chips.push({ id: `cond-${v}`, label: CONDITION_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, conditions: [] })) })
     )
     filters.cities.forEach(v =>
-      chips.push({ id: `city-${v}`, label: CITY_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, cities: p.cities.filter(x => x !== v) })) })
+      chips.push({ id: `city-${v}`, label: CITY_LABELS[v] ?? v, onRemove: () => setFilters(p => ({ ...p, cities: [] })) })
     )
     filters.frameSizes.forEach(v =>
-      chips.push({ id: `frame-${v}`, label: `Size ${v}`, onRemove: () => setFilters(p => ({ ...p, frameSizes: p.frameSizes.filter(x => x !== v) })) })
-    )
-    filters.groupsets.forEach(v =>
-      chips.push({ id: `gs-${v}`, label: v, onRemove: () => setFilters(p => ({ ...p, groupsets: p.groupsets.filter(x => x !== v) })) })
+      chips.push({ id: `frame-${v}`, label: `Size ${v}`, onRemove: () => setFilters(p => ({ ...p, frameSizes: [] })) })
     )
     if (filters.priceRange[0] > 0 || filters.priceRange[1] < 100_000_000) {
       chips.push({
