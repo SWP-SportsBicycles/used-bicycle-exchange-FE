@@ -4,7 +4,8 @@ import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useCreateListing, useSubmitListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { sellerApi } from '@/lib/api/seller-api'
+import { useCreateListing, useSubmitListing, useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,10 +27,13 @@ const steps = [
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
 
+const DRAFT_LISTING_ID_KEY = 'seller:draftListingId'
+
 export default function SellerCreateListingScreen() {
   const { language } = useLanguage()
   const createListingMutation = useCreateListing()
   const submitListingMutation = useSubmitListing()
+  const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
   
   const [currentStep, setCurrentStep] = useState(0)
@@ -41,10 +45,10 @@ export default function SellerCreateListingScreen() {
     title: '',
     category: '',
     brand: '',
-    model: '',
     condition: '',
     description: '',
     frameSize: '',
+    weight: '',
     frameMaterial: '',
     groupset: '',
     wheelSize: '',
@@ -139,7 +143,8 @@ export default function SellerCreateListingScreen() {
     // Basic validation
     if (
       !formData.title || !formData.category || !formData.brand || !formData.price ||
-      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial
+      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
+      !formData.weight
     ) {
       setSubmitError(language === 'vi' ? 'Vui lòng điền đầy đủ các trường bắt buộc (*).' : 'Please fill all required fields (*).')
       return
@@ -153,7 +158,7 @@ export default function SellerCreateListingScreen() {
     setIsSubmitting(true)
 
     try {
-      // 1. Tạo listing
+      // 1. Tạo listing hoặc cập nhật draft hiện có
       const priceVal = Number(String(formData.price).replace(/,/g, ''))
       const payload = {
         title: formData.title,
@@ -162,6 +167,7 @@ export default function SellerCreateListingScreen() {
         category: formData.category,
         brand: formData.brand,
         frameSize: formData.frameSize,
+        weight: Number(formData.weight),
         frameMaterial: formData.frameMaterial,
         condition: formData.condition,
         groupset: formData.groupset,
@@ -174,14 +180,37 @@ export default function SellerCreateListingScreen() {
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      const createRes = await createListingMutation.mutateAsync(payload)
-      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
-      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
-      const rawId = nested.id ?? nested.listingId
-      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
-      
+      let listingId = ''
+      const storedId = typeof window !== 'undefined' ? window.localStorage.getItem(DRAFT_LISTING_ID_KEY) : null
+
+      if (storedId) {
+        try {
+          await sellerApi.getListingDetail(storedId)
+          await updateListingMutation.mutateAsync({ listingId: storedId, data: payload })
+          listingId = storedId
+        } catch (storedError) {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
+          }
+          listingId = ''
+        }
+      }
+
       if (!listingId) {
-        throw new Error('Failed to retrieve listingId from response')
+        const createRes = await createListingMutation.mutateAsync(payload)
+        const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+        const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+        const rawId = nested.id ?? nested.listingId
+        const createdId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+
+        if (!createdId) {
+          throw new Error('Failed to retrieve listingId from response')
+        }
+
+        listingId = createdId
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(DRAFT_LISTING_ID_KEY, createdId)
+        }
       }
 
       // 2. Upload media
@@ -192,6 +221,9 @@ export default function SellerCreateListingScreen() {
 
       // 3. Gửi duyệt (submit)
       await submitListingMutation.mutateAsync(listingId)
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DRAFT_LISTING_ID_KEY)
+      }
 
       setSubmitSuccess(
         language === 'vi'
@@ -291,7 +323,9 @@ export default function SellerCreateListingScreen() {
             {currentStep === 0 && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="title">{language === 'vi' ? 'Tiêu đề' : 'Title'} *</Label>
+                  <Label htmlFor="title">
+                    {language === 'vi' ? 'Tiêu đề' : 'Title'} <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="title"
                     placeholder={language === 'vi' ? 'VD: Giant TCR Advanced Pro 1 - Full Carbon' : 'E.g., Giant TCR Advanced Pro 1 - Full Carbon'}
@@ -302,7 +336,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>{language === 'vi' ? 'Loại Xe' : 'Category'} *</Label>
+                    <Label>
+                      {language === 'vi' ? 'Loại Xe' : 'Category'} <span className="text-red-500">*</span>
+                    </Label>
                     <RadioGroup
                       value={formData.category}
                       onValueChange={(value) => updateField('category', value)}
@@ -325,7 +361,9 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>{language === 'vi' ? 'Tình Trạng' : 'Condition'} *</Label>
+                    <Label>
+                      {language === 'vi' ? 'Tình Trạng' : 'Condition'} <span className="text-red-500">*</span>
+                    </Label>
                     <RadioGroup
                       value={formData.condition}
                       onValueChange={(value) => updateField('condition', value)}
@@ -353,7 +391,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="brand">{language === 'vi' ? 'Thương Hiệu' : 'Brand'} *</Label>
+                    <Label htmlFor="brand">
+                      {language === 'vi' ? 'Thương Hiệu' : 'Brand'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.brand} onValueChange={(value) => updateField('brand', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thương hiệu' : 'Select brand'} />
@@ -368,19 +408,13 @@ export default function SellerCreateListingScreen() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="model">{language === 'vi' ? 'Model' : 'Model'}</Label>
-                    <Input
-                      id="model"
-                      placeholder={language === 'vi' ? 'VD: TCR Advanced Pro 1' : 'E.g., TCR Advanced Pro 1'}
-                      value={formData.model}
-                      onChange={(e) => updateField('model', e.target.value)}
-                    />
-                  </div>
+                  <div className="space-y-2" />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">{language === 'vi' ? 'Mô Tả' : 'Description'} *</Label>
+                  <Label htmlFor="description">
+                    {language === 'vi' ? 'Mô Tả' : 'Description'} <span className="text-red-500">*</span>
+                  </Label>
                   <Textarea
                     id="description"
                     placeholder={
@@ -400,7 +434,9 @@ export default function SellerCreateListingScreen() {
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="frameSize">{language === 'vi' ? 'Kích Cỡ Khung' : 'Frame Size'} *</Label>
+                    <Label htmlFor="frameSize">
+                      {language === 'vi' ? 'Kích Cỡ Khung' : 'Frame Size'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.frameSize} onValueChange={(value) => updateField('frameSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn size' : 'Select size'} />
@@ -433,7 +469,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="groupset">{language === 'vi' ? 'Bộ Truyền Động' : 'Groupset'} *</Label>
+                    <Label htmlFor="groupset">
+                      {language === 'vi' ? 'Bộ Truyền Động' : 'Groupset'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.groupset} onValueChange={(value) => updateField('groupset', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn groupset' : 'Select groupset'} />
@@ -467,7 +505,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="brakeType">{language === 'vi' ? 'Loại Phanh' : 'Brake Type'} *</Label>
+                    <Label htmlFor="brakeType">
+                      {language === 'vi' ? 'Loại Phanh' : 'Brake Type'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.brakeType} onValueChange={(value) => updateField('brakeType', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn loại phanh' : 'Select brake type'} />
@@ -481,7 +521,9 @@ export default function SellerCreateListingScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="paint">{language === 'vi' ? 'Màu Sơn' : 'Paint Color'} *</Label>
+                    <Label htmlFor="paint">
+                      {language === 'vi' ? 'Màu Sơn' : 'Paint Color'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="paint"
                       placeholder={language === 'vi' ? 'VD: Đen bóng / Nhám' : 'E.g., Gloss Black'}
@@ -493,7 +535,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="overall">{language === 'vi' ? 'Khấu Hao / Đánh Giá (%)' : 'Overall Condition'} *</Label>
+                    <Label htmlFor="overall">
+                      {language === 'vi' ? 'Khấu Hao / Đánh Giá (%)' : 'Overall Condition'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="overall"
                       placeholder={language === 'vi' ? 'VD: Xe mới 95%, ít xước xát' : 'E.g., 95% like new'}
@@ -502,30 +546,47 @@ export default function SellerCreateListingScreen() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="serial">{language === 'vi' ? 'Số Serial' : 'Serial Number'} *</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-sm">
-                              {language === 'vi'
-                                ? 'Số serial giúp xác minh nguồn gốc xe và ngăn chặn hàng gian lận'
-                                : 'Serial number helps verify bike origin and prevent fraud'}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+                    <Label htmlFor="weight">
+                      {language === 'vi' ? 'Trọng Lượng (kg)' : 'Weight (kg)'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
-                      id="serial"
-                      placeholder="VD: GNT2023TCR001234"
-                      value={formData.serial}
-                      onChange={(e) => updateField('serial', e.target.value)}
+                      id="weight"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="7.5"
+                      value={formData.weight}
+                      onChange={(e) => updateField('weight', e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="serial">
+                      {language === 'vi' ? 'Số Serial' : 'Serial Number'} <span className="text-red-500">*</span>
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            {language === 'vi'
+                              ? 'Số serial giúp xác minh nguồn gốc xe và ngăn chặn hàng gian lận'
+                              : 'Serial number helps verify bike origin and prevent fraud'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Input
+                    id="serial"
+                    placeholder="VD: GNT2023TCR001234"
+                    value={formData.serial}
+                    onChange={(e) => updateField('serial', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -545,7 +606,9 @@ export default function SellerCreateListingScreen() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="city">{language === 'vi' ? 'Thành Phố' : 'City'} *</Label>
+                    <Label htmlFor="city">
+                      {language === 'vi' ? 'Thành Phố' : 'City'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.city} onValueChange={(value) => updateField('city', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thành phố' : 'Select city'} />
@@ -569,7 +632,9 @@ export default function SellerCreateListingScreen() {
                 {/* Images */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-base">{language === 'vi' ? 'Hình Ảnh Xe' : 'Bike Photos'} *</Label>
+                    <Label className="text-base">
+                      {language === 'vi' ? 'Hình Ảnh Xe' : 'Bike Photos'} <span className="text-red-500">*</span>
+                    </Label>
                     <p className="text-sm text-muted-foreground">
                       {language === 'vi'
                         ? 'Tải lên ít nhất 1 ảnh chất lượng cao (tối đa 10 ảnh)'
@@ -676,7 +741,9 @@ export default function SellerCreateListingScreen() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="price">{language === 'vi' ? 'Giá Bán' : 'Selling Price'} (VND) *</Label>
+                  <Label htmlFor="price">
+                    {language === 'vi' ? 'Giá Bán' : 'Selling Price'} (VND) <span className="text-red-500">*</span>
+                  </Label>
                   <div className="relative">
                     <Input
                       id="price"

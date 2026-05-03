@@ -192,21 +192,6 @@ export default function SellerListingsPage() {
                     {resolveStatusLabel(listing.status)}
                   </Badge>
 
-                  {listing.status === 'draft' && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={(e) => { 
-                        e.preventDefault(); 
-                        e.stopPropagation(); 
-                        setConfirmState({ action: 'submit', listing }); 
-                      }}
-                      style={{ pointerEvents: 'auto' }}
-                    >
-                      {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
-                    </Button>
-                  )}
-
                   {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
                     <Button 
                       size="sm" 

@@ -45,10 +45,10 @@ type SellerListingDetail = {
   status: ListingStatus
   serialNumber: string
   brand: string
-  model: string
   category: string
   condition: string
   frameSize: string
+  weight: number
   frameMaterial: string
   groupset: string
   tireRim: string
@@ -265,10 +265,10 @@ function normalizeListingDetail(payload: unknown): SellerListingDetail | null {
     status: normalizeStatus(pickString(records, ['status'])),
     serialNumber: pickString(records, ['serialNumber', 'serial', 'frameNumber']),
     brand: pickString(records, ['brand']),
-    model: pickString(records, ['model']),
     category: pickString(records, ['category']),
     condition: pickString(records, ['condition']),
     frameSize: pickString(records, ['frameSize', 'size']),
+    weight: pickNumber(records, ['weight']),
     frameMaterial: pickString(records, ['frameMaterial']),
     groupset: pickString(records, ['groupset']),
     tireRim: pickString(records, ['tireRim', 'wheelSize']),
@@ -392,13 +392,6 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {currentStatus === 'draft' && (
-            <Button onClick={() => handleAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
-              <Send className="h-4 w-4 mr-2" />
-              {language === 'vi' ? 'Gửi duyệt ngay' : 'Submit Now'}
-            </Button>
-          )}
-
           {currentStatus === 'rejected' && (
             <Button onClick={() => handleAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
@@ -467,10 +460,6 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
               <p className="font-medium">{listing.brand || '-'}</p>
             </div>
             <div>
-              <p className="text-muted-foreground mb-1">Model</p>
-              <p className="font-medium">{listing.model || '-'}</p>
-            </div>
-            <div>
               <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Loại xe' : 'Category'}</p>
               <p className="font-medium">{listing.category || '-'}</p>
             </div>
@@ -481,6 +470,10 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
             <div>
               <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Kích cỡ' : 'Size'}</p>
               <p className="font-medium">{listing.frameSize || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Trọng lượng (kg)' : 'Weight (kg)'}</p>
+              <p className="font-medium">{listing.weight || '-'}</p>
             </div>
             <div>
               <p className="text-muted-foreground mb-1">{language === 'vi' ? 'Chất liệu khung' : 'Frame material'}</p>

@@ -7,6 +7,7 @@ export const listingSchema = z.object({
   category: z.string().min(1, "Vui long chon loai xe"),
   brand: z.string().min(1, "Vui long chon thuong hieu"),
   frameSize: z.string().min(1, "Vui long chon size khung"),
+  weight: z.coerce.number({ invalid_type_error: "Can nhap trong luong" }),
   frameMaterial: z.string().optional(),
   condition: z.string().min(1, "Vui long chon tinh trang"),
   paint: z.string().optional(),

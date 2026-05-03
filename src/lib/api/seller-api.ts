@@ -9,6 +9,7 @@ export interface SellerListingFormData {
   category: string;
   brand: string;
   frameSize: string;
+  weight: number;
   frameMaterial?: string;
   condition: string;
   paint: string;
@@ -28,10 +29,10 @@ export interface SellerListing {
   serialNumber: string;
   category: string;
   brand: string;
-  model: string;
   frameSize: string;
   frameMaterial: string;
   condition: string;
+  weight?: number;
   price: number;
   city: string;
   status: 'draft' | 'pending_review' | 'published' | 'sold' | 'withdrawn' | string;
