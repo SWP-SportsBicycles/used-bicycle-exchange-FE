@@ -8,10 +8,9 @@ import {
   normalizeListingsPayload, 
   normalizeOrdersPayload 
 } from '@/modules/seller/utils/normalization'
-import { 
-  Package, 
-  ShoppingCart, 
-  Eye,
+import {
+  Package,
+  ShoppingCart,
   CheckCircle2,
   ArrowUpRight,
   ChevronRight
@@ -67,8 +66,6 @@ export default function SellerDashboardPage() {
       !['completed', 'cancelled', 'delivered'].includes(o.status)
     ).length,
     totalEarnings: user.walletBalance || 0,
-    thisMonthViews: 1247, // Mock as backend doesn't have views yet
-    conversionRate: 4.8,  // Mock
   }
 
   if (isLoadingListings || isLoadingOrders) {
@@ -157,28 +154,6 @@ export default function SellerDashboardPage() {
           </Link>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Lượt Xem' : 'Views'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                <Eye className="h-4 w-4 text-[#407F3E]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.thisMonthViews.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.conversionRate}% {language === 'vi' ? 'tỉ lệ chuyển đổi' : 'conversion'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
       {/* Recent Orders & Listings */}
