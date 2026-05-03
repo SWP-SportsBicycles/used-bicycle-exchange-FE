@@ -71,7 +71,7 @@ export default function CreateInspectorPage() {
         </h1>
         <p className="text-muted-foreground">
           {language === "vi"
-            ? "Tạo mới tài khoản inspector để phân công nhiệm vụ kiểm định."
+            ? "Tạo mới tài khoản kiểm định viên để phân công nhiệm vụ kiểm định."
             : "Create inspector accounts for listing verification assignments."}
         </p>
       </div>
@@ -91,7 +91,7 @@ export default function CreateInspectorPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
-            {language === "vi" ? "Thông Tin Inspector" : "Inspector Information"}
+            {language === "vi" ? "Thông Tin Kiểm Định Viên" : "Inspector Information"}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -155,7 +155,7 @@ export default function CreateInspectorPage() {
 
               <Button type="submit" className="w-full sm:w-auto" disabled={createInspectorMutation.isPending}>
                 {createInspectorMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {language === "vi" ? "Create Inspector" : "Create Inspector"}
+                {language === "vi" ? "Tạo Kiểm Định Viên" : "Create Inspector"}
               </Button>
             </form>
           </Form>

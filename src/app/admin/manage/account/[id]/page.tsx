@@ -68,6 +68,9 @@ export default function AccountDetailPage() {
   })
 
   const user = userQuery.data
+  const isBuyer = user?.role === 'BUYER'
+  const isSeller = user?.role === 'SELLER'
+  const hidePhone = isBuyer || isSeller
 
   if (userQuery.isLoading) {
     return (
@@ -182,29 +185,35 @@ export default function AccountDetailPage() {
                     <p className="font-medium">{user.email}</p>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      {language === 'vi' ? 'Số điện thoại' : 'Phone Number'}
+                  {!hidePhone && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        {language === 'vi' ? 'Số điện thoại' : 'Phone Number'}
+                      </div>
+                      <p className="font-medium">{user.phoneNumber || '-'}</p>
                     </div>
-                    <p className="font-medium">{user.phoneNumber || '-'}</p>
-                  </div>
+                  )}
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Wallet className="h-4 w-4" />
-                      {language === 'vi' ? 'Tổng doanh thu' : 'Total Revenue'}
+                  {(isSeller || (!isBuyer && !isSeller)) && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Wallet className="h-4 w-4" />
+                        {language === 'vi' ? 'Tổng doanh thu' : 'Total Revenue'}
+                      </div>
+                      <p className="font-medium text-lg text-success">{formatVND(user.totalRevenue || 0)}</p>
                     </div>
-                    <p className="font-medium text-lg text-success">{formatVND(user.totalRevenue || 0)}</p>
-                  </div>
+                  )}
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Wallet className="h-4 w-4" />
-                      {language === 'vi' ? 'Tổng chi tiêu' : 'Total Spent'}
+                  {(isBuyer || (!isBuyer && !isSeller)) && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Wallet className="h-4 w-4" />
+                        {language === 'vi' ? 'Tổng chi tiêu' : 'Total Spent'}
+                      </div>
+                      <p className="font-medium text-lg">{formatVND(user.totalSpent || 0)}</p>
                     </div>
-                    <p className="font-medium text-lg">{formatVND(user.totalSpent || 0)}</p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -276,10 +285,12 @@ export default function AccountDetailPage() {
                 <span className="font-mono">{user.firebaseUID}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span>User ID:</span>
-              <span className="font-mono">{user.id}</span>
-            </div>
+            {!hidePhone && (
+              <div className="flex justify-between">
+                <span>User ID:</span>
+                <span className="font-mono">{user.id}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>{language === 'vi' ? 'Tổng đơn hàng:' : 'Total orders:'}</span>
               <span>{user.totalOrders ?? 0}</span>
@@ -288,10 +299,12 @@ export default function AccountDetailPage() {
               <span>{language === 'vi' ? 'Đơn hoàn tất:' : 'Completed orders:'}</span>
               <span>{user.completedOrders ?? 0}</span>
             </div>
-            <div className="flex justify-between">
-              <span>{language === 'vi' ? 'Tổng listings:' : 'Total listings:'}</span>
-              <span>{user.totalListings ?? 0}</span>
-            </div>
+            {isSeller && (
+              <div className="flex justify-between">
+                <span>{language === 'vi' ? 'Tổng listings:' : 'Total listings:'}</span>
+                <span>{user.totalListings ?? 0}</span>
+              </div>
+            )}
             {(user.bankName || user.bankAccountNumber || user.bankAccountName) && (
               <div className="pt-2 border-t border-border">
                 <p className="font-medium text-foreground mb-1">{language === 'vi' ? 'Thông tin ngân hàng' : 'Bank Information'}</p>

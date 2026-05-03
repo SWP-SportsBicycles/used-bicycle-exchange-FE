@@ -16,14 +16,38 @@ import { cn } from '@/lib/utils'
 
 const statusClass: Record<string, string> = {
   Locked: 'bg-destructive/15 text-destructive border-destructive/30',
+  Pending: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  pending: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  Paid: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  paid: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
   Confirmed: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  Shipping: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  shipping: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  Delivered: 'bg-teal-500/15 text-teal-700 border-teal-500/30',
+  delivered: 'bg-teal-500/15 text-teal-700 border-teal-500/30',
   Completed: 'bg-success/15 text-success border-success/30',
+  Cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+  cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+  Disputed: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
+  disputed: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
 }
 
 const statusLabel: Record<string, { vi: string; en: string }> = {
   Locked: { vi: 'Đã khóa', en: 'Locked' },
+  Pending: { vi: 'Chờ xử lý', en: 'Pending' },
+  pending: { vi: 'Chờ xử lý', en: 'Pending' },
+  Paid: { vi: 'Đã thanh toán', en: 'Paid' },
+  paid: { vi: 'Đã thanh toán', en: 'Paid' },
   Confirmed: { vi: 'Đã xác nhận', en: 'Confirmed' },
+  Shipping: { vi: 'Đang giao hàng', en: 'Shipping' },
+  shipping: { vi: 'Đang giao hàng', en: 'Shipping' },
+  Delivered: { vi: 'Đã giao hàng', en: 'Delivered' },
+  delivered: { vi: 'Đã giao hàng', en: 'Delivered' },
   Completed: { vi: 'Hoàn thành', en: 'Completed' },
+  Cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
+  cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
+  Disputed: { vi: 'Khiếu nại', en: 'Disputed' },
+  disputed: { vi: 'Khiếu nại', en: 'Disputed' },
 }
 
 function formatVND(value: number) {
