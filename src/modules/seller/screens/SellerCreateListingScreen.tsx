@@ -105,14 +105,23 @@ export default function SellerCreateListingScreen() {
   const videoInputRef = useRef<HTMLInputElement>(null)
   const groupsetPhotoInputRef = useRef<HTMLInputElement>(null)
 
-  // Clean up object URLs on unmount
+  // Keep track of all object URLs ever created to clean them up on unmount
+  const objectUrlsRef = useRef<Set<string>>(new Set())
+
+  const createTrackedObjectURL = (file: File) => {
+    const url = URL.createObjectURL(file)
+    objectUrlsRef.current.add(url)
+    return url
+  }
+
+  // Clean up object URLs only on unmount
   useEffect(() => {
+    const trackedUrls = objectUrlsRef.current
     return () => {
-      imageUrls.forEach(URL.revokeObjectURL)
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
-      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
+      trackedUrls.forEach(URL.revokeObjectURL)
+      trackedUrls.clear()
     }
-  }, [imageUrls, videoUrl, groupsetPhotoUrl])
+  }, [])
 
   const updateField = (field: string, value: string) => {
     const nextValue = field === 'serial' ? value.toUpperCase() : value
@@ -127,19 +136,29 @@ export default function SellerCreateListingScreen() {
     if (files.length === 0) return
 
     if (type === 'images') {
-      const newImages = [...images, ...files].slice(0, 10 - images.length)
+      const remainingSlots = Math.max(0, 10 - images.length)
+      const accepted = files.slice(0, remainingSlots)
+      if (accepted.length === 0) return
+
+      const newImages = [...images, ...accepted]
       setImages(newImages)
-      setImageUrls(newImages.map(file => URL.createObjectURL(file)))
+      setImageUrls((prev) => [...prev, ...accepted.map(file => createTrackedObjectURL(file))])
     } else if (type === 'video') {
       const file = files[0]
       setVideo(file)
-      if (videoUrl) URL.revokeObjectURL(videoUrl)
-      setVideoUrl(URL.createObjectURL(file))
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl)
+        objectUrlsRef.current.delete(videoUrl)
+      }
+      setVideoUrl(createTrackedObjectURL(file))
     } else if (type === 'groupset') {
       const file = files[0]
       setGroupsetPhoto(file)
-      if (groupsetPhotoUrl) URL.revokeObjectURL(groupsetPhotoUrl)
-      setGroupsetPhotoUrl(URL.createObjectURL(file))
+      if (groupsetPhotoUrl) {
+        URL.revokeObjectURL(groupsetPhotoUrl)
+        objectUrlsRef.current.delete(groupsetPhotoUrl)
+      }
+      setGroupsetPhotoUrl(createTrackedObjectURL(file))
     }
     
     // Clear input
@@ -147,9 +166,13 @@ export default function SellerCreateListingScreen() {
   }
 
   const removeImage = (index: number) => {
+    const targetUrl = imageUrls[index]
+    if (targetUrl) {
+      URL.revokeObjectURL(targetUrl)
+      objectUrlsRef.current.delete(targetUrl)
+    }
     const newImages = images.filter((_, i) => i !== index)
     const newUrls = imageUrls.filter((_, i) => i !== index)
-    URL.revokeObjectURL(imageUrls[index])
     setImages(newImages)
     setImageUrls(newUrls)
   }

@@ -407,13 +407,13 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           )}
 
           {(currentStatus === 'published' || currentStatus === 'pending_review') && (
-            <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="secondary">
+            <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="destructive">
               <EyeOff className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Rút tin này' : 'Withdraw'}
             </Button>
           )}
 
-          {(currentStatus === 'draft' || currentStatus === 'rejected' || currentStatus === 'pending_review') && (
+          {(currentStatus === 'draft' || currentStatus === 'rejected') && (
             <Button variant="outline" asChild>
               <Link href={`/seller/listings/${listingId}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />

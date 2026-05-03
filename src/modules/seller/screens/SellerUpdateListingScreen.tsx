@@ -352,16 +352,23 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const videoInputRef = useRef<HTMLInputElement>(null)
   const groupsetPhotoInputRef = useRef<HTMLInputElement>(null)
 
-  // Clean up object URLs on unmount
+  // Keep track of all object URLs ever created to clean them up on unmount
+  const objectUrlsRef = useRef<Set<string>>(new Set())
+
+  const createTrackedObjectURL = (file: File) => {
+    const url = URL.createObjectURL(file)
+    objectUrlsRef.current.add(url)
+    return url
+  }
+
+  // Clean up object URLs only on unmount
   useEffect(() => {
+    const trackedUrls = objectUrlsRef.current
     return () => {
-      imageUrls
-        .filter((url) => url.startsWith('blob:'))
-        .forEach(URL.revokeObjectURL)
-      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
-      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
+      trackedUrls.forEach(URL.revokeObjectURL)
+      trackedUrls.clear()
     }
-  }, [imageUrls, videoUrl, groupsetPhotoUrl])
+  }, [])
 
   const displayImageUrls = [...existingImageUrls, ...imageUrls]
 
@@ -384,17 +391,23 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
       const newImages = [...images, ...accepted]
       setImages(newImages)
-      setImageUrls((prev) => [...prev, ...accepted.map((file) => URL.createObjectURL(file))])
+      setImageUrls((prev) => [...prev, ...accepted.map((file) => createTrackedObjectURL(file))])
     } else if (type === 'video') {
       const file = files[0]
       setVideo(file)
-      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
-      setVideoUrl(URL.createObjectURL(file))
+      if (videoUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(videoUrl)
+        objectUrlsRef.current.delete(videoUrl)
+      }
+      setVideoUrl(createTrackedObjectURL(file))
     } else if (type === 'groupset') {
       const file = files[0]
       setGroupsetPhoto(file)
-      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
-      setGroupsetPhotoUrl(URL.createObjectURL(file))
+      if (groupsetPhotoUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(groupsetPhotoUrl)
+        objectUrlsRef.current.delete(groupsetPhotoUrl)
+      }
+      setGroupsetPhotoUrl(createTrackedObjectURL(file))
     }
     
     // Clear input
@@ -411,6 +424,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     const targetUrl = imageUrls[localIndex]
     if (targetUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(targetUrl)
+      objectUrlsRef.current.delete(targetUrl)
     }
 
     setImages((prev) => prev.filter((_, i) => i !== localIndex))

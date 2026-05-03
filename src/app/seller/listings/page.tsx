@@ -201,7 +201,7 @@ export default function SellerListingsPage() {
                     {resolveStatusLabel(listing.status)}
                   </Badge>
 
-                  {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
+                  {(listing.status === 'draft' || listing.status === 'rejected') && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -219,7 +219,7 @@ export default function SellerListingsPage() {
 {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
                     <Button 
                       size="sm" 
-                      variant="outline" 
+                      variant="destructive" 
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
@@ -284,7 +284,7 @@ export default function SellerListingsPage() {
                 {confirmState?.action === 'submit'
                   ? language === 'vi' ? 'Bạn có chắc chắn muốn gửi tin đăng này cho quản trị viên phê duyệt không?' : 'Are you sure you want to submit this listing for admin approval?'
                   : confirmState?.action === 'withdraw'
-                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không? Nó sẽ không còn hiển thị với người mua nữa.' : 'Are you sure you want to withdraw this listing? It will no longer be visible to buyers.'
+                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không?' : 'Are you sure you want to withdraw this listing?'
                     : confirmState?.action === 'resubmit'
                       ? language === 'vi' ? 'Bạn có muốn gửi lại tin đăng này để quản trị viên xem xét lại không?' : 'Do you want to resubmit this listing for admin review?'
                       : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
