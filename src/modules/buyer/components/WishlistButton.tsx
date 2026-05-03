@@ -25,16 +25,24 @@ export function WishlistButton({
   const [isWishlisted, setIsWishlisted] = useState(initialIsWishlisted);
   const { toggle, isLoading } = useWishlistToggle();
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigating if inside a Link
     e.stopPropagation();
+
+    // Guard: do not fire if we don't have a valid id
+    if (!listingId || !listingId.trim()) return;
 
     // Optimistic UI update
     const newValue = !isWishlisted;
     setIsWishlisted(newValue);
 
-    // Call API
-    toggle(listingId, !newValue); // passing the original state to the hook
+    try {
+      // Call API
+      await toggle(listingId, !newValue); // passing the original state to the hook
+    } catch {
+      // Rollback on error
+      setIsWishlisted(!newValue);
+    }
   };
 
   return (

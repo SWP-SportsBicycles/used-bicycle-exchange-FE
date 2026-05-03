@@ -26,7 +26,8 @@ function isBuyerOnlyPath(pathname: string) {
 
 function buildLoginRedirect(request: NextRequest) {
   const redirectUrl = new URL('/auth/login', request.url)
-  redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+  const fullPath = request.nextUrl.pathname + request.nextUrl.search
+  redirectUrl.searchParams.set('redirect', fullPath)
   return NextResponse.redirect(redirectUrl)
 }
 
