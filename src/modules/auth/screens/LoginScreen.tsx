@@ -300,7 +300,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     idToken: string,
     role: AuthRole | undefined,
     target: GoogleIntent,
-    options?: { suppressError?: boolean },
+    options?: { suppressError?: boolean; redirect?: boolean },
   ) => {
     setLoginErrorMessage(null)
     setRegisterErrorMessage(null)
@@ -309,9 +309,12 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     try {
       const session = await authApi.googleLogin(idToken, role)
       await loginWithSession(session)
-      const destination = await resolvePostLoginDestination(session, role)
-      router.push(destination)
-      return { success: true as const, error: null, errorMessage: null }
+      
+      if (options?.redirect !== false) {
+        const destination = await resolvePostLoginDestination(session, role)
+        router.push(destination)
+      }
+      return { success: true as const, session, error: null, errorMessage: null }
     } catch (error) {
       const message =
         error instanceof Error
@@ -410,9 +413,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
 
     const role = pendingGoogleRole === '3' ? 3 : 2
-    const { success } = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
+    const result = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent, { redirect: false })
 
-    if (success) {
+    if (result.success) {
       // Update SĐT cho register flow hoặc login lần đầu khi thiếu role
       if (requiresPhone) {
         setIsUpdatingPhone(true)
@@ -425,6 +428,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
         }
       }
       resetPendingGoogle()
+      const destination = await resolvePostLoginDestination(result.session, role)
+      router.push(destination)
     }
   }
 
