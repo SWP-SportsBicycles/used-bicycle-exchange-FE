@@ -214,14 +214,16 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
   // NOTE: BE has a typo — "isSucess" (missing 'c'). We handle all variants.
   if (payload && typeof payload === "object") {
     const obj = payload as Record<string, unknown>;
-    const hasWrapper =
-      ("isSucess" in obj || "isSuccess" in obj || "success" in obj) &&
-      "data" in obj;
+    const hasSuccessFlag =
+      "isSucess" in obj || "isSuccess" in obj || "success" in obj;
 
-    if (hasWrapper) {
+    if (hasSuccessFlag) {
       const isOk = obj.isSucess ?? obj.isSuccess ?? obj.success;
 
-      // BE sometimes returns { success: false, message: "..." } on HTTP 200.
+      // BE sometimes returns { success: false, message: "..." } on HTTP 200,
+      // with OR without a "data" field. Always throw so callers see the real
+      // error message instead of falling through to normalizeAuthSession which
+      // would throw a confusing "Auth response does not include access token".
       if (isOk === false) {
         const msg =
           (typeof obj.message === "string" && obj.message.trim()) ||
@@ -229,7 +231,10 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
         throw new Error(msg);
       }
 
-      return obj.data as T;
+      // Unwrap the data payload only if the field is present.
+      if ("data" in obj) {
+        return obj.data as T;
+      }
     }
   }
 
