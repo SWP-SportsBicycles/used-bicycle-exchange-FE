@@ -8,13 +8,21 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Vui long nhap mat khau"),
 });
 
-export const registerSchema = z.object({
-  fullName: z.string().min(2, "Ho ten toi thieu 2 ky tu"),
-  phoneNumber: z.string().regex(PHONE_REGEX, "So dien thoai phai theo dinh dang 0xxxxxxxxx"),
-  email: z.string().email("Email khong hop le"),
-  password: z.string().regex(PASSWORD_REGEX, "Mat khau can chu hoa, so, ky tu dac biet va toi thieu 6 ky tu"),
-  role: z.union([z.literal("2"), z.literal("3")]),
-});
+export const registerSchema = z
+  .object({
+    fullName: z.string().min(2, "Ho ten toi thieu 2 ky tu"),
+    phoneNumber: z.string().regex(PHONE_REGEX, "So dien thoai phai theo dinh dang 0xxxxxxxxx"),
+    email: z.string().email("Email khong hop le"),
+    password: z.string().regex(PASSWORD_REGEX, "Mat khau can chu hoa, so, ky tu dac biet va toi thieu 6 ky tu"),
+    confirmPassword: z.string().min(1, "Vui long xac nhan mat khau"),
+    role: z.enum(["2", "3"], {
+      errorMap: () => ({ message: "Vui long chon vai tro" }),
+    }),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Mat khau xac nhan khong khop",
+    path: ["confirmPassword"],
+  });
 
 export const otpSchema = z.object({
   email: z.string().email("Email khong hop le"),
