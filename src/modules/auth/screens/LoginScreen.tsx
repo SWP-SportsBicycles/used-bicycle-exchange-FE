@@ -68,6 +68,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const [pendingGoogleRole, setPendingGoogleRole] = useState<'2' | '3'>('2')
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [showRegisterPassword, setShowRegisterPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const defaultEmail = useMemo(() => searchParams.get('email') ?? '', [searchParams])
   const redirectTarget = useMemo(() => searchParams.get('redirect') ?? '/', [searchParams])
@@ -87,6 +88,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       phoneNumber: '',
       email: defaultEmail,
       password: '',
+      confirmPassword: '',
       role: '2',
     },
   })
@@ -639,6 +641,42 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                                 onTouchEnd={() => setShowRegisterPassword(false)}
                               >
                                 {showRegisterPassword
+                                  ? <EyeOff className="h-4 w-4" />
+                                  : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={registerForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{language === 'vi' ? 'Xác nhận mật khẩu' : 'Confirm password'}</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input
+                                placeholder="••••••••"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                className={cn(!field.value && 'placeholder:text-foreground/30')}
+                                {...field}
+                              />
+                              <button
+                                type="button"
+                                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors select-none"
+                                onMouseDown={() => setShowConfirmPassword(true)}
+                                onMouseUp={() => setShowConfirmPassword(false)}
+                                onMouseLeave={() => setShowConfirmPassword(false)}
+                                onTouchStart={() => setShowConfirmPassword(true)}
+                                onTouchEnd={() => setShowConfirmPassword(false)}
+                              >
+                                {showConfirmPassword
                                   ? <EyeOff className="h-4 w-4" />
                                   : <Eye className="h-4 w-4" />}
                               </button>
