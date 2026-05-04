@@ -117,9 +117,13 @@ export interface BuyerOrder {
   toWardCode?: string;
   shippingFee: number;
   totalPrice: number;
+  subTotal?: number;
   payosQrUrl?: string;
   orderCode?: string;
   waybillCode?: string;         // GHN tracking code
+  trackingUrl?: string;         // GHN tracking link
+  paidAt?: string;
+  transactionId?: string;
   expiresAt?: string;           // timer_draft expiry (ISO 8601)
   seller?: {                    // Full PII — hiện sau khi thanh toán
     name: string;
@@ -837,14 +841,20 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     toWardCode: ((src.address as Record<string, unknown>)?.wardCode as string) || (src.toWardCode as string) || undefined,
     shippingFee: parseNumber(src.shippingFee ?? src.shipFee
       ?? (src.shipment && typeof src.shipment === "object"
-          ? (src.shipment as Record<string, unknown>).fee
+          ? (src.shipment as Record<string, unknown>).shippingFee
           : undefined)),
     totalPrice: parseNumber(src.totalPrice ?? src.totalAmount ?? src.amount),
+    subTotal: parseNumber(src.subTotal ?? src.subtotal),
     payosQrUrl: parseOptionalString(
       paymentSource?.paymentLink ?? paymentSource?.checkoutUrl ?? src.checkoutUrl ?? src.payosQrUrl
     ),
     orderCode: src.orderCode ? String(src.orderCode) : undefined,
-    waybillCode: (src.waybillCode as string) || undefined,
+    waybillCode: (src.waybillCode as string) || 
+      ((src.shipment as Record<string, unknown>)?.providerOrderCode as string) || 
+      undefined,
+    trackingUrl: ((src.shipment as Record<string, unknown>)?.trackingUrl as string) || undefined,
+    paidAt: (paymentSource?.paidAt as string) || undefined,
+    transactionId: (paymentSource?.transactionId as string) || undefined,
     expiresAt: (src.expiresAt as string) || undefined,
     seller:
       src.seller && typeof src.seller === "object"
@@ -1134,4 +1144,75 @@ export const buyerApi = {
   // Swagger: POST /api/payment/cancel/{orderId} — CancelOrderDTO { reason? }
   cancelOrder: (orderId: string, reason?: string) =>
     http.post<unknown>(`/api/buyer-order/${orderId}/cancel`, reason ? { reason } : {}),
+
+  // ---------- Review ----------
+
+  /**
+   * POST /api/Review — CreateReviewDTO
+   * Buyer submits a review for a completed order.
+   */
+  createReview: (data: { orderId: string; rating: number; comment?: string }) =>
+    http.post<unknown>('/api/Review', data),
+
+  /**
+   * GET /api/Review/my-reviewed-orders
+   * Returns list of orderIds that the buyer has already reviewed.
+   * Also caches full review data for detail lookup.
+   */
+  getMyReviewedOrders: async (): Promise<string[]> => {
+    const raw = await http.get<unknown>('/api/Review/my-reviewed-orders');
+    const data = unwrap<unknown>(raw);
+    if (Array.isArray(data)) {
+      return data.map((item: unknown) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'orderId' in item) return String((item as Record<string, unknown>).orderId);
+        return String(item);
+      });
+    }
+    return [];
+  },
+
+  /**
+   * GET /api/Review/my-reviewed-orders (full objects)
+   * Returns full review detail objects keyed by orderId — for buyer to view their review.
+   */
+  getMyReviewsAsBuyer: async (): Promise<Record<string, { rating: number; comment: string | null; reviewedAt: string | null }>> => {
+    const raw = await http.get<unknown>('/api/Review/my-reviewed-orders');
+    const data = unwrap<unknown>(raw);
+    const result: Record<string, { rating: number; comment: string | null; reviewedAt: string | null }> = {};
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          const orderId = typeof obj.orderId === 'string' ? obj.orderId : null;
+          if (orderId) {
+            result[orderId] = {
+              rating: typeof obj.rating === 'number' ? obj.rating : 0,
+              comment: typeof obj.comment === 'string' ? obj.comment : null,
+              reviewedAt: typeof obj.reviewedAt === 'string' ? obj.reviewedAt : 
+                          typeof obj.createdAt === 'string' ? obj.createdAt : null,
+            };
+          }
+        }
+      }
+    }
+    return result;
+  },
+
+  /**
+   * GET /api/Review/my-reviews-for-seller
+   * Returns reviews that buyers have submitted for the seller's listings.
+   */
+  getMyReviewsForSeller: async () => {
+    const raw = await http.get<unknown>('/api/Review/my-reviews-for-seller');
+    const data = unwrap<unknown>(raw);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[Review] my-reviews-for-seller raw data:', JSON.stringify(data, null, 2));
+    }
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && 'items' in data) {
+      return (data as Record<string, unknown>).items as unknown[];
+    }
+    return [];
+  },
 };

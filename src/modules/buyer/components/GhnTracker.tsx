@@ -18,6 +18,9 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
     return null
   }
 
+  // Guard: API có thể trả về shipment nhưng không có events
+  const events = shipment.events ?? []
+
   return (
     <div className="rounded-3xl bg-card border border-border/40 shadow-sm overflow-hidden">
       <div className="bg-secondary/30 px-6 py-4 flex items-center justify-between border-b border-border/40">
@@ -32,11 +35,11 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
       <div className="p-6 md:p-8">
         <div className="space-y-6 relative">
           {/* Main vertical line */}
-          {shipment.events.length > 1 && (
+          {events.length > 1 && (
             <div className="absolute left-[15px] top-4 bottom-8 w-0.5 bg-border/50" />
           )}
 
-          {shipment.events.map((event, index) => (
+          {events.map((event, index) => (
             <div key={index} className="flex gap-5 relative group">
               <div className="flex flex-col items-center z-10 mt-0.5">
                 <div className={cn(
@@ -51,7 +54,7 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
               
               <div className={cn(
                 "flex-1 pb-4",
-                index !== shipment.events.length - 1 && "border-b border-border/40"
+                index !== events.length - 1 && "border-b border-border/40"
               )}>
                 <p className={cn(
                   "text-base font-bold",
@@ -76,7 +79,7 @@ export function GhnTracker({ shipment, isLoading }: GhnTrackerProps) {
             </div>
           ))}
 
-          {shipment.events.length === 0 && (
+          {events.length === 0 && (
             <div className="text-center text-muted-foreground py-8 text-sm flex flex-col items-center justify-center gap-3">
               <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
                 <Clock className="h-5 w-5 text-muted-foreground" />

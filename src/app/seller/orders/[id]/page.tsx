@@ -3,13 +3,14 @@
 import React, { use, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, AlertTriangle, PackageSearch, CheckCircle2, EyeOff } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, PackageSearch, CheckCircle2, EyeOff, Star } from 'lucide-react'
 import { format } from 'date-fns'
 import { vi, enUS } from 'date-fns/locale'
 
 import { useSellerOrderDetail, useSellerOrders } from '@/modules/seller/hooks/useSellerOrders'
 import { useConfirmOrder, useShipOrder, useCancelOrder } from '@/modules/seller/hooks/useSellerOrderMutations'
 import { normalizeOrderDetail, normalizeOrdersPayload } from '@/modules/seller/utils/normalization'
+import { useSellerReviews, type SellerReview } from '@/modules/seller/hooks/useSellerReviews'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,6 +57,15 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
   const orderFromList = ordersFromList.find(o => o.id === orderId)
   // Ưu tiên listingId từ detail response, fallback sang list cache
   const effectiveListingId = order?.listing?.id || orderFromList?.listing?.id || ''
+
+  // Fetch buyer reviews for seller
+  const { data: sellerReviews = [] } = useSellerReviews()
+  // Match by orderId first (most reliable), fall back to listingId
+  const reviewForThisOrder = sellerReviews.find((r: SellerReview) => {
+    if (r.orderId && r.orderId === orderId) return true
+    if (r.listingId && r.listingId === effectiveListingId && r.rating !== null) return true
+    return false
+  })
 
   const isPaid = order?.status === 'paid'
   const isConfirmed = order?.status === 'confirmed'
@@ -165,6 +175,7 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {order.status === 'completed' ? (
+        <>
         <Card className="border-success bg-success/5 py-12 flex flex-col items-center text-center">
           <CheckCircle2 className="h-16 w-16 text-success mb-6" />
           <h2 className="text-2xl font-bold text-success mb-2">
@@ -194,6 +205,43 @@ export default function SellerOrderDetailPage({ params }: { params: Promise<{ id
             </Alert>
           )}
         </Card>
+
+        {/* Buyer Review Card (read-only) */}
+        {reviewForThisOrder && (
+          <Card className="border-amber-200 bg-amber-50/30 dark:border-amber-900/30 dark:bg-amber-900/10">
+            <CardHeader>
+              <CardTitle className="text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                {language === 'vi' ? 'Đánh giá từ người mua' : 'Buyer Review'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-5 w-5 ${(reviewForThisOrder.rating ?? 0) >= star ? 'fill-amber-400 text-amber-400' : 'fill-none text-muted-foreground/30'}`}
+                  />
+                ))}
+                <span className="ml-2 text-sm font-bold text-amber-700 dark:text-amber-300">
+                  {reviewForThisOrder.rating}/5
+                </span>
+              </div>
+              {reviewForThisOrder.comment && (
+                <p className="text-sm text-foreground bg-white/50 dark:bg-black/20 rounded-xl p-4 border border-amber-100 dark:border-amber-900/30 italic">
+                  &ldquo;{reviewForThisOrder.comment}&rdquo;
+                </p>
+              )}
+              {reviewForThisOrder.reviewedAt && (
+                <p className="text-xs text-muted-foreground">
+                  {language === 'vi' ? 'Đánh giá lúc:' : 'Reviewed at:'}{' '}
+                  {format(new Date(reviewForThisOrder.reviewedAt), 'PPpp', { locale: language === 'vi' ? vi : enUS })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        </>
       ) : (
         <>
           {order.status === 'confirmed' && (
