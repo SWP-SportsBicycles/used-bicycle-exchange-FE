@@ -15,6 +15,8 @@ export interface AdminBikeDetail {
   category?: string;
   frameSize?: string;
   price?: number;
+  inspectionComment?: string;
+  inspectionScore?: number;
 }
 
 export interface AdminListing {
@@ -317,6 +319,20 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
   const medias = (Array.isArray(source.medias) ? source.medias : [])
     .map(normalizeMedia)
     .filter((item): item is AdminListingMedia => Boolean(item));
+  const rawInspectionScore =
+    typeof bikeSource.inspectionScore !== "undefined"
+      ? bikeSource.inspectionScore
+      : (source as Record<string, unknown>).inspectionScore;
+  const inspectionScore =
+    typeof rawInspectionScore === "number"
+      ? rawInspectionScore
+      : Number.isFinite(Number(rawInspectionScore))
+      ? Number(rawInspectionScore)
+      : undefined;
+  const inspectionComment =
+    pickString(bikeSource, ["inspectionComment", "inspection_note", "inspectionNote"]) ||
+    pickString(source, ["inspectionComment", "inspection_note", "inspectionNote"]) ||
+    undefined;
 
   return {
     ...base,
@@ -331,6 +347,8 @@ function normalizeListingDetail(raw: unknown): AdminListingDetail {
           : Number.isFinite(Number(bikeSource.price))
           ? Number(bikeSource.price)
           : undefined,
+      inspectionComment,
+      inspectionScore,
     },
     medias,
   };

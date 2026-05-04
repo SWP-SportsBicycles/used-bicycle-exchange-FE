@@ -3,11 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Check, Clock, Eye, Loader2, X } from "lucide-react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { adminApi } from "@/lib/api/admin-api";
 import { useLanguage } from "@/lib/language-context";
 import { formatVND } from "@/lib/mock-data";
@@ -15,39 +12,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
-
-const rejectSchema = z.object({
-  reason: z.string().trim().min(5, "Lý do từ chối tối thiểu 5 ký tự"),
-});
-
-type RejectValues = z.infer<typeof rejectSchema>;
 type ListingFilter = "all" | "pending" | "approved" | "rejected";
 
 export default function ApprovalsPage() {
   const { language } = useLanguage();
-  const queryClient = useQueryClient();
   const [activeStatus, setActiveStatus] = useState<ListingFilter>("pending");
   const [allPage, setAllPage] = useState(1);
-  const [rejectListingId, setRejectListingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const rejectForm = useForm<RejectValues>({
-    resolver: zodResolver(rejectSchema),
-    defaultValues: {
-      reason: "",
-    },
-  });
 
   const allListingsQuery = useQuery({
     queryKey: ["admin-listings", "all", allPage],
@@ -57,38 +27,6 @@ export default function ApprovalsPage() {
   const pendingListingsQuery = useQuery({
     queryKey: ["admin-listings", "pending"],
     queryFn: adminApi.getListings,
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: (listingId: string) => adminApi.approveListing(listingId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
-      ]);
-      setFeedback(language === "vi" ? "Duyệt tin thành công." : "Listing approved.");
-      setErrorMessage(null);
-    },
-    onError: (error) => {
-      setErrorMessage(error instanceof Error ? error.message : "Approve listing failed.");
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: ({ listingId, reason }: { listingId: string; reason: string }) => adminApi.rejectListing(listingId, reason),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["admin-listings"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-listings-sidebar"] }),
-      ]);
-      setFeedback(language === "vi" ? "Từ chối tin thành công." : "Listing rejected.");
-      setErrorMessage(null);
-      setRejectListingId(null);
-      rejectForm.reset();
-    },
-    onError: (error) => {
-      setErrorMessage(error instanceof Error ? error.message : "Reject listing failed.");
-    },
   });
 
   const allListings = allListingsQuery.data?.items ?? [];
@@ -173,22 +111,16 @@ export default function ApprovalsPage() {
         </p>
       </div>
 
-      {feedback && (
-        <Alert>
-          <AlertDescription>{feedback}</AlertDescription>
-        </Alert>
-      )}
-      {(errorMessage || allListingsQuery.error || pendingListingsQuery.error) && (
+      {(allListingsQuery.error || pendingListingsQuery.error) && (
         <Alert variant="destructive">
           <AlertDescription>
-            {errorMessage ??
-              (allListingsQuery.error instanceof Error
-                ? allListingsQuery.error.message
-                : pendingListingsQuery.error instanceof Error
-                ? pendingListingsQuery.error.message
-                : language === "vi"
-                ? "Không thể tải danh sách tin đăng."
-                : "Unable to load listings.")}
+            {allListingsQuery.error instanceof Error
+              ? allListingsQuery.error.message
+              : pendingListingsQuery.error instanceof Error
+              ? pendingListingsQuery.error.message
+              : language === "vi"
+              ? "Không thể tải danh sách tin đăng."
+              : "Unable to load listings."}
           </AlertDescription>
         </Alert>
       )}
@@ -305,22 +237,6 @@ export default function ApprovalsPage() {
                         {language === "vi" ? "Chi tiết" : "Detail"}
                         </Link>
                       </Button>
-                      {listing.status === "pending" && (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => setRejectListingId(listing.id)}>
-                            <X className="mr-1 h-4 w-4" />
-                            {language === "vi" ? "Từ chối" : "Reject"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => approveMutation.mutate(listing.id)}
-                            disabled={approveMutation.isPending}
-                          >
-                            <Check className="mr-1 h-4 w-4" />
-                            {language === "vi" ? "Duyệt" : "Approve"}
-                          </Button>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -356,60 +272,6 @@ export default function ApprovalsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!rejectListingId} onOpenChange={() => setRejectListingId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{language === "vi" ? "Từ Chối Tin Đăng" : "Reject Listing"}</DialogTitle>
-            <DialogDescription>
-              {language === "vi"
-                ? "Nhập lý do để gửi về seller."
-                : "Provide a rejection reason for seller."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...rejectForm}>
-            <form
-              className="space-y-4"
-              onSubmit={rejectForm.handleSubmit((values) => {
-                if (!rejectListingId) return;
-                rejectMutation.mutate({ listingId: rejectListingId, reason: values.reason });
-              })}
-            >
-              <FormField
-                control={rejectForm.control}
-                name="reason"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{language === "vi" ? "Lý do từ chối" : "Reason"}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        rows={4}
-                        placeholder={
-                          language === "vi"
-                            ? "VD: Số serial không khớp với ảnh..."
-                            : "E.g., Serial number does not match the photo..."
-                        }
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setRejectListingId(null)}>
-                  {language === "vi" ? "Hủy" : "Cancel"}
-                </Button>
-                <Button type="submit" variant="destructive" disabled={rejectMutation.isPending}>
-                  {rejectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {language === "vi" ? "Xác nhận từ chối" : "Confirm rejection"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
