@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, MapPinHouse, Save } from 'lucide-react'
 import { sellerShippingApi } from '@/lib/api/sellerShippingApi'
@@ -77,6 +77,7 @@ function ShippingProfileContent() {
   const [provinces, setProvinces] = useState<Province[]>([])
   const [districts, setDistricts] = useState<District[]>([])
   const [wards, setWards] = useState<Ward[]>([])
+  const hasResolvedProvinceRef = useRef(false)
 
   const redirectTarget = useMemo(() => searchParams.get('redirect') ?? '/seller', [searchParams])
   const selectedProvinceId = useMemo(() => {
@@ -135,6 +136,44 @@ function ShippingProfileContent() {
     if (!selectedProvinceId) return
     locationApi.getDistricts(selectedProvinceId).then(setDistricts).catch(console.error)
   }, [selectedProvinceId])
+
+  useEffect(() => {
+    if (hasResolvedProvinceRef.current) return
+    if (!form.fromDistrictId || form.fromProvinceName || provinces.length === 0) return
+
+    let active = true
+
+    const resolveProvince = async () => {
+      for (const province of provinces) {
+        try {
+          const districtList = await locationApi.getDistricts(province.provinceId)
+          if (!active) return
+          const matchedDistrict = districtList.find(
+            (district) => String(district.districtId) === String(form.fromDistrictId),
+          )
+          if (matchedDistrict) {
+            setDistricts(districtList)
+            setForm((prev) => ({
+              ...prev,
+              fromProvinceName: province.provinceName,
+              fromDistrictName: prev.fromDistrictName || matchedDistrict.districtName,
+            }))
+            hasResolvedProvinceRef.current = true
+            return
+          }
+        } catch {
+          // Ignore and continue searching other provinces
+        }
+      }
+      hasResolvedProvinceRef.current = true
+    }
+
+    void resolveProvince()
+
+    return () => {
+      active = false
+    }
+  }, [form.fromDistrictId, form.fromProvinceName, provinces])
 
   // Fetch wards when district changes
   useEffect(() => {

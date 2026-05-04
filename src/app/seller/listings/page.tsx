@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,8 +61,14 @@ export default function SellerListingsPage() {
   const resubmitMutation = useResubmitListing()
   const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; listing: SellerListingItem } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
+
+  const openConfirmState = (action: ConfirmAction, listing: SellerListingItem) => {
+    setTermsAccepted(false)
+    setConfirmState({ action, listing })
+  }
 
   const myListings = useMemo(() => {
     if (isError) {
@@ -103,6 +110,7 @@ export default function SellerListingsPage() {
         await deleteMutation.mutateAsync(confirmState.listing.id)
       }
       setConfirmState(null)
+      setTermsAccepted(false)
     } catch (mutationError) {
       setActionError(
         mutationError instanceof Error
@@ -161,12 +169,19 @@ export default function SellerListingsPage() {
         ) : (
         <div className="space-y-4">
           {myListings.map((listing) => (
-            <Link
+            <div
               key={listing.id}
-              href={`/seller/listings/${listing.id}`}
-              className="block"
+              role="button"
+              tabIndex={0}
+              className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer"
+              onClick={() => router.push(`/seller/listings/${listing.id}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  router.push(`/seller/listings/${listing.id}`)
+                }
+              }}
             >
-              <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted cursor-pointer">
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                   <Image
                     src={listing.images[0] ?? '/placeholder.svg'}
@@ -194,46 +209,29 @@ export default function SellerListingsPage() {
                     {resolveStatusLabel(listing.status)}
                   </Badge>
 
-                  {listing.status === 'draft' && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={(e) => { 
-                        e.preventDefault(); 
-                        e.stopPropagation(); 
-                        setConfirmState({ action: 'submit', listing }); 
+                  {(listing.status === 'draft' || listing.status === 'rejected') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        router.push(`/seller/listings/${listing.id}/edit`)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
-                      {language === 'vi' ? 'Gửi duyệt' : 'Submit'}
-                    </Button>
-                  )}
-
-                  {(listing.status === 'draft' || listing.status === 'rejected' || listing.status === 'pending_review' || listing.status === 'pending') && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      asChild 
-                      onClick={(e) => { 
-                        e.preventDefault(); 
-                        e.stopPropagation(); 
-                      }}
-                      style={{ pointerEvents: 'auto' }}
-                    >
-                      <Link href={`/seller/listings/${listing.id}/edit`}>
-                        {language === 'vi' ? 'Sửa' : 'Edit'}
-                      </Link>
+                      {language === 'vi' ? 'Sửa' : 'Edit'}
                     </Button>
                   )}
 
 {(listing.status === 'published' || listing.status === 'pending_review' || listing.status === 'pending') && (
                     <Button 
                       size="sm" 
-                      variant="outline" 
+                      variant="destructive" 
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'withdraw', listing}); 
+                        openConfirmState('withdraw', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -248,7 +246,7 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'resubmit', listing}); 
+                        openConfirmState('resubmit', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -263,7 +261,7 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'delete', listing}); 
+                        openConfirmState('delete', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -273,13 +271,20 @@ export default function SellerListingsPage() {
 
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
-              </div>
-            </Link>
+            </div>
           ))}
         </div>
         )}
 
-        <AlertDialog open={Boolean(confirmState)} onOpenChange={(open) => !open && setConfirmState(null)}>
+        <AlertDialog
+          open={Boolean(confirmState)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfirmState(null)
+              setTermsAccepted(false)
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
@@ -293,19 +298,47 @@ export default function SellerListingsPage() {
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmState?.action === 'submit'
-                  ? language === 'vi' ? 'Bạn có chắc chắn muốn gửi tin đăng này cho quản trị viên phê duyệt không?' : 'Are you sure you want to submit this listing for admin approval?'
+                  ? language === 'vi'
+                    ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán trước khi gửi duyệt.'
+                    : 'Please review all information, photos, and pricing before submission.'
                   : confirmState?.action === 'withdraw'
-                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không? Nó sẽ không còn hiển thị với người mua nữa.' : 'Are you sure you want to withdraw this listing? It will no longer be visible to buyers.'
+                    ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không?' : 'Are you sure you want to withdraw this listing?'
                     : confirmState?.action === 'resubmit'
-                      ? language === 'vi' ? 'Bạn có muốn gửi lại tin đăng này để quản trị viên xem xét lại không?' : 'Do you want to resubmit this listing for admin review?'
+                      ? language === 'vi'
+                        ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán trước khi gửi duyệt lại.'
+                        : 'Please review all information, photos, and pricing before resubmitting.'
                       : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
               </AlertDialogDescription>
+              {(confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && (
+                <label
+                  htmlFor={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                  className="mt-4 flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/30 p-3 text-sm text-foreground"
+                >
+                  <Checkbox
+                    id={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                    checked={termsAccepted}
+                    onCheckedChange={(value) => setTermsAccepted(Boolean(value))}
+                    className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-2 border-primary/50 bg-background data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                  <span>
+                    {language === 'vi'
+                      ? 'Tôi đã đọc và đồng ý với điều khoản người dùng.'
+                      : 'I have read and agree to the user terms.'}
+                  </span>
+                </label>
+              )}
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isActionPending}>
                 {language === 'vi' ? 'Hủy' : 'Cancel'}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={executeAction} disabled={isActionPending}>
+              <AlertDialogAction
+                onClick={executeAction}
+                disabled={
+                  isActionPending ||
+                  ((confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && !termsAccepted)
+                }
+              >
                 {isActionPending ? (
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />

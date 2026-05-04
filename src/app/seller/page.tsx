@@ -8,10 +8,9 @@ import {
   normalizeListingsPayload, 
   normalizeOrdersPayload 
 } from '@/modules/seller/utils/normalization'
-import { 
-  Package, 
-  ShoppingCart, 
-  Eye,
+import {
+  Package,
+  ShoppingCart,
   CheckCircle2,
   ArrowUpRight,
   ChevronRight
@@ -67,8 +66,6 @@ export default function SellerDashboardPage() {
       !['completed', 'cancelled', 'delivered'].includes(o.status)
     ).length,
     totalEarnings: user.walletBalance || 0,
-    thisMonthViews: 1247, // Mock as backend doesn't have views yet
-    conversionRate: 4.8,  // Mock
   }
 
   if (isLoadingListings || isLoadingOrders) {
@@ -157,89 +154,10 @@ export default function SellerDashboardPage() {
           </Link>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Lượt Xem' : 'Views'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-[#407F3E]/12 flex items-center justify-center">
-                <Eye className="h-4 w-4 text-[#407F3E]" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{stats.thisMonthViews.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.conversionRate}% {language === 'vi' ? 'tỉ lệ chuyển đổi' : 'conversion'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
       {/* Recent Orders & Listings */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Orders */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>{language === 'vi' ? 'Đơn Hàng Gần Đây' : 'Recent Orders'}</CardTitle>
-                <CardDescription>
-                  {language === 'vi' ? 'Cập nhật mới nhất' : 'Latest updates'}
-                </CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/seller/orders" className="gap-1">
-                  {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {myOrders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    {language === 'vi' ? 'Chưa có đơn hàng nào' : 'No orders yet'}
-                  </p>
-                ) : (
-                  myOrders.map((order) => (
-                    <div 
-                      key={order.id} 
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
-                        <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{order.listing.title}</p>
-                        <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="outline" className={cn('text-xs', statusColors[order.status] || 'bg-muted')}>
-                          {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]?.[language] || order.status}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatVND(order.depositAmount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {/* My Listings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -314,7 +232,75 @@ export default function SellerDashboardPage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Recent Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>{language === 'vi' ? 'Đơn Hàng Gần Đây' : 'Recent Orders'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi' ? 'Cập nhật mới nhất' : 'Latest updates'}
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/seller/orders" className="gap-1">
+                  {language === 'vi' ? 'Xem tất cả' : 'View all'}
+                  <ArrowUpRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {myOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {language === 'vi' ? 'Chưa có đơn hàng nào' : 'No orders yet'}
+                  </p>
+                ) : (
+                  myOrders.map((order) => (
+                    <div 
+                      key={order.id} 
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={order.buyer.avatar} alt={order.buyer.name} />
+                        <AvatarFallback>{order.buyer.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{order.listing.title}</p>
+                        <p className="text-xs text-muted-foreground">{order.buyer.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className={cn('text-xs', statusColors[order.status] || 'bg-muted')}>
+                          {ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS]?.[language] || order.status}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatVND(order.depositAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
+
+      <Card className="border-border/60 bg-muted/40">
+        <CardHeader>
+          <CardTitle>{language === 'vi' ? 'Điều khoản dịch vụ' : 'Service Terms'}</CardTitle>
+          <CardDescription>
+            {language === 'vi'
+              ? 'Phí kiểm định: 100.000đ sẽ được cộng thêm cho mỗi giao dịch thành công.'
+              : 'Inspection fee: 100,000 VND is added for each successful transaction.'}
+          </CardDescription>
+        </CardHeader>
+      </Card>
     </div>
   )
 }

@@ -123,4 +123,9 @@ export const authApi = {
   async changePassword(payload: { currentPassword: string; newPassword: string; confirmPassword: string }) {
     return http.post<unknown>("/api/Auth/change-password", payload);
   },
+
+  async updatePhone(phoneNumber: string) {
+    // BE expects raw string body, not an object
+    return http.put<unknown>("/api/Auth/update-phone", phoneNumber);
+  },
 };

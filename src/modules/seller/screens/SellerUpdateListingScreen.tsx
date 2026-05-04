@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useUpdateListing, useUploadMedia, useSubmitListing, useResubmitListing } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +25,55 @@ const steps = [
   { id: 'photos', label: { vi: 'Hình Ảnh', en: 'Photos' } },
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
+
+const FRAME_MATERIAL_OPTIONS = [
+  { value: 'carbon', label: 'Carbon' },
+  { value: 'alloy', label: 'Hợp kim' },
+  { value: 'steel', label: 'Thép' },
+  { value: 'titanium', label: 'Titan' },
+]
+
+const BRAKE_TYPES = [
+  'Rim Brake',
+  'Mechanical Disc Brake',
+  'Hydraulic Disc Brake',
+]
+
+const WHEEL_SIZES = ['700c', '650b', '29', '27.5', '26']
+
+const REQUIRED_FIELD_LABELS: Record<string, string> = {
+  Title: 'tiêu đề',
+  Description: 'mô tả',
+  SerialNumber: 'số serial',
+  Category: 'loại xe',
+  Brand: 'thương hiệu',
+  FrameSize: 'kích cỡ khung',
+  Condition: 'tình trạng',
+  Groupset: 'bộ truyền động',
+  TireRim: 'cỡ bánh',
+  BrakeType: 'loại phanh',
+  Paint: 'màu sơn',
+  Overall: 'khấu hao / đánh giá',
+  Price: 'giá bán',
+  City: 'thành phố',
+  Weight: 'trọng lượng',
+}
+
+const formatApiErrorMessage = (message: string): string => {
+  const parts = message.split(' | ').map((part) => part.trim()).filter(Boolean)
+  const mapped = parts.map((part) => {
+    const match = part.match(/The\s+([A-Za-z0-9_]+)\s+field\s+is\s+required\.?/i)
+    if (match) {
+      const key = match[1]
+      const label = REQUIRED_FIELD_LABELS[key]
+      if (label) {
+        return `Vui lòng nhập ${label}.`
+      }
+    }
+    return part
+  })
+  return mapped.join(' ')
+}
 
 interface SellerUpdateListingScreenProps {
   listingId: string
@@ -89,6 +138,19 @@ function pickString(records: Record<string, unknown>[], keys: string[]): string 
     }
   }
   return ''
+}
+
+function pickNumber(records: Record<string, unknown>[], keys: string[]): number {
+  for (const record of records) {
+    for (const key of keys) {
+      const value = getValueByKey(record, key)
+      const parsed = typeof value === 'number' ? value : Number(value)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+  return 0
 }
 
 function isVideoUrl(url: string): boolean {
@@ -158,16 +220,49 @@ function extractMediaSeed(initialData: unknown): MediaSeed {
   }
 }
 
-function str(v: unknown): string {
-  return typeof v === 'string' ? v : v != null ? String(v) : ''
+function normalizeValue(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[._/-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
+function normalizeOptionValue(input: string, options: Array<{ value: string; label: string }>): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  const match = options.find((option) =>
+    normalizeValue(option.value) === normalized || normalizeValue(option.label) === normalized
+  )
+  return match ? match.value : input
+}
+
+function normalizeStringOption(input: string, options: string[]): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  const match = options.find((option) => normalizeValue(option) === normalized)
+  return match ?? input
+}
+
+function normalizeCityValue(input: string): string {
+  if (!input) return ''
+  const normalized = normalizeValue(input)
+  if (normalized === 'hcm' || normalized.includes('ho chi minh') || normalized.includes('tp hcm') || normalized.includes('tphcm')) {
+    return 'TP.HCM'
+  }
+  if (normalized === 'hanoi' || normalized.includes('ha noi')) {
+    return 'Hà Nội'
+  }
+  if (normalized === 'danang' || normalized.includes('da nang')) {
+    return 'Đà Nẵng'
+  }
+  return input
 }
 
 export default function SellerUpdateListingScreen({ listingId, initialData }: SellerUpdateListingScreenProps) {
   const { language } = useLanguage()
   const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
-  const submitListingMutation = useSubmitListing()
-  const resubmitListingMutation = useResubmitListing()
   const mediaSeed = useMemo(() => extractMediaSeed(initialData), [initialData])
   
   // Track original status to determine which API to call after update
@@ -195,28 +290,50 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   // Combined loading state
   const isLoading = isSubmitting || 
     updateListingMutation.isPending || 
-    uploadMediaMutation.isPending ||
-    submitListingMutation.isPending ||
-    resubmitListingMutation.isPending
+    uploadMediaMutation.isPending
   
-  const [formData, setFormData] = useState({
-    title: str(initialData?.title),
-    category: str(initialData?.category),
-    brand: str(initialData?.brand),
-    model: str(initialData?.model),
-    condition: str(initialData?.condition),
-    description: str(initialData?.description),
-    frameSize: str(initialData?.frameSize),
-    frameMaterial: str(initialData?.frameMaterial),
-    groupset: str(initialData?.groupset),
-    wheelSize: str(initialData?.wheelSize) || str(initialData?.tireRim),
-    usageHistory: str(initialData?.usageHistory) || str(initialData?.operating),
-    serial: str(initialData?.serialNumber) || str(initialData?.serial),
-    city: str(initialData?.city),
-    price: str(initialData?.price),
-    paint: str(initialData?.paint),
-    brakeType: str(initialData?.brakeType),
-    overall: str(initialData?.overall),
+  const [formData, setFormData] = useState(() => {
+    const records = collectNestedRecords(initialData)
+    const root = toRecord(initialData) || {}
+    const sources = [root, ...records]
+
+    const rawCategory = pickString(sources, ['category', 'bikeType', 'type'])
+    const rawCondition = pickString(sources, ['condition', 'bikeCondition'])
+    const rawCity = pickString(sources, ['city', 'cityName', 'location'])
+    const rawFrameMaterial = pickString(sources, ['frameMaterial', 'material'])
+    const rawFrameSize = pickString(sources, ['frameSize', 'size'])
+    const rawGroupset = pickString(sources, ['groupset'])
+    const rawWheelSize = pickString(sources, ['wheelSize', 'tireRim', 'rimSize'])
+    const rawBrakeType = pickString(sources, ['brakeType', 'brake'])
+    const rawBrand = pickString(sources, ['brand', 'brandName'])
+    const rawTitle = pickString(sources, ['title', 'listingTitle', 'name'])
+    const rawDescription = pickString(sources, ['description', 'desc'])
+    const rawSerial = pickString(sources, ['serialNumber', 'serial', 'frameNumber'])
+    const rawUsageHistory = pickString(sources, ['usageHistory', 'operating'])
+    const rawPaint = pickString(sources, ['paint', 'color'])
+    const rawOverall = pickString(sources, ['overall', 'rating', 'depreciation'])
+    const rawPrice = pickNumber(sources, ['price', 'listingPrice'])
+    const rawWeight = pickNumber(sources, ['weight'])
+
+    return {
+      title: rawTitle,
+      category: normalizeOptionValue(rawCategory, CATEGORIES),
+      brand: normalizeStringOption(rawBrand, BRANDS),
+      condition: normalizeOptionValue(rawCondition, CONDITIONS),
+      description: rawDescription,
+      frameSize: normalizeStringOption(rawFrameSize, FRAME_SIZES),
+      weight: rawWeight ? String(rawWeight) : '',
+      frameMaterial: normalizeOptionValue(rawFrameMaterial, FRAME_MATERIAL_OPTIONS),
+      groupset: normalizeStringOption(rawGroupset, GROUPSETS),
+      wheelSize: normalizeStringOption(rawWheelSize, WHEEL_SIZES),
+      usageHistory: rawUsageHistory,
+      serial: rawSerial ? rawSerial.toUpperCase() : '',
+      city: normalizeOptionValue(normalizeCityValue(rawCity), CITIES),
+      price: rawPrice ? String(rawPrice) : '',
+      paint: rawPaint,
+      brakeType: normalizeStringOption(rawBrakeType, BRAKE_TYPES),
+      overall: rawOverall,
+    }
   })
 
   // State for files
@@ -235,21 +352,29 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const videoInputRef = useRef<HTMLInputElement>(null)
   const groupsetPhotoInputRef = useRef<HTMLInputElement>(null)
 
-  // Clean up object URLs on unmount
+  // Keep track of all object URLs ever created to clean them up on unmount
+  const objectUrlsRef = useRef<Set<string>>(new Set())
+
+  const createTrackedObjectURL = (file: File) => {
+    const url = URL.createObjectURL(file)
+    objectUrlsRef.current.add(url)
+    return url
+  }
+
+  // Clean up object URLs only on unmount
   useEffect(() => {
+    const trackedUrls = objectUrlsRef.current
     return () => {
-      imageUrls
-        .filter((url) => url.startsWith('blob:'))
-        .forEach(URL.revokeObjectURL)
-      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
-      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
+      trackedUrls.forEach(URL.revokeObjectURL)
+      trackedUrls.clear()
     }
-  }, [imageUrls, videoUrl, groupsetPhotoUrl])
+  }, [])
 
   const displayImageUrls = [...existingImageUrls, ...imageUrls]
 
   const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    const nextValue = field === 'serial' ? value.toUpperCase() : value
+    setFormData((prev) => ({ ...prev, [field]: nextValue }))
   }
 
   const handleFileChange = (
@@ -266,17 +391,23 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
       const newImages = [...images, ...accepted]
       setImages(newImages)
-      setImageUrls((prev) => [...prev, ...accepted.map((file) => URL.createObjectURL(file))])
+      setImageUrls((prev) => [...prev, ...accepted.map((file) => createTrackedObjectURL(file))])
     } else if (type === 'video') {
       const file = files[0]
       setVideo(file)
-      if (videoUrl?.startsWith('blob:')) URL.revokeObjectURL(videoUrl)
-      setVideoUrl(URL.createObjectURL(file))
+      if (videoUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(videoUrl)
+        objectUrlsRef.current.delete(videoUrl)
+      }
+      setVideoUrl(createTrackedObjectURL(file))
     } else if (type === 'groupset') {
       const file = files[0]
       setGroupsetPhoto(file)
-      if (groupsetPhotoUrl?.startsWith('blob:')) URL.revokeObjectURL(groupsetPhotoUrl)
-      setGroupsetPhotoUrl(URL.createObjectURL(file))
+      if (groupsetPhotoUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(groupsetPhotoUrl)
+        objectUrlsRef.current.delete(groupsetPhotoUrl)
+      }
+      setGroupsetPhotoUrl(createTrackedObjectURL(file))
     }
     
     // Clear input
@@ -293,6 +424,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     const targetUrl = imageUrls[localIndex]
     if (targetUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(targetUrl)
+      objectUrlsRef.current.delete(targetUrl)
     }
 
     setImages((prev) => prev.filter((_, i) => i !== localIndex))
@@ -318,9 +450,10 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     // Basic validation
     if (
       !formData.title || !formData.category || !formData.brand || !formData.price ||
-      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial
+      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
+      !formData.weight || !formData.frameSize || !formData.condition || !formData.groupset || !formData.wheelSize
     ) {
-      setSubmitError(language === 'vi' ? 'Vui lòng điền đầy đủ các trường bắt buộc (*).' : 'Please fill all required fields (*).')
+      setSubmitError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
       return
     }
 
@@ -337,92 +470,33 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
       const payload = {
         title: formData.title,
         description: formData.description,
-        serialNumber: formData.serial,
+        serialNumber: formData.serial.toUpperCase(),
         category: formData.category,
         brand: formData.brand,
         frameSize: formData.frameSize,
+        weight: Number(formData.weight),
         frameMaterial: formData.frameMaterial,
         condition: formData.condition,
         groupset: formData.groupset,
         operating: formData.usageHistory,
         tireRim: formData.wheelSize,
         price: priceVal,
-        city: formData.city,
+        city: normalizeCityValue(formData.city),
         paint: formData.paint || 'N/A', // fallback if empty but now added to UI
         overall: formData.overall || 'N/A',
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      // Different flows based on original status
-      if (originalStatus === 'rejected') {
-        // FLOW 1: Resubmit first, then update (only for rejected listings)
-        try {
-          await resubmitListingMutation.mutateAsync(listingId)
-          
-          // Update listing after resubmit succeeds
-          await updateListingMutation.mutateAsync({
-            listingId,
-            data: payload
-          })
-          
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Gửi lại tin đăng thành công! Tin đang chờ duyệt.'
-              : 'Listing resubmitted successfully! Waiting for approval.'
-          )
-        } catch (resubmitError) {
-          // If resubmit fails, don't try to update
-          throw resubmitError
-        }
-      } else if (originalStatus === 'withdrawn') {
-        // FLOW 2: Only update (withdrawn listings cannot be resubmitted)
-        await updateListingMutation.mutateAsync({
-          listingId,
-          data: payload
-        })
-        
-        setSubmitSuccess(
-          language === 'vi'
-            ? 'Cập nhật tin đăng thành công! Tin vẫn ở trạng thái đã rút.'
-            : 'Listing updated successfully! Listing remains withdrawn.'
-        )
-      } else if (originalStatus === 'draft') {
-        // FLOW 2: Update first, then submit
-        try {
-          await updateListingMutation.mutateAsync({
-            listingId,
-            data: payload
-          })
-          
-          await submitListingMutation.mutateAsync(listingId)
-          
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Gửi tin đăng thành công! Tin đang chờ duyệt.'
-              : 'Listing submitted successfully! Waiting for approval.'
-          )
-        } catch (submitError) {
-          // If submit fails, listing is still updated
-          console.warn('Submit failed:', submitError)
-          setSubmitSuccess(
-            language === 'vi'
-              ? 'Cập nhật tin đăng thành công! (Chưa gửi duyệt)'
-              : 'Listing updated successfully! (Not submitted)'
-          )
-        }
-      } else {
-        // FLOW 3: Just update
-        await updateListingMutation.mutateAsync({
-          listingId,
-          data: payload
-        })
-        
-        setSubmitSuccess(
-          language === 'vi'
-            ? 'Cập nhật tin đăng thành công!'
-            : 'Listing updated successfully!'
-        )
-      }
+      await updateListingMutation.mutateAsync({
+        listingId,
+        data: payload
+      })
+
+      setSubmitSuccess(
+        originalStatus === 'draft'
+          ? 'Cập nhật bản nháp thành công. Vui lòng gửi duyệt tại trang chi tiết.'
+          : 'Cập nhật tin đăng thành công.'
+      )
 
       // Upload new media files if any (common for all flows)
       const newMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
@@ -438,10 +512,8 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     } catch (error) {
       setSubmitError(
         error instanceof Error
-          ? error.message
-          : language === 'vi'
-            ? 'Không thể cập nhật tin lúc này. Vui lòng thử lại.'
-            : 'Unable to update listing right now. Please try again.'
+          ? formatApiErrorMessage(error.message)
+          : 'Không thể cập nhật tin lúc này. Vui lòng thử lại.'
       )
     } finally {
       setIsSubmitting(false)
@@ -522,7 +594,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
             {currentStep === 0 && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="title">{language === 'vi' ? 'Tiêu đề' : 'Title'} *</Label>
+                  <Label htmlFor="title">
+                    {language === 'vi' ? 'Tiêu đề' : 'Title'} <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="title"
                     placeholder={language === 'vi' ? 'VD: Giant TCR Advanced Pro 1 - Full Carbon' : 'E.g., Giant TCR Advanced Pro 1 - Full Carbon'}
@@ -533,7 +607,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>{language === 'vi' ? 'Loại Xe' : 'Category'} *</Label>
+                    <Label>
+                      {language === 'vi' ? 'Loại Xe' : 'Category'} <span className="text-red-500">*</span>
+                    </Label>
                     <RadioGroup
                       value={formData.category}
                       onValueChange={(value) => updateField('category', value)}
@@ -556,7 +632,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                   </div>
 
                   <div className="space-y-2">
-                    <Label>{language === 'vi' ? 'Tình Trạng' : 'Condition'} *</Label>
+                    <Label>
+                      {language === 'vi' ? 'Tình Trạng' : 'Condition'} <span className="text-red-500">*</span>
+                    </Label>
                     <RadioGroup
                       value={formData.condition}
                       onValueChange={(value) => updateField('condition', value)}
@@ -584,7 +662,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="brand">{language === 'vi' ? 'Thương Hiệu' : 'Brand'} *</Label>
+                    <Label htmlFor="brand">
+                      {language === 'vi' ? 'Thương Hiệu' : 'Brand'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.brand} onValueChange={(value) => updateField('brand', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thương hiệu' : 'Select brand'} />
@@ -599,19 +679,13 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="model">{language === 'vi' ? 'Model' : 'Model'}</Label>
-                    <Input
-                      id="model"
-                      placeholder={language === 'vi' ? 'VD: TCR Advanced Pro 1' : 'E.g., TCR Advanced Pro 1'}
-                      value={formData.model}
-                      onChange={(e) => updateField('model', e.target.value)}
-                    />
-                  </div>
+                  <div className="space-y-2" />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">{language === 'vi' ? 'Mô Tả' : 'Description'} *</Label>
+                  <Label htmlFor="description">
+                    {language === 'vi' ? 'Mô Tả' : 'Description'} <span className="text-red-500">*</span>
+                  </Label>
                   <Textarea
                     id="description"
                     placeholder={
@@ -631,7 +705,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
               <div className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="frameSize">{language === 'vi' ? 'Kích Cỡ Khung' : 'Frame Size'} *</Label>
+                    <Label htmlFor="frameSize">
+                      {language === 'vi' ? 'Kích Cỡ Khung' : 'Frame Size'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.frameSize} onValueChange={(value) => updateField('frameSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn size' : 'Select size'} />
@@ -653,10 +729,11 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                         <SelectValue placeholder={language === 'vi' ? 'Chọn chất liệu' : 'Select material'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="carbon">Carbon</SelectItem>
-                        <SelectItem value="alloy">Alloy</SelectItem>
-                        <SelectItem value="steel">Steel</SelectItem>
-                        <SelectItem value="titanium">Titanium</SelectItem>
+                        {FRAME_MATERIAL_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -664,7 +741,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="groupset">{language === 'vi' ? 'Bộ Truyền Động' : 'Groupset'} *</Label>
+                    <Label htmlFor="groupset">
+                      {language === 'vi' ? 'Bộ Truyền Động' : 'Groupset'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.groupset} onValueChange={(value) => updateField('groupset', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn groupset' : 'Select groupset'} />
@@ -680,7 +759,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="wheelSize">{language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'}</Label>
+                    <Label htmlFor="wheelSize">
+                      {language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.wheelSize} onValueChange={(value) => updateField('wheelSize', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn cỡ bánh' : 'Select wheel size'} />
@@ -698,7 +779,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="brakeType">{language === 'vi' ? 'Loại Phanh' : 'Brake Type'} *</Label>
+                    <Label htmlFor="brakeType">
+                      {language === 'vi' ? 'Loại Phanh' : 'Brake Type'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.brakeType} onValueChange={(value) => updateField('brakeType', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn loại phanh' : 'Select brake type'} />
@@ -712,7 +795,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="paint">{language === 'vi' ? 'Màu Sơn' : 'Paint Color'} *</Label>
+                    <Label htmlFor="paint">
+                      {language === 'vi' ? 'Màu Sơn' : 'Paint Color'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="paint"
                       placeholder={language === 'vi' ? 'VD: Đen bóng / Nhám' : 'E.g., Gloss Black'}
@@ -724,7 +809,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="overall">{language === 'vi' ? 'Khấu Hao / Đánh Giá (%)' : 'Overall Condition'} *</Label>
+                    <Label htmlFor="overall">
+                      {language === 'vi' ? 'Khấu Hao / Đánh Giá (%)' : 'Overall Condition'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="overall"
                       placeholder={language === 'vi' ? 'VD: Xe mới 95%, ít xước xát' : 'E.g., 95% like new'}
@@ -733,30 +820,47 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                     />
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="serial">{language === 'vi' ? 'Số Serial' : 'Serial Number'} *</Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-sm">
-                              {language === 'vi'
-                                ? 'Số serial giúp xác minh nguồn gốc xe và ngăn chặn hàng gian lận'
-                                : 'Serial number helps verify bike origin and prevent fraud'}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+                    <Label htmlFor="weight">
+                      {language === 'vi' ? 'Trọng Lượng (kg)' : 'Weight (kg)'} <span className="text-red-500">*</span>
+                    </Label>
                     <Input
-                      id="serial"
-                      placeholder="VD: GNT2023TCR001234"
-                      value={formData.serial}
-                      onChange={(e) => updateField('serial', e.target.value)}
+                      id="weight"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      placeholder="7.5"
+                      value={formData.weight}
+                      onChange={(e) => updateField('weight', e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="serial">
+                      {language === 'vi' ? 'Số Serial' : 'Serial Number'} <span className="text-red-500">*</span>
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            {language === 'vi'
+                              ? 'Số serial giúp xác minh nguồn gốc xe và ngăn chặn hàng gian lận'
+                              : 'Serial number helps verify bike origin and prevent fraud'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Input
+                    id="serial"
+                    placeholder="VD: GNT2023TCR001234"
+                    value={formData.serial}
+                    onChange={(e) => updateField('serial', e.target.value)}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -776,7 +880,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="city">{language === 'vi' ? 'Thành Phố' : 'City'} *</Label>
+                    <Label htmlFor="city">
+                      {language === 'vi' ? 'Thành Phố' : 'City'} <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.city} onValueChange={(value) => updateField('city', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thành phố' : 'Select city'} />
@@ -800,7 +906,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                 {/* Images */}
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-base">{language === 'vi' ? 'Hình Ảnh Xe' : 'Bike Photos'} *</Label>
+                    <Label className="text-base">
+                      {language === 'vi' ? 'Hình Ảnh Xe' : 'Bike Photos'} <span className="text-red-500">*</span>
+                    </Label>
                     <p className="text-sm text-muted-foreground">
                       {language === 'vi'
                         ? 'Tải lên ít nhất 1 ảnh chất lượng cao (tối đa 10 ảnh)'
@@ -919,7 +1027,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="price">{language === 'vi' ? 'Giá Bán' : 'Selling Price'} (VND) *</Label>
+                  <Label htmlFor="price">
+                    {language === 'vi' ? 'Giá Bán' : 'Selling Price'} (VND) <span className="text-red-500">*</span>
+                  </Label>
                   <div className="relative">
                     <Input
                       id="price"
@@ -999,7 +1109,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
             ) : (
               <Button className="gap-2" onClick={handleSubmitForReview} disabled={isLoading}>
                 {isLoading ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isLoading ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : (language === 'vi' ? 'Gửi Duyệt' : 'Submit for Review')}
+                {isLoading ? 'Đang cập nhật...' : 'Lưu cập nhật'}
               </Button>
             )}
           </div>

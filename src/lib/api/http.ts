@@ -159,7 +159,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
       credentials: "include", // for refresh token cookie
     });
   } catch {
-    throw new Error("Unable to connect to API. Please check backend service and network.");
+    throw new Error("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
   }
 
 
@@ -173,7 +173,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
       if (!softFail) {
         await forceLogout();
       }
-      throw new Error("Unauthorized");
+      throw new Error("Không có quyền truy cập hoặc phiên đăng nhập đã hết hạn.");
     }
 
     const nextToken = await refreshAccessToken();
@@ -182,7 +182,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
       if (!softFail) {
         await forceLogout();
       }
-      throw new Error("Unauthorized");
+      throw new Error("Không có quyền truy cập hoặc phiên đăng nhập đã hết hạn.");
     }
 
     return fetchWithAuth<T>(
@@ -204,7 +204,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
       extractApiErrorMessage(errorPayload) ||
       (typeof errorPayload === "string" && errorPayload.trim()) ||
       res.statusText ||
-      "API request failed";
+      "Yêu cầu xử lý thất bại. Vui lòng thử lại sau.";
     throw new Error(message);
   }
 
@@ -214,22 +214,27 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
   // NOTE: BE has a typo — "isSucess" (missing 'c'). We handle all variants.
   if (payload && typeof payload === "object") {
     const obj = payload as Record<string, unknown>;
-    const hasWrapper =
-      ("isSucess" in obj || "isSuccess" in obj || "success" in obj) &&
-      "data" in obj;
+    const hasSuccessFlag =
+      "isSucess" in obj || "isSuccess" in obj || "success" in obj;
 
-    if (hasWrapper) {
+    if (hasSuccessFlag) {
       const isOk = obj.isSucess ?? obj.isSuccess ?? obj.success;
 
-      // BE sometimes returns { success: false, message: "..." } on HTTP 200.
+      // BE sometimes returns { success: false, message: "..." } on HTTP 200,
+      // with OR without a "data" field. Always throw so callers see the real
+      // error message instead of falling through to normalizeAuthSession which
+      // would throw a confusing "Auth response does not include access token".
       if (isOk === false) {
         const msg =
           (typeof obj.message === "string" && obj.message.trim()) ||
-          "Thao tác không thành công";
+          "Thao tác không thành công.";
         throw new Error(msg);
       }
 
-      return obj.data as T;
+      // Unwrap the data payload only if the field is present.
+      if ("data" in obj) {
+        return obj.data as T;
+      }
     }
   }
 
@@ -253,15 +258,14 @@ export async function httpMultipart<T>(path: string, form: FormData, options?: {
       cache: "no-store",
     });
   } catch {
-    throw new Error("Unable to connect to API. Please check backend service and network.");
+    throw new Error("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
   }
 
   if (!response.ok) {
-    const errorPayload = await response.json().catch(() => null);
-    const message =
-      (errorPayload && typeof errorPayload.message === "string" && errorPayload.message) ||
-      response.statusText ||
-      "Upload failed";
+    const errorPayload = await safeParseBody(response);
+    const apiMsg = extractApiErrorMessage(errorPayload);
+    const rawMsg = typeof errorPayload === "string" && errorPayload.trim() ? errorPayload.trim() : "";
+    const message: string = apiMsg || rawMsg || response.statusText || "Tải lên thất bại. Vui lòng thử lại sau.";
     throw new Error(message);
   }
 
@@ -286,7 +290,7 @@ export const http = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
     });
-    if (!res.ok) throw new Error("Upload failed");
+    if (!res.ok) throw new Error("Tải lên thất bại. Vui lòng thử lại sau.");
     return res.json() as Promise<T>;
   },
 };

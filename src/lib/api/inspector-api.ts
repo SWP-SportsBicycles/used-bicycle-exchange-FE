@@ -58,6 +58,27 @@ export interface InspectorListingDetail {
   bikes: InspectorListingBike[];
 }
 
+export interface InspectorAllItem {
+  id: string;
+  listingId: string;
+  serialNumber: string;
+  brand: string;
+  category: string;
+  frameSize: string;
+  condition: string;
+  city: string;
+  price: number;
+  medias: InspectorListingMedia[];
+}
+
+export interface InspectorAllPaginated {
+  items: InspectorAllItem[];
+  totalItems: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
 export interface SubmitInspectionPayload {
   comment: string;
   frame: boolean;
@@ -106,6 +127,24 @@ export interface InspectorReportItem {
 
 export interface InspectorReportDetail extends InspectorReportItem {
   videoUrl: string | null;
+}
+
+export interface InspectorReportPaginated {
+  items: InspectorReportItem[];
+  totalItems: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
+export interface InspectorPendingOrder {
+  orderId: string;
+  buyerName: string;
+  status: string;
+  createdAt: string;
+  totalAmount: number;
+  listingTitle: string;
+  city: string;
 }
 
 function extractPayloadObject(payload: unknown): Record<string, unknown> {
@@ -268,7 +307,38 @@ function normalizeInspectorReport(payload: unknown): InspectorReportDetail {
   };
 }
 
+function normalizeInspectorAllItem(raw: unknown): InspectorAllItem {
+  const source = extractPayloadObject(raw);
+  const medias = extractArray(source.medias).map(normalizeMedia).filter((item): item is InspectorListingMedia => Boolean(item));
+
+  return {
+    id: pickString(source, ["id"]) || crypto.randomUUID(),
+    listingId: pickString(source, ["listingId", "listingID"]) || "",
+    serialNumber: pickString(source, ["serialNumber", "serial"]) || "",
+    brand: pickString(source, ["brand"]) || "",
+    category: pickString(source, ["category"]) || "",
+    frameSize: pickString(source, ["frameSize"]) || "",
+    condition: pickString(source, ["condition"]) || "",
+    city: pickString(source, ["city"]) || "",
+    price: pickNumber(source, ["price", "salePrice", "originalPrice"]),
+    medias,
+  };
+}
+
 export const inspectorApi = {
+  async getAll(pageNumber = 1, pageSize = 10): Promise<InspectorAllPaginated> {
+    const response = await http.get<unknown>(`/api/inspector/all?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+    const source = extractPayloadObject(response);
+    const data = source.data && typeof source.data === "object" ? (source.data as Record<string, unknown>) : source;
+
+    return {
+      items: extractArray(data.items).map(normalizeInspectorAllItem),
+      totalItems: pickNumber(data, ["totalItems", "totalCount"]),
+      totalPages: pickNumber(data, ["totalPages"]),
+      pageNumber: pickNumber(data, ["pageNumber", "page"]),
+      pageSize: pickNumber(data, ["pageSize", "limit"]),
+    };
+  },
   async getPendingListings() {
     const response = await http.get<unknown>("/api/inspector-listing/pending");
     return extractArray(response).map(normalizePendingListing);
@@ -319,6 +389,30 @@ export const inspectorApi = {
     }));
   },
 
+  async getReportsPaged(pageNumber = 1, pageSize = 10): Promise<InspectorReportPaginated> {
+    const response = await http.get<unknown>(`/api/inspector-report?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+    const source = extractPayloadObject(response);
+    const data = source.data && typeof source.data === "object" ? (source.data as Record<string, unknown>) : source;
+    const items = extractArray(data.items).map(normalizeInspectorReport).map((report) => ({
+      reportId: report.reportId,
+      buyerName: report.buyerName,
+      orderStatus: report.orderStatus,
+      transactionStatus: report.transactionStatus,
+      status: report.status,
+      reason: report.reason,
+      description: report.description,
+      createdAt: report.createdAt,
+    }));
+
+    return {
+      items,
+      totalItems: pickNumber(data, ["totalItems", "totalCount"]),
+      totalPages: pickNumber(data, ["totalPages"]),
+      pageNumber: pickNumber(data, ["pageNumber", "page"]),
+      pageSize: pickNumber(data, ["pageSize", "limit"]),
+    };
+  },
+
   async getReportDetail(reportId: string): Promise<InspectorReportDetail> {
     const response = await http.get<unknown>(`/api/inspector-report/${reportId}`);
     return normalizeInspectorReport(response);
@@ -331,7 +425,35 @@ export const inspectorApi = {
   async rejectReport(reportId: string) {
     return http.put<unknown>(`/api/inspector-report/${reportId}/reject`, {});
   },
+
+  // Inspector Order APIs
+  async getPendingOrders(): Promise<InspectorPendingOrder[]> {
+    const response = await http.get<unknown>("/api/inspector/pending");
+    return extractArray(response).map(normalizePendingOrder);
+  },
+
+  async getOrderDetail(orderId: string) {
+    const response = await http.get<unknown>(`/api/inspector/${orderId}`);
+    return extractPayloadObject(response);
+  },
+
+  async submitOrderInspection(orderId: string, payload: SubmitInspectionPayload) {
+    return http.post<unknown>(`/api/inspector/${orderId}/submit`, payload);
+  },
 };
+
+function normalizePendingOrder(raw: unknown): InspectorPendingOrder {
+  const source = extractPayloadObject(raw);
+  return {
+    orderId: pickString(source, ["orderId", "id"]) || crypto.randomUUID(),
+    buyerName: pickString(source, ["buyerName", "buyerFullName", "buyer"]),
+    status: pickString(source, ["status"]),
+    createdAt: pickString(source, ["createdAt", "created_at", "createdDate"]),
+    totalAmount: pickNumber(source, ["totalAmount", "total", "amount"]),
+    listingTitle: pickString(source, ["listingTitle", "title", "bikeName"]),
+    city: pickString(source, ["city"]),
+  };
+}
 
 function normalizeHistory(raw: unknown): InspectorHistory {
   const source = extractPayloadObject(raw);

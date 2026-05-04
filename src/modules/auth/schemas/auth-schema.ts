@@ -4,42 +4,42 @@ const PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
 const PHONE_REGEX = /^0\d{9}$/;
 
 export const loginSchema = z.object({
-  email: z.string().email("Email khong hop le"),
-  password: z.string().min(1, "Vui long nhap mat khau"),
+  email: z.string().email("Email không hợp lệ"),
+  password: z.string().min(1, "Vui lòng nhập mật khẩu"),
 });
 
 export const registerSchema = z
   .object({
-    fullName: z.string().min(2, "Ho ten toi thieu 2 ky tu"),
-    phoneNumber: z.string().regex(PHONE_REGEX, "So dien thoai phai theo dinh dang 0xxxxxxxxx"),
-    email: z.string().email("Email khong hop le"),
-    password: z.string().regex(PASSWORD_REGEX, "Mat khau can chu hoa, so, ky tu dac biet va toi thieu 6 ky tu"),
-    confirmPassword: z.string().min(1, "Vui long xac nhan mat khau"),
+    fullName: z.string().min(2, "Họ tên tối thiểu 2 ký tự"),
+    phoneNumber: z.string().regex(PHONE_REGEX, "Số điện thoại phải theo định dạng 0xxxxxxxxx"),
+    email: z.string().email("Email không hợp lệ"),
+    password: z.string().regex(PASSWORD_REGEX, "Mật khẩu cần chữ hoa, số, ký tự đặc biệt và tối thiểu 6 ký tự"),
+    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu"),
     role: z.enum(["2", "3"], {
-      errorMap: () => ({ message: "Vui long chon vai tro" }),
+      errorMap: () => ({ message: "Vui lòng chọn vai trò" }),
     }),
   })
   .refine((value) => value.password === value.confirmPassword, {
-    message: "Mat khau xac nhan khong khop",
+    message: "Mật khẩu xác nhận không khớp",
     path: ["confirmPassword"],
   });
 
 export const otpSchema = z.object({
-  email: z.string().email("Email khong hop le"),
-  otp: z.string().length(6, "OTP phai gom 6 ky tu"),
+  email: z.string().email("Email không hợp lệ"),
+  otp: z.string().length(6, "OTP phải gồm 6 ký tự"),
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Email khong hop le"),
+  email: z.string().email("Email không hợp lệ"),
 });
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().regex(PASSWORD_REGEX, "Mat khau can chu hoa, so, ky tu dac biet va toi thieu 6 ky tu"),
-    confirmPassword: z.string().min(1, "Vui long xac nhan mat khau"),
+    newPassword: z.string().regex(PASSWORD_REGEX, "Mật khẩu cần chữ hoa, số, ký tự đặc biệt và tối thiểu 6 ký tự"),
+    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu"),
   })
   .refine((value) => value.newPassword === value.confirmPassword, {
-    message: "Mat khau xac nhan khong khop",
+    message: "Mật khẩu xác nhận không khớp",
     path: ["confirmPassword"],
   });
 

@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useLanguage } from '@/lib/language-context'
 import { formatVND } from '@/lib/mock-data'
 import { inspectorApi, type SubmitInspectionPayload } from '@/lib/api/inspector-api'
@@ -98,6 +99,7 @@ export default function InspectionPage() {
   
   const [currentStep, setCurrentStep] = useState(0)
   const [serialConfirmed, setSerialConfirmed] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [inspection, setInspection] = useState<Record<InspectionFieldKey, InspectionFieldState>>(() => ({
     frame: { result: null, notes: '' },
     paintCondition: { result: null, notes: '' },
@@ -357,9 +359,15 @@ export default function InspectionPage() {
                   </Label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {imageList.slice(0, 6).map((img, idx) => (
-                      <div key={idx} className="h-44 rounded-lg overflow-hidden border border-border/70 bg-muted">
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedImage(img)}
+                        className="h-44 rounded-lg overflow-hidden border border-border/70 bg-muted transition-transform hover:-translate-y-0.5"
+                      >
                         <Image src={img} alt={`Bike ${idx + 1}`} width={176} height={176} className="h-full w-full object-cover" />
-                      </div>
+                        <span className="sr-only">Open image</span>
+                      </button>
                     ))}
                   </div>
                   {videoList.length > 0 && (
@@ -467,9 +475,15 @@ export default function InspectionPage() {
                     {imageList.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                         {imageList.map((img, idx) => (
-                          <div key={`${item.id}-${idx}`} className="h-32 rounded-lg overflow-hidden border border-border/60 bg-muted">
+                          <button
+                            key={`${item.id}-${idx}`}
+                            type="button"
+                            onClick={() => setSelectedImage(img)}
+                            className="h-32 rounded-lg overflow-hidden border border-border/60 bg-muted transition-transform hover:-translate-y-0.5"
+                          >
                             <Image src={img} alt={`${item.id}-${idx}`} width={128} height={128} className="h-full w-full object-cover" />
-                          </div>
+                            <span className="sr-only">Open image</span>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -580,6 +594,39 @@ export default function InspectionPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(selectedImage)} onOpenChange={(open) => !open && setSelectedImage(null)}>
+        <DialogContent
+          showCloseButton={false}
+          className="w-[92vw] max-w-4xl border-border/60 bg-white p-4 sm:p-5"
+        >
+          <DialogTitle className="sr-only">{language === 'vi' ? 'Xem ảnh' : 'Image preview'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {language === 'vi' ? 'Phóng to ảnh kiểm định' : 'Preview inspection image'}
+          </DialogDescription>
+          <div className="relative flex max-h-[80vh] w-full items-center justify-center">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setSelectedImage(null)}
+              className="absolute right-2 top-2 z-10 h-9 w-9 rounded-full bg-black/70 text-white hover:bg-black/85"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+            {selectedImage && (
+              <Image
+                src={selectedImage}
+                alt={language === 'vi' ? 'Xem ảnh' : 'Preview image'}
+                width={2000}
+                height={1500}
+                className="max-h-[70vh] w-auto max-w-full object-contain"
+                unoptimized
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
