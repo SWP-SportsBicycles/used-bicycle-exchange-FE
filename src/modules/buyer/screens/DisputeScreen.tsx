@@ -72,8 +72,8 @@ export default function DisputeScreen({ params }: PageProps) {
   const existingReport = reports?.find((r) => r.orderId === id);
   const isViewMode = order?.status === "disputed" || !!existingReport;
 
-  // Logic: Chỉ cho phép khiếu nại nếu đơn hàng đã được giao (delivered)
-  const canStartDispute = order?.status === "delivered";
+  // Logic: Chỉ cho phép khiếu nại nếu đơn hàng đã được xác nhận (completed)
+  const canStartDispute = order?.status === "completed";
   const isInvalidAccess =
     !isOrderLoading && order && !canStartDispute && !isViewMode;
 
@@ -181,7 +181,7 @@ export default function DisputeScreen({ params }: PageProps) {
           </div>
           <h2 className="text-xl font-bold mb-2">Truy cập không hợp lệ</h2>
           <p className="text-muted-foreground mb-6">
-            Bạn chỉ có thể khiếu nại cho những đơn hàng đã được giao thành công.
+            Bạn chỉ có thể khiếu nại cho những đơn hàng đã được xác nhận nhận hàng.
             Đơn hàng hiện tại đang ở trạng thái:{" "}
             <strong>{order.statusLabel || order.status}</strong>.
           </p>

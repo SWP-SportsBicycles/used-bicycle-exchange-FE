@@ -127,7 +127,8 @@ export function createMockReport(overrides: Record<string, unknown> = {}) {
     statusDisplay: "Đang chờ Inspector kiểm định",
     createdAt: "2024-12-25T14:00:00Z",
     ...overrides,
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
 }
 
 export function createMockListingPage(
