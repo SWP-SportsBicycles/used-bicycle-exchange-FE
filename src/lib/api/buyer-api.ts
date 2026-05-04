@@ -54,6 +54,11 @@ export interface BuyerListing {
   frameMaterial: string;
   groupset: string;
   wheelSize: string;
+  // ── Extended bike specs (from bikes[0] in detail response) ──
+  paint?: string;             // Màu sắc khung xe (e.g. "Green")
+  operating?: string;         // Đánh giá vận hành (e.g. "Very Smooth")
+  brakeType?: string;         // Loại phanh (e.g. "Disc Brake")
+  weight?: number;            // Trọng lượng kg (0 = không xác định)
   description: string;
   images: string[];
   videoUrls?: string[];
@@ -420,6 +425,16 @@ function normalizeListing(raw: Record<string, unknown>): BuyerListing {
   const category = ((merged.category ?? bike0?.category) as string) || "road";
   const updatedAt = ((merged.updatedAt ?? merged.createdAt) as string) || createdAt;
 
+  // ── Extended specs: paint, operating, brakeType, weight ─────────────────
+  const paint = ((merged.paint ?? bike0?.paint) as string) || undefined;
+  const operating = ((merged.operating ?? bike0?.operating) as string) || undefined;
+  const brakeType = ((merged.brakeType ?? bike0?.brakeType) as string) || undefined;
+  const rawWeight = merged.weight ?? bike0?.weight;
+  const weight =
+    rawWeight != null && rawWeight !== ""
+      ? parseFloat(String(rawWeight))
+      : undefined;
+
   const listing: BuyerListing = {
     ...merged,
     id,
@@ -441,6 +456,10 @@ function normalizeListing(raw: Record<string, unknown>): BuyerListing {
     frameSize: ((merged.frameSize ?? bike0?.frameSize) as string) || "",
     frameMaterial: ((merged.frameMaterial ?? bike0?.frameMaterial) as string) || "",
     groupset: ((merged.groupset ?? bike0?.groupset) as string) || "",
+    paint,
+    operating,
+    brakeType,
+    weight,
     description: (merged.description as string) || "",
     seller: (merged.seller as BuyerListing["seller"]) ?? {
       id: "",

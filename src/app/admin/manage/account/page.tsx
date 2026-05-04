@@ -36,14 +36,14 @@ const roleLabels: Record<string, { vi: string; en: string }> = {
 }
 
 const statusColors: Record<string, string> = {
-  active: 'bg-green-100 text-green-700 border-green-200',
-  inactive: 'bg-gray-100 text-gray-700 border-gray-200',
+  Active: 'bg-green-100 text-green-700 border-green-200',
+  InActive: 'bg-gray-100 text-gray-600 border-gray-200',
   Banned: 'bg-red-100 text-red-700 border-red-200',
 }
 
 const statusLabels: Record<string, { vi: string; en: string }> = {
-  active: { vi: 'Hoạt động', en: 'Active' },
-  inactive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
+  Active: { vi: 'Hoạt động', en: 'Active' },
+  InActive: { vi: 'Chưa kích hoạt', en: 'Inactive' },
   Banned: { vi: 'Bị cấm', en: 'Banned' },
 }
 
@@ -211,12 +211,12 @@ export default function AccountManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {typeof user.isActive === 'boolean' ? (
+                          {user.status ? (
                             <Badge
                               variant="outline"
-                              className={cn('text-xs', statusColors[user.isActive ? 'active' : 'inactive'] || 'bg-gray-100')}
+                              className={cn('text-xs', statusColors[user.status] ?? 'bg-gray-100 text-gray-600 border-gray-200')}
                             >
-                              {statusLabels[user.isActive ? 'active' : 'inactive']?.[language] || '-'}
+                              {statusLabels[user.status]?.[language] ?? user.status}
                             </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>

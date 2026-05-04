@@ -189,7 +189,7 @@ describe("http client", () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 
     await expect(http.get("/api/fail")).rejects.toThrow(
-      "Unable to connect to API",
+      /Unable to connect to API|Không thể kết nối/,
     );
   });
 
