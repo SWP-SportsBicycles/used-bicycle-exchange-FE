@@ -16,6 +16,7 @@ import {
   XCircle,
   FileText,
   History,
+  ClipboardCheck,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,11 +26,11 @@ import { formatVND } from '@/lib/mock-data'
 import { inspectorApi } from '@/lib/api/inspector-api'
 import { cn } from '@/lib/utils'
 
-type ListingFilter = 'all' | 'pending'
+type TabKey = 'listings' | 'history'
 
 export default function InspectorAssignedPage() {
   const { language } = useLanguage()
-  const [activeStatus, setActiveStatus] = useState<ListingFilter>('pending')
+  const [activeTab, setActiveTab] = useState<TabKey>('listings')
 
   const pendingQuery = useQuery({
     queryKey: ['inspector-listings', 'pending'],
@@ -39,87 +40,99 @@ export default function InspectorAssignedPage() {
   const historyQuery = useQuery({
     queryKey: ['inspector-history', 1, 10],
     queryFn: () => inspectorApi.getHistory(1, 10),
-    enabled: activeStatus === 'all',
     staleTime: 0,
     refetchOnMount: true,
   })
 
   const pendingListings = pendingQuery.data ?? []
   const historyData = historyQuery.data
-
-  const listTitle =
-    activeStatus === 'pending'
-      ? language === 'vi'
-        ? 'Tin Đăng Chờ Kiểm Định'
-        : 'Pending Inspection Listings'
-      : language === 'vi'
-      ? 'Lịch Sử Kiểm Định'
-      : 'Inspection History'
-
-  const listDescription =
-    activeStatus === 'pending'
-      ? language === 'vi'
-        ? 'Danh sách xe đang chờ kiểm định từ hệ thống'
-        : 'Listings waiting for inspector verification'
-      : language === 'vi'
-      ? 'Danh sách các xe đã kiểm định'
-        : 'List of inspected bikes'
+  const tabs: { key: TabKey; icon: React.ComponentType<{ className?: string }>; label: { vi: string; en: string }; count: number; tone?: string }[] = [
+    {
+      key: 'history',
+      icon: History,
+      label: { vi: 'Lịch Sử', en: 'History' },
+      count: historyData?.totalItems ?? 0,
+    },
+    {
+      key: 'listings',
+      icon: ClipboardCheck,
+      label: { vi: 'Tin Đăng Chờ Duyệt', en: 'Pending Listings' },
+      count: pendingListings.length,
+      tone: 'amber',
+    },
+  ]
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
-            {language === 'vi' ? 'Kiểm định xe' : 'Bike Inspection'}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {language === 'vi'
-              ? 'Danh sách xe cần kiểm định từ hệ thống'
-              : 'Listings assigned for inspection from API'}
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
+          {language === 'vi' ? 'Kiểm Định Xe' : 'Bike Inspection'}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {language === 'vi' ? 'Danh sách xe cần kiểm định từ hệ thống' : 'Listings assigned for inspection'}
+        </p>
       </div>
 
+      {/* Tabs */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={activeStatus === 'all' ? 'default' : 'outline'}
-              onClick={() => setActiveStatus('all')}
-            >
-              {language === 'vi' ? 'Lịch sử' : 'History'} ({activeStatus === 'all' && historyQuery.isLoading ? '...' : (historyData?.totalItems ?? 0)})
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={activeStatus === 'pending' ? 'default' : 'outline'}
-              onClick={() => setActiveStatus('pending')}
-            >
-              {language === 'vi' ? 'Chờ duyệt' : 'Pending'} ({pendingListings.length})
-            </Button>
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key
+              return (
+                <Button
+                  key={tab.key}
+                  type="button"
+                  size="sm"
+                  variant={isActive ? 'default' : 'outline'}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    'gap-1.5',
+                    !isActive && 'bg-background',
+                    isActive && tab.tone === 'amber' && 'bg-amber-600 hover:bg-amber-700',
+                    isActive && tab.tone === 'blue' && 'bg-blue-600 hover:bg-blue-700',
+                  )}
+                >
+                  <tab.icon className="h-3.5 w-3.5" />
+                  {tab.label[language]}
+                  <Badge
+                    variant={isActive ? 'secondary' : 'outline'}
+                    className={cn('h-5 px-1.5 text-xs ml-0.5', isActive && 'bg-white/20 text-white border-0')}
+                  >
+                    {tab.count}
+                  </Badge>
+                </Button>
+              )
+            })}
           </div>
         </CardContent>
       </Card>
 
+      {/* Content */}
       <Card>
         <CardHeader>
-          <CardTitle>{listTitle}</CardTitle>
-          <CardDescription>{listDescription}</CardDescription>
+          <CardTitle>
+            {activeTab === 'listings' && (language === 'vi' ? 'Tin Đăng Chờ Kiểm Định' : 'Pending Inspection Listings')}
+            {activeTab === 'history' && (language === 'vi' ? 'Lịch Sử Kiểm Định' : 'Inspection History')}
+          </CardTitle>
+          <CardDescription>
+            {activeTab === 'listings' && (language === 'vi' ? 'Xe đang chờ kiểm định trước khi đăng lên marketplace' : 'Bikes awaiting inspection before marketplace listing')}
+            {activeTab === 'history' && (language === 'vi' ? 'Danh sách các xe đã kiểm định' : 'List of completed inspections')}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {activeStatus === 'pending' ? (
-            <PendingListingsView 
-              isLoading={pendingQuery.isLoading} 
-              error={pendingQuery.error} 
+          {activeTab === 'listings' && (
+            <PendingListingsView
+              isLoading={pendingQuery.isLoading}
+              error={pendingQuery.error}
               listings={pendingListings}
               language={language}
             />
-          ) : (
-            <HistoryView 
-              isLoading={historyQuery.isLoading} 
-              error={historyQuery.error} 
+          )}
+          {activeTab === 'history' && (
+            <HistoryView
+              isLoading={historyQuery.isLoading}
+              error={historyQuery.error}
               historyData={historyData}
               language={language}
             />
@@ -130,13 +143,13 @@ export default function InspectorAssignedPage() {
   )
 }
 
-// Sub-components for different views
+/* ── Pending Listings ── */
 
 interface PendingListingsViewProps {
-  isLoading: boolean;
-  error: Error | null;
-  listings: import('@/lib/api/inspector-api').InspectorPendingListing[];
-  language: string;
+  isLoading: boolean
+  error: Error | null
+  listings: import('@/lib/api/inspector-api').InspectorPendingListing[]
+  language: string
 }
 
 function PendingListingsView({ isLoading, error, listings, language }: PendingListingsViewProps) {
@@ -159,8 +172,10 @@ function PendingListingsView({ isLoading, error, listings, language }: PendingLi
 
   if (listings.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        <p>{language === 'vi' ? 'Không có xe nào chờ kiểm định' : 'No pending listings'}</p>
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <ClipboardCheck className="h-12 w-12 mb-3 text-muted-foreground/30" />
+        <p className="font-medium">{language === 'vi' ? 'Không có xe nào chờ kiểm định' : 'No pending listings'}</p>
+        <p className="text-sm mt-1">{language === 'vi' ? 'Các tin đăng mới sẽ xuất hiện ở đây' : 'New listings will appear here'}</p>
       </div>
     )
   }
@@ -187,7 +202,7 @@ function PendingListingsView({ isLoading, error, listings, language }: PendingLi
                     {listing.brand || '-'} • {formatVND(listing.price)}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
                       {language === 'vi' ? 'Chờ duyệt' : 'Pending'}
                     </Badge>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -239,11 +254,13 @@ function PendingListingsView({ isLoading, error, listings, language }: PendingLi
   )
 }
 
+/* ── History ── */
+
 interface HistoryViewProps {
-  isLoading: boolean;
-  error: Error | null;
-  historyData: import('@/lib/api/inspector-api').InspectorHistoryPaginated | undefined;
-  language: string;
+  isLoading: boolean
+  error: Error | null
+  historyData: import('@/lib/api/inspector-api').InspectorHistoryPaginated | undefined
+  language: string
 }
 
 function HistoryView({ isLoading, error, historyData, language }: HistoryViewProps) {
@@ -268,9 +285,9 @@ function HistoryView({ isLoading, error, historyData, language }: HistoryViewPro
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        <History className="h-12 w-12 mx-auto mb-4" />
-        <p>{language === 'vi' ? 'Chưa có lịch sử kiểm định' : 'No inspection history yet'}</p>
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <History className="h-12 w-12 mb-3 text-muted-foreground/30" />
+        <p className="font-medium">{language === 'vi' ? 'Chưa có lịch sử kiểm định' : 'No inspection history yet'}</p>
       </div>
     )
   }
@@ -293,21 +310,21 @@ function HistoryView({ isLoading, error, historyData, language }: HistoryViewPro
                     {language === 'vi' ? 'Điểm số' : 'Score'}: {item.score}/100
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={cn(
                         'text-xs',
-                        item.score >= 80 
-                          ? 'bg-green-100 text-green-700 border-green-200' 
-                          : item.score >= 50 
-                            ? 'bg-amber-100 text-amber-700 border-amber-200' 
+                        item.score >= 80
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : item.score >= 50
+                            ? 'bg-amber-100 text-amber-700 border-amber-200'
                             : 'bg-red-100 text-red-700 border-red-200'
                       )}
                     >
-                      {item.score >= 80 
-                        ? (language === 'vi' ? 'Đạt tốt' : 'Good') 
-                        : item.score >= 50 
-                          ? (language === 'vi' ? 'Trung bình' : 'Average') 
+                      {item.score >= 80
+                        ? (language === 'vi' ? 'Đạt tốt' : 'Good')
+                        : item.score >= 50
+                          ? (language === 'vi' ? 'Trung bình' : 'Average')
                           : (language === 'vi' ? 'Yếu' : 'Poor')
                       }
                     </Badge>
@@ -321,35 +338,19 @@ function HistoryView({ isLoading, error, historyData, language }: HistoryViewPro
 
               <div className="grid grid-cols-2 gap-2 text-sm lg:min-w-60">
                 <p className={cn('flex items-center gap-1.5', item.frame ? 'text-green-600' : 'text-red-600')}>
-                  {item.frame ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5" />
-                  )}
+                  {item.frame ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                   {language === 'vi' ? 'Khung' : 'Frame'}
                 </p>
                 <p className={cn('flex items-center gap-1.5', item.paintCondition ? 'text-green-600' : 'text-red-600')}>
-                  {item.paintCondition ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5" />
-                  )}
+                  {item.paintCondition ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                   {language === 'vi' ? 'Sơn' : 'Paint'}
                 </p>
                 <p className={cn('flex items-center gap-1.5', item.drivetrain ? 'text-green-600' : 'text-red-600')}>
-                  {item.drivetrain ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5" />
-                  )}
+                  {item.drivetrain ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                   {language === 'vi' ? 'Truyền động' : 'Drivetrain'}
                 </p>
                 <p className={cn('flex items-center gap-1.5', item.brakes ? 'text-green-600' : 'text-red-600')}>
-                  {item.brakes ? (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <XCircle className="h-3.5 w-3.5" />
-                  )}
+                  {item.brakes ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                   {language === 'vi' ? 'Phanh' : 'Brakes'}
                 </p>
               </div>

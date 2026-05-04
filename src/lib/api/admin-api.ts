@@ -62,6 +62,15 @@ export interface AdminOrder {
   payoutAmount: number | null;
 }
 
+export interface AdminOrderPayoutInfo {
+  orderId: string;
+  sellerName: string;
+  payoutAmount: number | null;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+}
+
 export interface AdminDashboardSummary {
   totalUsers: number;
   totalSellers: number;
@@ -636,6 +645,14 @@ export const adminApi = {
     return normalized.id ? normalized : null;
   },
 
+  banUser(userId: string, payload: { reason: string }) {
+    return http.put<unknown>(`/api/AdminUser/ban/${userId}`, payload);
+  },
+
+  unbanUser(userId: string) {
+    return http.put<unknown>(`/api/AdminUser/unban/${userId}`, {});
+  },
+
   async getOrders(params?: { page?: number; size?: number; status?: number }): Promise<AdminOrder[]> {
     const search = new URLSearchParams();
     search.set("page", String(params?.page ?? 1));
@@ -650,6 +667,25 @@ export const adminApi = {
   async getOrderById(orderId: string): Promise<AdminOrder | null> {
     const orders = await this.getOrders({ page: 1, size: 100 });
     return orders.find((order) => order.orderId === orderId) ?? null;
+  },
+
+  async getOrderPayoutInfo(orderId: string): Promise<AdminOrderPayoutInfo | null> {
+    const response = await http.get<unknown>(`/api/AdminOrder/${orderId}/payout-info`);
+    const data = extractPayloadObject(response);
+    const normalized: AdminOrderPayoutInfo = {
+      orderId: typeof data.orderId === 'string' ? data.orderId : '',
+      sellerName: typeof data.sellerName === 'string' ? data.sellerName : '',
+      payoutAmount:
+        typeof data.payoutAmount === 'number'
+          ? data.payoutAmount
+          : typeof data.payoutAmount === 'string'
+            ? Number(data.payoutAmount)
+            : null,
+      bankName: typeof data.bankName === 'string' ? data.bankName : '',
+      bankAccountNumber: typeof data.bankAccountNumber === 'string' ? data.bankAccountNumber : '',
+      bankAccountName: typeof data.bankAccountName === 'string' ? data.bankAccountName : '',
+    };
+    return normalized.orderId ? normalized : null;
   },
 
   notifySeller(orderId: string) {

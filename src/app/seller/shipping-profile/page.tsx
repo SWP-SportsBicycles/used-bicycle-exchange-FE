@@ -182,28 +182,6 @@ function ShippingProfileContent() {
     locationApi.getWards(dId).then(setWards).catch(console.error)
   }, [form.fromDistrictId])
 
-  useEffect(() => {
-    if (!form.fromDistrictId || form.fromDistrictName || districts.length === 0) return
-    const matchedDistrict = districts.find(
-      (district) => String(district.districtId) === String(form.fromDistrictId),
-    )
-    if (!matchedDistrict) return
-    setForm((prev) => ({
-      ...prev,
-      fromDistrictName: matchedDistrict.districtName,
-    }))
-  }, [districts, form.fromDistrictId, form.fromDistrictName])
-
-  useEffect(() => {
-    if (!form.fromWardCode || form.fromWardName || wards.length === 0) return
-    const matchedWard = wards.find((ward) => ward.wardCode === form.fromWardCode)
-    if (!matchedWard) return
-    setForm((prev) => ({
-      ...prev,
-      fromWardName: matchedWard.wardName,
-    }))
-  }, [form.fromWardCode, form.fromWardName, wards])
-
   const updateField = (field: keyof ShippingProfileForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }

@@ -1,9 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Users, Eye, Loader2 } from 'lucide-react'
+import { Search, Users, Eye, Loader2, UserCheck, ShieldAlert } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,13 +20,12 @@ import {
 import { useLanguage } from '@/lib/language-context'
 import { adminApi } from '@/lib/api/admin-api'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
 
 const roleColors: Record<string, string> = {
-  BUYER: 'bg-blue-100 text-blue-700 border-blue-200',
-  SELLER: 'bg-green-100 text-green-700 border-green-200',
-  ADMIN: 'bg-red-100 text-red-700 border-red-200',
-  INSPECTOR: 'bg-purple-100 text-purple-700 border-purple-200',
+  BUYER: 'bg-blue-100 text-blue-700 border-blue-300/60 dark:bg-blue-900/30 dark:text-blue-400',
+  SELLER: 'bg-emerald-100 text-emerald-700 border-emerald-300/60 dark:bg-emerald-900/30 dark:text-emerald-400',
+  ADMIN: 'bg-rose-100 text-rose-700 border-rose-300/60 dark:bg-rose-900/30 dark:text-rose-400',
+  INSPECTOR: 'bg-violet-100 text-violet-700 border-violet-300/60 dark:bg-violet-900/30 dark:text-violet-400',
 }
 
 const roleLabels: Record<string, { vi: string; en: string }> = {
@@ -36,9 +36,9 @@ const roleLabels: Record<string, { vi: string; en: string }> = {
 }
 
 const statusColors: Record<string, string> = {
-  Active: 'bg-green-100 text-green-700 border-green-200',
-  InActive: 'bg-gray-100 text-gray-600 border-gray-200',
-  Banned: 'bg-red-100 text-red-700 border-red-200',
+  Active: 'bg-emerald-100 text-emerald-700 border-emerald-300/60 dark:bg-emerald-900/30 dark:text-emerald-400',
+  InActive: 'bg-gray-100 text-gray-600 border-gray-300/60 dark:bg-gray-800/30 dark:text-gray-400',
+  Banned: 'bg-rose-100 text-rose-700 border-rose-300/60 dark:bg-rose-900/30 dark:text-rose-400',
 }
 
 const statusLabels: Record<string, { vi: string; en: string }> = {
@@ -85,13 +85,19 @@ export default function AccountManagementPage() {
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const filterTabs: { key: UserFilter; label: { vi: string; en: string }; count: number; tone?: string }[] = [
+    { key: 'all', label: { vi: 'Tất cả', en: 'All' }, count: allCountQuery.data ?? 0 },
+    { key: 'seller', label: { vi: 'Người bán', en: 'Sellers' }, count: sellerCountQuery.data ?? 0, tone: 'emerald' },
+    { key: 'buyer', label: { vi: 'Người mua', en: 'Buyers' }, count: buyerCountQuery.data ?? 0, tone: 'blue' },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
-            {language === 'vi' ? 'Quản lý tài khoản' : 'Account Management'}
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
+            {language === 'vi' ? 'Quản Lý Tài Khoản' : 'Account Management'}
           </h1>
           <p className="text-muted-foreground mt-1">
             {language === 'vi'
@@ -99,40 +105,35 @@ export default function AccountManagementPage() {
               : 'Manage and view all user account information'}
           </p>
         </div>
-        <Badge variant="outline" className="text-xs px-3 py-1.5 border-primary/30 bg-primary/5 text-primary font-medium">
+        <Badge variant="outline" className="text-xs px-3 py-1.5">
           <Users className="h-3.5 w-3.5 mr-1.5" />
           {filteredUsers.length} {language === 'vi' ? 'tài khoản' : 'accounts'}
         </Badge>
       </div>
 
-      {/* Search */}
-      <Card className="border-border/60">
-        <CardContent className="p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={userFilter === 'all' ? 'default' : 'outline'}
-              onClick={() => setUserFilter('all')}
-            >
-              {language === 'vi' ? 'Tất cả' : 'All'} ({allCountQuery.data ?? 0})
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={userFilter === 'seller' ? 'default' : 'outline'}
-              onClick={() => setUserFilter('seller')}
-            >
-              {language === 'vi' ? 'Người bán' : 'Sellers'} ({sellerCountQuery.data ?? 0})
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={userFilter === 'buyer' ? 'default' : 'outline'}
-              onClick={() => setUserFilter('buyer')}
-            >
-              {language === 'vi' ? 'Người mua' : 'Buyers'} ({buyerCountQuery.data ?? 0})
-            </Button>
+      {/* Filters + Search */}
+      <Card>
+        <CardContent className="pt-6 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {filterTabs.map((tab) => {
+              const isActive = userFilter === tab.key
+              return (
+                <Button
+                  key={tab.key}
+                  type="button"
+                  size="sm"
+                  variant={isActive ? 'default' : 'outline'}
+                  onClick={() => setUserFilter(tab.key)}
+                  className={cn(
+                    !isActive && 'bg-background',
+                    isActive && tab.tone === 'emerald' && 'bg-emerald-600 hover:bg-emerald-700',
+                    isActive && tab.tone === 'blue' && 'bg-blue-600 hover:bg-blue-700',
+                  )}
+                >
+                  {tab.label[language]} ({tab.count})
+                </Button>
+              )
+            })}
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -152,56 +153,63 @@ export default function AccountManagementPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="border-border/60 shadow-athletic">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {language === 'vi' ? 'Danh sách tài khoản' : 'Account List'}
-            </CardTitle>
-            <CardDescription>
-              {language === 'vi'
-                ? 'Nhấn vào hàng để xem chi tiết tài khoản'
-                : 'Click on a row to view account details'}
-            </CardDescription>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle>{language === 'vi' ? 'Danh sách tài khoản' : 'Account List'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi'
+                    ? 'Nhấn vào nút Xem để kiểm tra chi tiết tài khoản'
+                    : 'Click View to check account details'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {usersQuery.isLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : usersQuery.error ? (
-              <div className="text-center py-12 text-muted-foreground">
-                {language === 'vi' ? 'Có lỗi xảy ra khi tải dữ liệu' : 'Error loading data'}
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <ShieldAlert className="h-12 w-12 mb-3 opacity-30" />
+                <p className="text-sm text-destructive">{language === 'vi' ? 'Có lỗi xảy ra khi tải dữ liệu' : 'Error loading data'}</p>
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                {language === 'vi' ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <UserCheck className="h-12 w-12 mb-3 opacity-30" />
+                <p className="font-medium">{language === 'vi' ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}</p>
+                {searchTerm && (
+                  <p className="text-sm mt-1">{language === 'vi' ? 'Thử tìm kiếm với từ khóa khác' : 'Try a different search term'}</p>
+                )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border border-border/60">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>{language === 'vi' ? 'Họ tên' : 'Full Name'}</TableHead>
-                      <TableHead>{language === 'vi' ? 'Số điện thoại' : 'Phone Number'}</TableHead>
-                      <TableHead>{language === 'vi' ? 'Vai trò' : 'Role'}</TableHead>
-                      <TableHead>{language === 'vi' ? 'Trạng thái' : 'Status'}</TableHead>
-                      <TableHead className="text-right">{language === 'vi' ? 'Thao tác' : 'Actions'}</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="w-14 font-semibold">#</TableHead>
+                      <TableHead className="font-semibold">{language === 'vi' ? 'Họ tên' : 'Full Name'}</TableHead>
+                      <TableHead className="font-semibold">{language === 'vi' ? 'Số điện thoại' : 'Phone'}</TableHead>
+                      <TableHead className="font-semibold">{language === 'vi' ? 'Vai trò' : 'Role'}</TableHead>
+                      <TableHead className="font-semibold">{language === 'vi' ? 'Trạng thái' : 'Status'}</TableHead>
+                      <TableHead className="text-right font-semibold">{language === 'vi' ? 'Thao tác' : 'Actions'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((user, index) => (
                       <TableRow
                         key={user.id}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        className="hover:bg-muted/30 transition-colors group"
                       >
-                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                         <TableCell>
                           <div className="font-medium">{user.fullName}</div>
                           <div className="text-xs text-muted-foreground">{user.email}</div>
                         </TableCell>
-                        <TableCell>{user.phoneNumber || '-'}</TableCell>
+                        <TableCell className="text-sm">{user.phoneNumber || '-'}</TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -223,8 +231,8 @@ export default function AccountManagementPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/manage/account/${user.id}`} className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" asChild className="opacity-60 group-hover:opacity-100 transition-opacity">
+                            <Link href={`/admin/manage/account/${user.id}`} className="flex items-center gap-1.5">
                               <Eye className="h-4 w-4" />
                               {language === 'vi' ? 'Xem' : 'View'}
                             </Link>
