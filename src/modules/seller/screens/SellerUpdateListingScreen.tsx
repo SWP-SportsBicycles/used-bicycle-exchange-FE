@@ -247,13 +247,13 @@ function normalizeStringOption(input: string, options: string[]): string {
 function normalizeCityValue(input: string): string {
   if (!input) return ''
   const normalized = normalizeValue(input)
-  if (normalized.includes('ho chi minh') || normalized.includes('tp hcm') || normalized.includes('tphcm')) {
+  if (normalized === 'hcm' || normalized.includes('ho chi minh') || normalized.includes('tp hcm') || normalized.includes('tphcm')) {
     return 'TP.HCM'
   }
-  if (normalized.includes('ha noi')) {
+  if (normalized === 'hanoi' || normalized.includes('ha noi')) {
     return 'Hà Nội'
   }
-  if (normalized.includes('da nang')) {
+  if (normalized === 'danang' || normalized.includes('da nang')) {
     return 'Đà Nẵng'
   }
   return input
@@ -470,7 +470,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
       const payload = {
         title: formData.title,
         description: formData.description,
-        serialNumber: formData.serial,
+        serialNumber: formData.serial.toUpperCase(),
         category: formData.category,
         brand: formData.brand,
         frameSize: formData.frameSize,
@@ -481,7 +481,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
         operating: formData.usageHistory,
         tireRim: formData.wheelSize,
         price: priceVal,
-        city: formData.city,
+        city: normalizeCityValue(formData.city),
         paint: formData.paint || 'N/A', // fallback if empty but now added to UI
         overall: formData.overall || 'N/A',
         brakeType: formData.brakeType || 'Chưa Xách Định',

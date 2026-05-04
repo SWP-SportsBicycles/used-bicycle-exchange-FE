@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useCreateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useCreateListing, useSubmitListing, useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -25,6 +36,9 @@ const steps = [
   { id: 'photos', label: { vi: 'Hình Ảnh', en: 'Photos' } },
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
+
+const DRAFT_FORM_KEY = 'sellerListingDraftForm'
+const DRAFT_ID_KEY = 'sellerListingDraftId'
 
 const REQUIRED_FIELD_LABELS: Record<string, string> = {
   Title: 'tiêu đề',
@@ -60,15 +74,49 @@ const formatApiErrorMessage = (message: string): string => {
   return mapped.join(' ')
 }
 
+const normalizeSellerCity = (value: string): string => {
+  const raw = value.trim()
+  if (!raw) return raw
+  const normalized = raw
+    .toLowerCase()
+    .replace(/[._/-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  if (normalized === 'hanoi' || normalized.includes('ha noi')) return 'Hà Nội'
+  if (normalized === 'danang' || normalized.includes('da nang')) return 'Đà Nẵng'
+  if (normalized === 'hcm') return 'TP.HCM'
+  if (normalized.includes('tp hcm') || normalized.includes('tphcm') || normalized.includes('ho chi minh')) {
+    return 'TP.HCM'
+  }
+  return raw
+}
+
+const hasAnyDraftData = (data: Record<string, string>) =>
+  Object.values(data).some((value) => value.trim().length > 0)
+
+const isReadyForApiDraft = (data: Record<string, string>) =>
+  Boolean(
+    data.title && data.category && data.brand && data.price &&
+    data.city && data.brakeType && data.paint && data.overall && data.serial &&
+    data.weight && data.frameSize && data.condition && data.groupset && data.wheelSize
+  )
+
 export default function SellerCreateListingScreen() {
   const { language } = useLanguage()
   const createListingMutation = useCreateListing()
+  const updateListingMutation = useUpdateListing()
+  const submitListingMutation = useSubmitListing()
   const uploadMediaMutation = useUploadMedia()
   
   const [currentStep, setCurrentStep] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [draftListingId, setDraftListingId] = useState<string>('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  const [hasAgreedTerms, setHasAgreedTerms] = useState(false)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -90,10 +138,92 @@ export default function SellerCreateListingScreen() {
     overall: '',
   })
 
+  const formDataRef = useRef(formData)
+  const draftIdRef = useRef(draftListingId)
+  const isSubmittingRef = useRef(isSubmitting)
+  const hasSavedDraftRef = useRef(false)
+
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
+
+  useEffect(() => {
+    draftIdRef.current = draftListingId
+  }, [draftListingId])
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting
+  }, [isSubmitting])
+
+  useEffect(() => {
+    if (!isConfirmOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasAgreedTerms(false)
+    }
+  }, [isConfirmOpen])
+
   // State for files
   const [images, setImages] = useState<File[]>([])
   const [video, setVideo] = useState<File | null>(null)
   const [groupsetPhoto, setGroupsetPhoto] = useState<File | null>(null)
+
+  const validateStep = (stepIndex: number) => {
+    const errors: Record<string, string> = {}
+    const isVi = language === 'vi'
+
+    if (stepIndex === 0) {
+      if (!formData.title.trim()) errors.title = isVi ? 'Vui lòng nhập tiêu đề.' : 'Please enter a title.'
+      if (!formData.category) errors.category = isVi ? 'Vui lòng chọn loại xe.' : 'Please select a category.'
+      if (!formData.condition) errors.condition = isVi ? 'Vui lòng chọn tình trạng.' : 'Please select a condition.'
+      if (!formData.brand) errors.brand = isVi ? 'Vui lòng chọn thương hiệu.' : 'Please select a brand.'
+      if (!formData.description.trim()) errors.description = isVi ? 'Vui lòng nhập mô tả.' : 'Please enter a description.'
+    }
+
+    if (stepIndex === 1) {
+      if (!formData.frameSize) errors.frameSize = isVi ? 'Vui lòng chọn kích cỡ khung.' : 'Please select a frame size.'
+      if (!formData.groupset) errors.groupset = isVi ? 'Vui lòng chọn groupset.' : 'Please select a groupset.'
+      if (!formData.wheelSize) errors.wheelSize = isVi ? 'Vui lòng chọn cỡ bánh.' : 'Please select a wheel size.'
+      if (!formData.brakeType) errors.brakeType = isVi ? 'Vui lòng chọn loại phanh.' : 'Please select a brake type.'
+      if (!formData.paint.trim()) errors.paint = isVi ? 'Vui lòng nhập màu sơn.' : 'Please enter the paint color.'
+      if (!formData.overall.trim()) errors.overall = isVi ? 'Vui lòng nhập khấu hao/đánh giá.' : 'Please enter the overall condition.'
+      if (!formData.serial.trim()) errors.serial = isVi ? 'Vui lòng nhập số serial.' : 'Please enter the serial number.'
+      if (!formData.city) errors.city = isVi ? 'Vui lòng chọn thành phố.' : 'Please select a city.'
+      const weightValue = Number(formData.weight)
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        errors.weight = isVi ? 'Vui lòng nhập trọng lượng hợp lệ.' : 'Please enter a valid weight.'
+      }
+    }
+
+    if (stepIndex === 2) {
+      if (images.length === 0) errors.images = isVi ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.'
+    }
+
+    if (stepIndex === 3) {
+      const priceValue = Number(String(formData.price).replace(/,/g, ''))
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        errors.price = isVi ? 'Vui lòng nhập giá bán hợp lệ.' : 'Please enter a valid price.'
+      }
+    }
+
+    return errors
+  }
+
+  useEffect(() => {
+    const nextErrors = validateStep(currentStep)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFieldErrors((prev) => {
+      const prevKeys = Object.keys(prev)
+      const nextKeys = Object.keys(nextErrors)
+      if (
+        prevKeys.length === nextKeys.length &&
+        prevKeys.every((key) => prev[key] === nextErrors[key])
+      ) {
+        return prev
+      }
+      return nextErrors
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, formData, images, language])
 
   // Object URLs for preview
   const [imageUrls, setImageUrls] = useState<string[]>([])
@@ -126,6 +256,56 @@ export default function SellerCreateListingScreen() {
   const updateField = (field: string, value: string) => {
     const nextValue = field === 'serial' ? value.toUpperCase() : value
     setFormData((prev) => ({ ...prev, [field]: nextValue }))
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  const markTouched = (field: string) => {
+    setTouchedFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }))
+  }
+
+  const shouldShowError = (field: string) => Boolean(touchedFields[field])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storedForm = window.localStorage.getItem(DRAFT_FORM_KEY)
+    if (storedForm) {
+      try {
+        const parsed = JSON.parse(storedForm) as Partial<typeof formData>
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setFormData((prev) => ({ ...prev, ...parsed }))
+      } catch {
+        // Ignore malformed storage
+      }
+    }
+
+    const storedId = window.localStorage.getItem(DRAFT_ID_KEY)
+    if (storedId) {
+      setDraftListingId(storedId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(DRAFT_FORM_KEY, JSON.stringify(formData))
+  }, [formData])
+
+  const clearDraftStorage = () => {
+    if (typeof window === 'undefined') return
+    window.localStorage.removeItem(DRAFT_FORM_KEY)
+    window.localStorage.removeItem(DRAFT_ID_KEY)
+  }
+
+  const persistDraftId = (listingId: string) => {
+    setDraftListingId(listingId)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(DRAFT_ID_KEY, listingId)
+    }
   }
 
   const handleFileChange = (
@@ -143,6 +323,12 @@ export default function SellerCreateListingScreen() {
       const newImages = [...images, ...accepted]
       setImages(newImages)
       setImageUrls((prev) => [...prev, ...accepted.map(file => createTrackedObjectURL(file))])
+      setFieldErrors((prev) => {
+        if (!prev.images) return prev
+        const next = { ...prev }
+        delete next.images
+        return next
+      })
     } else if (type === 'video') {
       const file = files[0]
       setVideo(file)
@@ -177,8 +363,31 @@ export default function SellerCreateListingScreen() {
     setImageUrls(newUrls)
   }
 
+  const validateAllSteps = () => {
+    const stepErrors = [0, 1, 2, 3].map((step) => validateStep(step))
+    const firstErrorIndex = stepErrors.findIndex((errors) => Object.keys(errors).length > 0)
+    if (firstErrorIndex === -1) {
+      setFieldErrors({})
+      return true
+    }
+
+    setFieldErrors(stepErrors[firstErrorIndex])
+    setCurrentStep(firstErrorIndex)
+    setSubmitError(language === 'vi' ? 'Vui lòng hoàn tất các trường bắt buộc.' : 'Please complete the required fields.')
+    return false
+  }
+
+  const isCurrentStepValid = Object.keys(validateStep(currentStep)).length === 0
+
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
+      const errors = validateStep(currentStep)
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        return
+      }
+      setFieldErrors({})
+      setSubmitError(null)
       setCurrentStep((prev) => prev + 1)
     }
   }
@@ -189,34 +398,27 @@ export default function SellerCreateListingScreen() {
     }
   }
 
+  const openSubmitConfirm = () => {
+    if (!validateAllSteps()) return
+    setSubmitError(null)
+    setIsConfirmOpen(true)
+  }
+
   const handleSubmitForReview = async () => {
     setSubmitError(null)
     setSubmitSuccess(null)
 
-    // Basic validation
-    if (
-      !formData.title || !formData.category || !formData.brand || !formData.price ||
-      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
-      !formData.weight || !formData.frameSize || !formData.condition || !formData.groupset || !formData.wheelSize
-    ) {
-      setSubmitError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
-      return
-    }
-
-    if (images.length === 0) {
-      setSubmitError(language === 'vi' ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.')
-      return
-    }
+    if (!validateAllSteps()) return
 
     setIsSubmitting(true)
 
     try {
-      // 1. Tạo listing nháp
+      // 1. Tạo hoặc cập nhật listing nháp
       const priceVal = Number(String(formData.price).replace(/,/g, ''))
       const payload = {
         title: formData.title,
         description: formData.description,
-        serialNumber: formData.serial,
+        serialNumber: formData.serial.toUpperCase(),
         category: formData.category,
         brand: formData.brand,
         frameSize: formData.frameSize,
@@ -227,21 +429,28 @@ export default function SellerCreateListingScreen() {
         operating: formData.usageHistory,
         tireRim: formData.wheelSize,
         price: priceVal,
-        city: formData.city,
+        city: normalizeSellerCity(formData.city),
         paint: formData.paint || 'N/A', // fallback if empty but now added to UI
         overall: formData.overall || 'N/A',
         brakeType: formData.brakeType || 'Chưa Xách Định',
       }
 
-      const createRes = await createListingMutation.mutateAsync(payload)
-      const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
-      const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
-      const rawId = nested.id ?? nested.listingId
-      const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+      let listingId = draftListingId
+      if (listingId) {
+        await updateListingMutation.mutateAsync({ listingId, data: payload })
+      } else {
+        const createRes = await createListingMutation.mutateAsync(payload)
+        const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+        const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+        const rawId = nested.id ?? nested.listingId
+        listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+      }
 
       if (!listingId) {
         throw new Error('Không lấy được ID tin đăng')
       }
+
+      persistDraftId(listingId)
 
       // 2. Upload media
       const allMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
@@ -249,9 +458,11 @@ export default function SellerCreateListingScreen() {
         await uploadMediaMutation.mutateAsync({ listingId, files: allMediaFiles })
       }
 
-      setSubmitSuccess(
-        'Tạo tin nháp thành công. Vui lòng cập nhật và gửi duyệt tại trang chi tiết.'
-      )
+      // 3. Submit listing for review
+      await submitListingMutation.mutateAsync(listingId)
+
+      clearDraftStorage()
+      setSubmitSuccess(language === 'vi' ? 'Gửi duyệt tin thành công.' : 'Listing submitted for review.')
       
       // Reset form on success
       setTimeout(() => {
@@ -268,6 +479,86 @@ export default function SellerCreateListingScreen() {
       setIsSubmitting(false)
     }
   }
+
+  const saveDraftOnExit = async () => {
+    if (isSubmittingRef.current) return
+    if (hasSavedDraftRef.current) return
+    hasSavedDraftRef.current = true
+
+    const data = formDataRef.current
+    if (!hasAnyDraftData(data)) {
+      hasSavedDraftRef.current = false
+      return
+    }
+
+    const draftId = draftIdRef.current
+    if (!draftId && !isReadyForApiDraft(data)) {
+      hasSavedDraftRef.current = false
+      return
+    }
+
+    try {
+      const priceVal = Number(String(data.price).replace(/,/g, ''))
+      const payload = {
+        title: data.title,
+        description: data.description,
+        serialNumber: data.serial.toUpperCase(),
+        category: data.category,
+        brand: data.brand,
+        frameSize: data.frameSize,
+        weight: Number(data.weight),
+        frameMaterial: data.frameMaterial,
+        condition: data.condition,
+        groupset: data.groupset,
+        operating: data.usageHistory,
+        tireRim: data.wheelSize,
+        price: Number.isFinite(priceVal) ? priceVal : 0,
+        city: normalizeSellerCity(data.city),
+        paint: data.paint || 'N/A',
+        overall: data.overall || 'N/A',
+        brakeType: data.brakeType || 'Chưa Xách Định',
+      }
+
+      if (draftId) {
+        await updateListingMutation.mutateAsync({ listingId: draftId, data: payload })
+      } else {
+        const createRes = await createListingMutation.mutateAsync(payload)
+        const rawData = typeof createRes === 'object' && createRes !== null ? createRes as Record<string, unknown> : {} as Record<string, unknown>
+        const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
+        const rawId = nested.id ?? nested.listingId
+        const listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+        if (listingId) {
+          persistDraftId(listingId)
+        }
+      }
+    } catch {
+      // Best-effort draft save; ignore errors on exit
+    } finally {
+      hasSavedDraftRef.current = false
+    }
+  }
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      void saveDraftOnExit()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        void saveDraftOnExit()
+      }
+    }
+
+    window.addEventListener('pagehide', handlePageHide)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      void saveDraftOnExit()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -351,7 +642,11 @@ export default function SellerCreateListingScreen() {
                     placeholder={language === 'vi' ? 'VD: Giant TCR Advanced Pro 1 - Full Carbon' : 'E.g., Giant TCR Advanced Pro 1 - Full Carbon'}
                     value={formData.title}
                     onChange={(e) => updateField('title', e.target.value)}
+                    onBlur={() => markTouched('title')}
                   />
+                  {fieldErrors.title && shouldShowError('title') && (
+                    <p className="text-xs text-destructive">{fieldErrors.title}</p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -362,6 +657,7 @@ export default function SellerCreateListingScreen() {
                     <RadioGroup
                       value={formData.category}
                       onValueChange={(value) => updateField('category', value)}
+                      onBlur={() => markTouched('category')}
                       className="grid grid-cols-2 gap-2"
                     >
                       {CATEGORIES.map((cat) => (
@@ -378,6 +674,9 @@ export default function SellerCreateListingScreen() {
                         </Label>
                       ))}
                     </RadioGroup>
+                    {fieldErrors.category && shouldShowError('category') && (
+                      <p className="text-xs text-destructive">{fieldErrors.category}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -387,6 +686,7 @@ export default function SellerCreateListingScreen() {
                     <RadioGroup
                       value={formData.condition}
                       onValueChange={(value) => updateField('condition', value)}
+                      onBlur={() => markTouched('condition')}
                       className="space-y-2"
                     >
                       {CONDITIONS.map((cond) => (
@@ -406,6 +706,9 @@ export default function SellerCreateListingScreen() {
                         </Label>
                       ))}
                     </RadioGroup>
+                    {fieldErrors.condition && shouldShowError('condition') && (
+                      <p className="text-xs text-destructive">{fieldErrors.condition}</p>
+                    )}
                   </div>
                 </div>
 
@@ -415,7 +718,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Thương Hiệu' : 'Brand'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.brand} onValueChange={(value) => updateField('brand', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('brand')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thương hiệu' : 'Select brand'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -426,6 +729,9 @@ export default function SellerCreateListingScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.brand && shouldShowError('brand') && (
+                      <p className="text-xs text-destructive">{fieldErrors.brand}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2" />
@@ -445,7 +751,11 @@ export default function SellerCreateListingScreen() {
                     rows={4}
                     value={formData.description}
                     onChange={(e) => updateField('description', e.target.value)}
+                    onBlur={() => markTouched('description')}
                   />
+                  {fieldErrors.description && shouldShowError('description') && (
+                    <p className="text-xs text-destructive">{fieldErrors.description}</p>
+                  )}
                 </div>
               </div>
             )}
@@ -458,7 +768,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Kích Cỡ Khung' : 'Frame Size'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.frameSize} onValueChange={(value) => updateField('frameSize', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('frameSize')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn size' : 'Select size'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -469,6 +779,9 @@ export default function SellerCreateListingScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.frameSize && shouldShowError('frameSize') && (
+                      <p className="text-xs text-destructive">{fieldErrors.frameSize}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -493,7 +806,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Bộ Truyền Động' : 'Groupset'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.groupset} onValueChange={(value) => updateField('groupset', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('groupset')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn groupset' : 'Select groupset'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -504,6 +817,9 @@ export default function SellerCreateListingScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.groupset && shouldShowError('groupset') && (
+                      <p className="text-xs text-destructive">{fieldErrors.groupset}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -511,7 +827,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Cỡ Bánh' : 'Wheel Size'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.wheelSize} onValueChange={(value) => updateField('wheelSize', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('wheelSize')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn cỡ bánh' : 'Select wheel size'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -522,6 +838,9 @@ export default function SellerCreateListingScreen() {
                         <SelectItem value="26">26&quot;</SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldErrors.wheelSize && shouldShowError('wheelSize') && (
+                      <p className="text-xs text-destructive">{fieldErrors.wheelSize}</p>
+                    )}
                   </div>
                 </div>
 
@@ -531,7 +850,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Loại Phanh' : 'Brake Type'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.brakeType} onValueChange={(value) => updateField('brakeType', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('brakeType')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn loại phanh' : 'Select brake type'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -540,6 +859,9 @@ export default function SellerCreateListingScreen() {
                         <SelectItem value="Hydraulic Disc Brake">Phanh Đĩa Thủy Lực</SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldErrors.brakeType && shouldShowError('brakeType') && (
+                      <p className="text-xs text-destructive">{fieldErrors.brakeType}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -551,7 +873,11 @@ export default function SellerCreateListingScreen() {
                       placeholder={language === 'vi' ? 'VD: Đen bóng / Nhám' : 'E.g., Gloss Black'}
                       value={formData.paint}
                       onChange={(e) => updateField('paint', e.target.value)}
+                      onBlur={() => markTouched('paint')}
                     />
+                    {fieldErrors.paint && shouldShowError('paint') && (
+                      <p className="text-xs text-destructive">{fieldErrors.paint}</p>
+                    )}
                   </div>
                 </div>
 
@@ -565,7 +891,11 @@ export default function SellerCreateListingScreen() {
                       placeholder={language === 'vi' ? 'VD: Xe mới 95%, ít xước xát' : 'E.g., 95% like new'}
                       value={formData.overall}
                       onChange={(e) => updateField('overall', e.target.value)}
+                      onBlur={() => markTouched('overall')}
                     />
+                    {fieldErrors.overall && shouldShowError('overall') && (
+                      <p className="text-xs text-destructive">{fieldErrors.overall}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="weight">
@@ -579,7 +909,11 @@ export default function SellerCreateListingScreen() {
                       placeholder="7.5"
                       value={formData.weight}
                       onChange={(e) => updateField('weight', e.target.value)}
+                      onBlur={() => markTouched('weight')}
                     />
+                    {fieldErrors.weight && shouldShowError('weight') && (
+                      <p className="text-xs text-destructive">{fieldErrors.weight}</p>
+                    )}
                   </div>
                 </div>
 
@@ -608,7 +942,11 @@ export default function SellerCreateListingScreen() {
                     placeholder="VD: GNT2023TCR001234"
                     value={formData.serial}
                     onChange={(e) => updateField('serial', e.target.value)}
+                    onBlur={() => markTouched('serial')}
                   />
+                  {fieldErrors.serial && shouldShowError('serial') && (
+                    <p className="text-xs text-destructive">{fieldErrors.serial}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -632,7 +970,7 @@ export default function SellerCreateListingScreen() {
                       {language === 'vi' ? 'Thành Phố' : 'City'} <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.city} onValueChange={(value) => updateField('city', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger onBlur={() => markTouched('city')}>
                         <SelectValue placeholder={language === 'vi' ? 'Chọn thành phố' : 'Select city'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -643,6 +981,9 @@ export default function SellerCreateListingScreen() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.city && shouldShowError('city') && (
+                      <p className="text-xs text-destructive">{fieldErrors.city}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -694,7 +1035,10 @@ export default function SellerCreateListingScreen() {
                     {images.length < 10 && (
                       <button
                         type="button"
-                        onClick={() => imagesInputRef.current?.click()}
+                        onClick={() => {
+                          markTouched('images')
+                          imagesInputRef.current?.click()
+                        }}
                         className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors flex flex-col items-center justify-center gap-2"
                       >
                         <Upload className="h-6 w-6 text-muted-foreground" />
@@ -702,6 +1046,9 @@ export default function SellerCreateListingScreen() {
                       </button>
                     )}
                   </div>
+                  {fieldErrors.images && shouldShowError('images') && (
+                    <p className="text-xs text-destructive">{fieldErrors.images}</p>
+                  )}
                 </div>
 
                 {/* Video Option */}
@@ -773,10 +1120,14 @@ export default function SellerCreateListingScreen() {
                       placeholder="45,000,000"
                       value={formData.price}
                       onChange={(e) => updateField('price', e.target.value)}
+                      onBlur={() => markTouched('price')}
                       className="pl-4 pr-16 text-lg font-semibold"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">VND</span>
                   </div>
+                  {fieldErrors.price && shouldShowError('price') && (
+                    <p className="text-xs text-destructive">{fieldErrors.price}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     {language === 'vi'
                       ? 'Nền tảng thu 5% phí trên giá bán khi giao dịch thành công.'
@@ -834,19 +1185,58 @@ export default function SellerCreateListingScreen() {
             </Button>
 
             {currentStep < steps.length - 1 ? (
-              <Button onClick={nextStep} disabled={isSubmitting} className="gap-2">
+              <Button onClick={nextStep} disabled={isSubmitting || !isCurrentStepValid} className="gap-2">
                 {language === 'vi' ? 'Tiếp theo' : 'Next'}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2" onClick={handleSubmitForReview} disabled={isSubmitting}>
+              <Button className="gap-2" onClick={openSubmitConfirm} disabled={isSubmitting || !isCurrentStepValid}>
                 {isSubmitting ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isSubmitting ? 'Đang tạo...' : 'Tạo bản nháp'}
+                {isSubmitting ? 'Đang gửi...' : 'Gửi duyệt'}
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === 'vi' ? 'Xác nhận gửi duyệt tin đăng' : 'Confirm listing submission'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'vi'
+                ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán. Tin đăng sẽ được chuyển tới quản trị viên xét duyệt. Hãy đọc kỹ điều khoản người dùng trước khi xác nhận.'
+                : 'Please review all information, photos, and pricing. Your listing will be sent for admin review. Read the user terms carefully before confirming.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <label
+            htmlFor="create-terms-ack"
+            className="flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/20 p-3 text-sm text-foreground"
+          >
+            <Checkbox
+              id="create-terms-ack"
+              checked={hasAgreedTerms}
+              onCheckedChange={(value) => setHasAgreedTerms(Boolean(value))}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-2 border-primary/50 bg-background data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <span>
+              {language === 'vi'
+                ? 'Tôi đã đọc và đồng ý với điều khoản người dùng.'
+                : 'I have read and agree to the user terms.'}
+            </span>
+          </label>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>
+              {language === 'vi' ? 'Hủy' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleSubmitForReview} disabled={!hasAgreedTerms || isSubmitting}>
+              {isSubmitting ? (language === 'vi' ? 'Đang gửi...' : 'Submitting...') : language === 'vi' ? 'Xác nhận' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
