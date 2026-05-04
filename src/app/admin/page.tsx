@@ -1,18 +1,16 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { Bar, BarChart, Cell, Pie, PieChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Area, AreaChart, ComposedChart, Legend, ResponsiveContainer } from 'recharts'
-import { Package, Users, Wallet, ClipboardList, ReceiptText, MapPin } from 'lucide-react'
+import { Cell, Pie, PieChart, CartesianGrid, Line, ComposedChart, Legend, XAxis, YAxis } from 'recharts'
+import { Package, Users, Wallet, ClipboardList, ReceiptText, MapPin, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { useLanguage } from '@/lib/language-context'
 import { formatVND } from '@/lib/mock-data'
 import { adminApi } from '@/lib/api/admin-api'
-
-const ADMIN_COMMISSION_RATE = 0.05
+import { cn } from '@/lib/utils'
 
 export default function AdminDashboardPage() {
   const { language } = useLanguage()
@@ -84,7 +82,7 @@ export default function AdminDashboardPage() {
     const parts = monthStr.split('-')
     if (parts.length < 2) return monthStr
     const m = parseInt(parts[1], 10)
-    return language === 'vi' ? `Tháng ${m}` : new Date(2026, m - 1, 1).toLocaleString('en-US', { month: 'short' })
+    return language === 'vi' ? `T${m}` : new Date(2026, m - 1, 1).toLocaleString('en-US', { month: 'short' })
   }
 
   const gmvData = revenueDataRaw.map((item) => ({
@@ -113,141 +111,158 @@ export default function AdminDashboardPage() {
     revenueQuery.isLoading ||
     listingAnalyticsQuery.isLoading
 
+  const statCards = [
+    {
+      label: { vi: 'Tổng Tin Đăng', en: 'Total Listings' },
+      value: totalListings.toLocaleString(),
+      sub: `${pendingListingsCount} ${language === 'vi' ? 'chờ duyệt' : 'pending'}`,
+      icon: Package,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgIcon: 'bg-blue-100 dark:bg-blue-900/40',
+      borderAccent: 'border-l-blue-500',
+    },
+    {
+      label: { vi: 'Tổng Người Dùng', en: 'Total Users' },
+      value: totalUsers.toLocaleString(),
+      sub: `${sellerCount} ${language === 'vi' ? 'người bán' : 'sellers'} • ${buyerCount} ${language === 'vi' ? 'người mua' : 'buyers'}`,
+      icon: Users,
+      color: 'text-violet-600 dark:text-violet-400',
+      bgIcon: 'bg-violet-100 dark:bg-violet-900/40',
+      borderAccent: 'border-l-violet-500',
+    },
+    {
+      label: { vi: 'Doanh Thu Giao Dịch', en: 'Revenue' },
+      value: formatVND(totalRevenueFromLine),
+      sub: language === 'vi' ? '6 tháng gần nhất' : 'Last 6 months',
+      icon: Wallet,
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgIcon: 'bg-emerald-100 dark:bg-emerald-900/40',
+      borderAccent: 'border-l-emerald-500',
+    },
+    {
+      label: { vi: 'Tổng Đơn Hàng', en: 'Total Orders' },
+      value: totalOrders.toLocaleString(),
+      sub: `${completedOrders} ${language === 'vi' ? 'hoàn thành' : 'completed'}`,
+      icon: ReceiptText,
+      color: 'text-amber-600 dark:text-amber-400',
+      bgIcon: 'bg-amber-100 dark:bg-amber-900/40',
+      borderAccent: 'border-l-amber-500',
+    },
+  ]
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
-            {language === 'vi' ? 'Dữ Liệu Thống Kê' : 'Statistics Data'}
+            {language === 'vi' ? 'Bảng Điều Khiển' : 'Dashboard'}
           </h1>
+          <p className="text-muted-foreground mt-1">
+            {language === 'vi' ? 'Tổng quan hoạt động hệ thống xe đạp' : 'Platform activity overview'}
+          </p>
         </div>
-        <Badge variant="outline" className="text-xs px-3 py-1.5 border-primary/30 bg-primary/5 text-primary font-medium">
-          {isLoading ? (language === 'vi' ? 'Đang tải' : 'Loading') : 'LIVE'}
+        <Badge variant="outline" className={cn(
+          "text-xs px-3 py-1.5 font-semibold tracking-wide",
+          isLoading
+            ? "border-muted-foreground/30 text-muted-foreground"
+            : "border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+        )}>
+          <span className={cn(
+            "inline-block h-2 w-2 rounded-full mr-2",
+            isLoading ? "bg-muted-foreground animate-pulse" : "bg-emerald-500 animate-pulse"
+          )} />
+          {isLoading ? (language === 'vi' ? 'Đang tải...' : 'Loading...') : 'LIVE'}
         </Badge>
       </div>
 
+      {/* Stat Cards — redesigned with left border accent */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Tổng Tin Đăng' : 'Total Listings'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{totalListings.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {pendingListingsCount} {language === 'vi' ? 'đang chờ duyệt' : 'pending approvals'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Tổng Người Dùng' : 'Total Users'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{totalUsers.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {sellerCount} {language === 'vi' ? 'người bán' : 'sellers'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-success/30 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Doanh Thu Giao Dịch' : 'Transaction Revenue'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-success/15 flex items-center justify-center">
-                <Wallet className="h-4 w-4 text-success" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold text-success" style={{ fontFamily: 'var(--font-archivo)' }}>{formatVND(totalRevenueFromLine)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'vi'
-                  ? `Cập nhật từ 6 tháng gần nhất`
-                  : `Based on last 6 months`}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="border-border/60 shadow-athletic hover:shadow-athletic-lg transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Tổng Đơn Hàng' : 'Total Orders'}
-              </CardTitle>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ReceiptText className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>{totalOrders.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {completedOrders} {language === 'vi' ? 'đã hoàn thành' : 'completed'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {statCards.map((stat, index) => (
+          <motion.div
+            key={stat.label.en}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 * (index + 1) }}
+          >
+            <Card className={cn(
+              'border-l-4 overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5',
+              stat.borderAccent
+            )}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {stat.label[language]}
+                </CardTitle>
+                <div className={cn('h-9 w-9 rounded-xl flex items-center justify-center', stat.bgIcon)}>
+                  <stat.icon className={cn('h-4.5 w-4.5', stat.color)} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-extrabold tracking-tight" style={{ fontFamily: 'var(--font-archivo)' }}>
+                  {stat.value}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">{stat.sub}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
+      {/* City Stats — redesigned with better cards */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.43 }}>
-        <Card className="border-border/60 shadow-athletic">
+        <Card>
           <CardHeader>
-            <CardTitle>{language === 'vi' ? 'Thống Kê Theo Thành Phố' : 'City Statistics'}</CardTitle>
-            <CardDescription>
-              {language === 'vi'
-                ? 'Dữ liệu số tin đăng và giao dịch theo từng khu vực'
-                : 'Listings and transaction counts by city'}
-            </CardDescription>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle>{language === 'vi' ? 'Thống Kê Theo Thành Phố' : 'City Statistics'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi'
+                    ? 'Phân bổ tin đăng và giao dịch theo khu vực'
+                    : 'Listings and transactions by region'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {cityStats.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {language === 'vi' ? 'Chưa có dữ liệu thành phố.' : 'No city data available.'}
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <MapPin className="h-10 w-10 mb-3 opacity-30" />
+                <p className="text-sm">{language === 'vi' ? 'Chưa có dữ liệu thành phố.' : 'No city data available.'}</p>
+              </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-3">
-                {cityStats.map((city) => (
-                  <div key={city.city} className="rounded-lg border border-border/60 bg-muted/25 p-4">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <MapPin className="h-3.5 w-3.5" />
-                      </span>
-                      <p className="text-xl font-bold" style={{ fontFamily: 'var(--font-archivo)' }}>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {cityStats.map((city, i) => (
+                  <motion.div
+                    key={city.city}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.05 * i }}
+                    className="group rounded-xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-5 hover:shadow-lg hover:border-primary/30 transition-all duration-300"
+                  >
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                        <MapPin className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-archivo)' }}>
                         {city.city}
-                      </p>
+                      </h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">{language === 'vi' ? 'Tin đăng' : 'Listings'}</p>
-                        <p className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>
+                      <div className="rounded-lg bg-blue-50/60 dark:bg-blue-950/20 p-3">
+                        <p className="text-xs text-muted-foreground mb-1">{language === 'vi' ? 'Tin đăng' : 'Listings'}</p>
+                        <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400" style={{ fontFamily: 'var(--font-archivo)' }}>
                           {city.listings.toLocaleString()}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">{language === 'vi' ? 'Giao dịch' : 'Orders'}</p>
-                        <p className="text-3xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>
+                      <div className="rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+                        <p className="text-xs text-muted-foreground mb-1">{language === 'vi' ? 'Giao dịch' : 'Orders'}</p>
+                        <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400" style={{ fontFamily: 'var(--font-archivo)' }}>
                           {city.orders.toLocaleString()}
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -255,16 +270,21 @@ export default function AdminDashboardPage() {
         </Card>
       </motion.div>
 
-      {/* ROW 2: Composed Chart (GMV vs Revenue) */}
+      {/* GMV & Revenue Chart */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-        <Card className="border-border/60 shadow-athletic">
+        <Card>
           <CardHeader>
-            <CardTitle>{language === 'vi' ? 'Tổng Giao Dịch (GMV) & Lợi Nhuận' : 'Gross Merchandise Value & Revenue'}</CardTitle>
-            <CardDescription>
-              {language === 'vi'
-                ? 'So sánh tổng giá trị giao dịch của toàn sàn và mức phí hoa hồng thu được (5%)'
-                : 'Comparing total platform transaction value and 5% commission revenue'}
-            </CardDescription>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <div>
+                <CardTitle>{language === 'vi' ? 'Tổng Giao Dịch (GMV) & Lợi Nhuận' : 'GMV & Revenue'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi'
+                    ? 'So sánh tổng giá trị giao dịch và hoa hồng thu được (5%)'
+                    : 'Comparing total transaction value and 5% commission revenue'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -274,12 +294,20 @@ export default function AdminDashboardPage() {
               }}
               className="h-[300px] w-full"
             >
-              <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={gmvData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                <YAxis yAxisId="left" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={formatRevenueTick} />
+                <Line type="monotone" dataKey="gmv" stroke="#94a3b8" strokeWidth={2} dot={{ r: 4, fill: '#94a3b8' }} name="GMV" />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#16a34a"
+                  strokeWidth={3}
+                  dot={{ r: 6, fill: '#16a34a', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 8 }}
+                  name={language === 'vi' ? 'Lợi nhuận (5%)' : 'Revenue (5%)'}
+                />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -293,52 +321,42 @@ export default function AdminDashboardPage() {
                   }
                 />
                 <Legend verticalAlign="top" height={36}/>
-                <Bar yAxisId="left" dataKey="gmv" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="GMV" barSize={40} />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#16a34a"
-                  strokeWidth={4}
-                  dot={{ r: 6, fill: '#16a34a', strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 8 }}
-                  name={language === 'vi' ? 'Lợi nhuận (5%)' : 'Revenue (5%)'}
-                />
               </ComposedChart>
-              </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* ROW 3: Listing Overview Redesign */}
+      {/* Listing Overview */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-        <Card className="border-border/60 shadow-athletic overflow-hidden relative">
-          <div className="absolute inset-0 bg-linear-to-r from-primary/5 to-transparent pointer-events-none" />
+        <Card className="overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/3 via-transparent to-transparent pointer-events-none" />
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <ClipboardList className="h-6 w-6 text-primary" />
-              {language === 'vi' ? 'Tổng Quan Tình Trạng Tin Đăng' : 'Listing Status Overview'}
-            </CardTitle>
-            <CardDescription>
-              {language === 'vi' 
-                ? 'Phân bổ chi tiết trạng thái của tất cả các tin đăng trên hệ thống' 
-                : 'Detailed status distribution of all listings on the platform'}
-            </CardDescription>
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              <div>
+                <CardTitle>{language === 'vi' ? 'Tình Trạng Tin Đăng' : 'Listing Status Overview'}</CardTitle>
+                <CardDescription>
+                  {language === 'vi'
+                    ? 'Phân bổ trạng thái tất cả tin đăng trên hệ thống'
+                    : 'Status distribution of all platform listings'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid lg:grid-cols-2 gap-8 items-center">
               <ChartContainer config={listingChartConfig} className="h-[300px] w-full">
                 <PieChart>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Pie 
-                    data={listingOverviewData} 
-                    dataKey="value" 
-                    nameKey="name" 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={90} 
-                    outerRadius={130} 
+                  <Pie
+                    data={listingOverviewData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={90}
+                    outerRadius={130}
                     paddingAngle={5}
                     cornerRadius={8}
                     stroke="none"
@@ -358,16 +376,19 @@ export default function AdminDashboardPage() {
                 </PieChart>
               </ChartContainer>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {listingOverviewData.map((item) => {
                   const percentage = totalListings > 0 ? ((item.value / totalListings) * 100).toFixed(1) : '0';
                   return (
-                    <div key={`listing-stat-${item.name}`} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-background/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+                    <div key={`listing-stat-${item.name}`} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-background/80 hover:shadow-md transition-all duration-200">
                       <div className="flex items-center gap-4">
-                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.fill, boxShadow: `0 0 10px ${item.fill}80` }} />
+                        <div
+                          className="w-3.5 h-3.5 rounded-full ring-4 ring-offset-2 ring-offset-background"
+                          style={{ backgroundColor: item.fill, ['--tw-ring-color' as string]: `${item.fill}30` }}
+                        />
                         <div>
-                          <div className="font-semibold text-lg">{item.name}</div>
-                          <div className="text-sm text-muted-foreground">{percentage}% {language === 'vi' ? 'tỉ trọng' : 'share'}</div>
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">{percentage}% {language === 'vi' ? 'tỉ trọng' : 'share'}</p>
                         </div>
                       </div>
                       <div className="text-2xl font-extrabold" style={{ fontFamily: 'var(--font-archivo)' }}>

@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { FileWarning, User, Package, CreditCard, Calendar, Eye } from "lucide-react";
+import { FileWarning, User, Package, CreditCard, Calendar, Eye, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/language-context";
+
 import { inspectorApi, type InspectorReportItem } from "@/lib/api/inspector-api";
 import { cn } from "@/lib/utils";
 
-type ReportFilter = "all" | "approved" | "rejected";
+type ReportFilter = "all" | "pending" | "approved" | "rejected";
 
 const statusColors: Record<string, string> = {
   Pending: "bg-amber-500/15 text-amber-700 border-amber-500/25",
@@ -57,6 +58,7 @@ const statusLabels: Record<string, { vi: string; en: string }> = {
 
 const approvedStatuses = new Set(["Resolved", "Approved", "Confirmed", "Accepted"]);
 const rejectedStatuses = new Set(["Rejected", "Declined"]);
+const pendingStatuses = new Set(["Pending", "Reviewing"]);
 
 function formatDate(dateString: string, language: "vi" | "en"): string {
   const date = new Date(dateString);
@@ -81,33 +83,29 @@ export default function InspectorReportPage() {
   });
 
   const reports = useMemo(() => reportsQuery.data ?? [], [reportsQuery.data]);
+
   const filteredReports = useMemo(() => {
-    if (activeFilter === "approved") {
-      return reports.filter((report) => approvedStatuses.has(report.status));
-    }
-
-    if (activeFilter === "rejected") {
-      return reports.filter((report) => rejectedStatuses.has(report.status));
-    }
-
+    if (activeFilter === "pending") return reports.filter((r) => pendingStatuses.has(r.status));
+    if (activeFilter === "approved") return reports.filter((r) => approvedStatuses.has(r.status));
+    if (activeFilter === "rejected") return reports.filter((r) => rejectedStatuses.has(r.status));
     return reports;
   }, [activeFilter, reports]);
 
-  const countByFilter = useMemo(() => {
-    const approved = reports.filter((report) => approvedStatuses.has(report.status)).length;
-    const rejected = reports.filter((report) => rejectedStatuses.has(report.status)).length;
-    return {
-      all: reports.length,
-      approved,
-      rejected,
-    };
-  }, [reports]);
+  const countByFilter = useMemo(() => ({
+    all: reports.length,
+    pending: reports.filter((r) => pendingStatuses.has(r.status)).length,
+    approved: reports.filter((r) => approvedStatuses.has(r.status)).length,
+    rejected: reports.filter((r) => rejectedStatuses.has(r.status)).length,
+  }), [reports]);
 
-  const filterLabel: Record<ReportFilter, { vi: string; en: string }> = {
-    all: { vi: "Tất cả", en: "All" },
-    approved: { vi: "Chấp thuận", en: "Approved" },
-    rejected: { vi: "Bác bỏ", en: "Rejected" },
-  };
+  const filterConfig: { key: ReportFilter; label: { vi: string; en: string }; tone?: string }[] = [
+    { key: "all", label: { vi: "Tất cả", en: "All" } },
+    { key: "pending", label: { vi: "Chờ Xử Lý", en: "Pending" }, tone: "amber" },
+    { key: "approved", label: { vi: "Chấp thuận", en: "Approved" } },
+    { key: "rejected", label: { vi: "Bác bỏ", en: "Rejected" } },
+  ];
+
+  const isPending = (status: string) => pendingStatuses.has(status);
 
   return (
     <div className="space-y-6">
@@ -122,14 +120,13 @@ export default function InspectorReportPage() {
         </p>
       </div>
 
+      {/* Filter Tabs */}
       <Card>
         <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <CardTitle>{language === "vi" ? "Danh sách báo cáo" : "Report List"}</CardTitle>
             <CardDescription>
-              {language === "vi"
-                ? "Các báo cáo khiếu nại giao dịch cần xử lý"
-                : "Transaction complaint reports to process"}
+              {language === "vi" ? "Các báo cáo khiếu nại giao dịch cần xử lý" : "Transaction complaint reports to process"}
             </CardDescription>
           </div>
           <Badge variant="outline" className="w-fit">
@@ -139,19 +136,29 @@ export default function InspectorReportPage() {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-2">
-            {(["all", "approved", "rejected"] as const).map((filter) => {
-              const isActive = activeFilter === filter;
+            {filterConfig.map((filter) => {
+              const isActive = activeFilter === filter.key;
+              const count = countByFilter[filter.key];
 
               return (
                 <Button
-                  key={filter}
+                  key={filter.key}
                   type="button"
                   variant={isActive ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setActiveFilter(filter)}
-                  className={cn(!isActive && "bg-background")}
+                  onClick={() => setActiveFilter(filter.key)}
+                  className={cn(
+                    !isActive && "bg-background",
+                    isActive && filter.key === "pending" && "bg-amber-600 hover:bg-amber-700"
+                  )}
                 >
-                  {filterLabel[filter][language]} ({countByFilter[filter]})
+                  {filter.label[language]} ({count})
+                  {filter.key === "pending" && count > 0 && !isActive && (
+                    <span className="relative flex h-2 w-2 ml-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    </span>
+                  )}
                 </Button>
               );
             })}
@@ -159,10 +166,12 @@ export default function InspectorReportPage() {
         </CardContent>
       </Card>
 
+      {/* Report List */}
       <div className="space-y-4">
         {reportsQuery.isLoading ? (
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
               {language === "vi" ? "Đang tải dữ liệu..." : "Loading..."}
             </CardContent>
           </Card>
@@ -175,76 +184,76 @@ export default function InspectorReportPage() {
         ) : (
           filteredReports.map((report: InspectorReportItem, index) => {
             return (
-            <motion.div
-              key={report.reportId}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.06 }}
-            >
-              <Card className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className={cn("text-xs", statusColors[report.status] ?? "bg-muted text-muted-foreground border-border")}>
-                      {statusLabels[report.status]?.[language] ?? report.status}
-                    </Badge>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {formatDate(report.createdAt, language)}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{language === "vi" ? "Người mua:" : "Buyer:"}</span>
-                        <span className="text-sm font-medium">{report.buyerName}</span>
+              <motion.div
+                key={report.reportId}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.06 }}
+              >
+                <Card className={cn(
+                  "overflow-hidden transition-all",
+                  isPending(report.status) && "border-l-4 border-l-amber-400"
+                )}>
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className={cn("text-xs", statusColors[report.status] ?? "bg-muted text-muted-foreground border-border")}>
+                        {statusLabels[report.status]?.[language] ?? report.status}
+                      </Badge>
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(report.createdAt, language)}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{language === "vi" ? "Người mua:" : "Buyer:"}</span>
+                          <span className="text-sm font-medium">{report.buyerName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{language === "vi" ? "Giao hàng:" : "Delivery:"}</span>
+                          <Badge variant="outline" className={cn("text-xs", orderStatusColors[report.orderStatus] ?? "bg-muted text-muted-foreground border-border")}>
+                            {orderStatusLabels[report.orderStatus] ?? report.orderStatus}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{language === "vi" ? "Giao dịch:" : "Transaction:"}</span>
+                          <Badge variant="outline" className={cn("text-xs", transactionStatusColors[report.transactionStatus] ?? "bg-muted text-muted-foreground border-border")}>
+                            {transactionStatusLabels[report.transactionStatus] ?? report.transactionStatus}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{language === "vi" ? "Giao hàng:" : "Delivery:"}</span>
-                        <Badge variant="outline" className={cn("text-xs", orderStatusColors[report.orderStatus] ?? "bg-muted text-muted-foreground border-border")}>
-                          {orderStatusLabels[report.orderStatus] ?? report.orderStatus}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{language === "vi" ? "Giao dịch:" : "Transaction:"}</span>
-                        <Badge variant="outline" className={cn("text-xs", transactionStatusColors[report.transactionStatus] ?? "bg-muted text-muted-foreground border-border")}>
-                          {transactionStatusLabels[report.transactionStatus] ?? report.transactionStatus}
-                        </Badge>
+
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">{language === "vi" ? "Lý do" : "Reason"}</p>
+                          <p className="mt-1 text-sm font-medium">{report.reason}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">{language === "vi" ? "Mô tả" : "Description"}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">{report.description}</p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="rounded-xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {language === "vi" ? "Lý do" : "Reason"}
-                        </p>
-                        <p className="mt-1 text-sm font-medium">{report.reason}</p>
-                      </div>
-                      <div className="rounded-xl border border-border/60 bg-background/70 p-3">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {language === "vi" ? "Mô tả" : "Description"}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">{report.description}</p>
-                      </div>
+                    <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
+                      <Button asChild>
+                        <Link href={`/inspector/report/${report.reportId}`}>
+                          <Eye className="mr-1 h-4 w-4" />
+                          {language === "vi" ? "Chi tiết" : "Detail"}
+                        </Link>
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-3 sm:flex-row sm:justify-end">
-                    <Button asChild>
-                      <Link href={`/inspector/report/${report.reportId}`}>
-                        <Eye className="mr-1 h-4 w-4" />
-                        {language === "vi" ? "Chi tiết" : "Detail"}
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );})
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })
         )}
       </div>
     </div>
