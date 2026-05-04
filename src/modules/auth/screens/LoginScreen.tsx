@@ -307,19 +307,13 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       const idToken = await result.user.getIdToken()
 
       if (target === 'login') {
-        // Try First, Ask Later: gọi API với role = undefined
-        // Nếu tài khoản đã tồn tại, backend sẽ trả về session.
-        // Nếu tài khoản chưa tồn tại, backend sẽ báo lỗi (do thiếu role) → hiện UI chọn role.
-        const success = await submitGoogleSession(idToken, undefined, 'login')
-        if (!success) {
-          // Tài khoản chưa đăng ký – xoá lỗi API rồi cho user chọn role
-          setLoginErrorMessage(null)
-          setPendingGoogleIdToken(idToken)
-          setPendingGoogleIntent('login')
-          setPendingGoogleRole('2')
-        }
+        // Ask First: BE luôn yêu cầu role kể cả tài khoản cũ → hiện picker chọn role trước,
+        // sau đó gọi API 1 lần duy nhất với role đã chọn.
+        setPendingGoogleIdToken(idToken)
+        setPendingGoogleIntent('login')
+        setPendingGoogleRole('2')
       } else {
-        // Register flow: luôn hỏi role trước khi gọi API
+        // Register flow: luôn hỏi role + SĐT trước khi gọi API
         setPendingGoogleIdToken(idToken)
         setPendingGoogleIntent('register')
         setPendingGoogleRole(registerRole === '3' ? '3' : '2')
@@ -337,31 +331,36 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const onConfirmGoogleLoginRole = async () => {
     if (!pendingGoogleIdToken || !pendingGoogleIntent) return
 
-    // Validate phone before submitting
-    const PHONE_REGEX = /^0\d{9}$/
-    if (!PHONE_REGEX.test(pendingGooglePhone)) {
-      setPendingGooglePhoneError(
-        language === 'vi'
-          ? 'Số điện thoại phải theo định dạng 0xxxxxxxxx'
-          : 'Phone must be in format 0xxxxxxxxx',
-      )
-      return
+    // Chỉ validate SĐT cho register flow (tài khoản mới cần nhập SĐT)
+    // Login flow không cần — tài khoản đã tồn tại đã có SĐT trong hệ thống
+    if (pendingGoogleIntent === 'register') {
+      const PHONE_REGEX = /^0\d{9}$/
+      if (!PHONE_REGEX.test(pendingGooglePhone)) {
+        setPendingGooglePhoneError(
+          language === 'vi'
+            ? 'Số điện thoại phải theo định dạng 0xxxxxxxxx'
+            : 'Phone must be in format 0xxxxxxxxx',
+        )
+        return
+      }
+      setPendingGooglePhoneError(null)
     }
-    setPendingGooglePhoneError(null)
 
     const role = pendingGoogleRole === '3' ? 3 : 2
     const success = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
 
     if (success) {
-      // Account created + token saved → update phone number
-      setIsUpdatingPhone(true)
-      try {
-        await authApi.updatePhone(pendingGooglePhone)
-      } catch {
-        // Non-blocking: account is created, phone update failure should not block navigation
-        console.warn('[Auth] Could not update phone number after Google sign-up')
-      } finally {
-        setIsUpdatingPhone(false)
+      // Chỉ update SĐT cho register flow (tài khoản mới)
+      // Login flow không gọi updatePhone — không ghi đè SĐT tài khoản cũ
+      if (pendingGoogleIntent === 'register') {
+        setIsUpdatingPhone(true)
+        try {
+          await authApi.updatePhone(pendingGooglePhone)
+        } catch {
+          console.warn('[Auth] Could not update phone number after Google sign-up')
+        } finally {
+          setIsUpdatingPhone(false)
+        }
       }
       resetPendingGoogle()
     }
@@ -531,27 +530,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                             <div className="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
                               <p className="text-sm font-medium text-foreground">
                                 {language === 'vi'
-                                  ? 'Tài khoản Google chưa được đăng ký. Điền thông tin để tạo tài khoản mới.'
-                                  : 'Google account not registered yet. Fill in your details to create a new account.'}
+                                  ? 'Chọn vai trò để tiếp tục đăng nhập với Google.'
+                                  : 'Select your role to continue signing in with Google.'}
                               </p>
-                              <div className="space-y-1">
-                                <label className="text-sm font-medium">
-                                  {language === 'vi' ? 'Số điện thoại' : 'Phone number'}
-                                </label>
-                                <Input
-                                  placeholder="09xxxxxxxx"
-                                  inputMode="numeric"
-                                  value={pendingGooglePhone}
-                                  onChange={(e) => {
-                                    setPendingGooglePhone(e.target.value)
-                                    setPendingGooglePhoneError(null)
-                                  }}
-                                  disabled={isGoogleSubmitting || isUpdatingPhone}
-                                />
-                                {pendingGooglePhoneError && (
-                                  <p className="text-xs text-destructive">{pendingGooglePhoneError}</p>
-                                )}
-                              </div>
                               <Select value={pendingGoogleRole} onValueChange={(value) => setPendingGoogleRole(value as '2' | '3')}>
                                 <SelectTrigger>
                                   <SelectValue placeholder={language === 'vi' ? 'Chọn vai trò' : 'Select role'} />
@@ -562,15 +543,15 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                                 </SelectContent>
                               </Select>
                               <div className="flex gap-2">
-                                <Button type="button" className="flex-1" onClick={() => void onConfirmGoogleLoginRole()} disabled={isGoogleSubmitting || isUpdatingPhone}>
-                                  {(isGoogleSubmitting || isUpdatingPhone) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <Button type="button" className="flex-1" onClick={() => void onConfirmGoogleLoginRole()} disabled={isGoogleSubmitting}>
+                                  {isGoogleSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                   {language === 'vi' ? 'Xác nhận' : 'Confirm'}
                                 </Button>
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   onClick={resetPendingGoogle}
-                                  disabled={isGoogleSubmitting || isUpdatingPhone}
+                                  disabled={isGoogleSubmitting}
                                 >
                                   {language === 'vi' ? 'Hủy' : 'Cancel'}
                                 </Button>
