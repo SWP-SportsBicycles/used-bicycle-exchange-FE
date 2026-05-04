@@ -360,6 +360,18 @@ function normalizeUserRole(value: unknown): UserRole {
   return "BUYER";
 }
 
+function normalizeUserStatus(source: Record<string, unknown>, isActive: boolean | undefined): UserStatus | undefined {
+  // Prefer direct status string from API ("Active", "InActive", "Banned")
+  const rawStatus = typeof source.status === "string" ? source.status.trim() : "";
+  if (rawStatus === "Active" || rawStatus === "active") return "Active";
+  if (rawStatus === "InActive" || rawStatus === "inactive" || rawStatus === "Inactive") return "InActive";
+  if (rawStatus === "Banned" || rawStatus === "banned") return "Banned";
+  // Fallback: derive from isActive boolean
+  if (isActive === true) return "Active";
+  if (isActive === false) return "InActive";
+  return undefined;
+}
+
 function normalizeUser(raw: unknown): AdminUser {
   const source = extractPayloadObject(raw);
   const role = normalizeUserRole(source.role);
@@ -377,7 +389,7 @@ function normalizeUser(raw: unknown): AdminUser {
     firebaseUID: pickString(source, ["firebaseUID", "firebase_uid", "firebaseId"]) || undefined,
     walletBalance:
       typeof source.walletBalance === "number" ? source.walletBalance : Number(source.walletBalance) || undefined,
-    status: isActive === undefined ? undefined : isActive ? "Active" : "InActive",
+    status: normalizeUserStatus(source, isActive),
     totalOrders: typeof source.totalOrders === "number" ? source.totalOrders : undefined,
     completedOrders: typeof source.completedOrders === "number" ? source.completedOrders : undefined,
     totalListings: typeof source.totalListings === "number" ? source.totalListings : undefined,

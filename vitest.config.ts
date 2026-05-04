@@ -8,10 +8,14 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
-    environment: "node",
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
     coverage: {
       enabled: false,
     },
+    // Mock CSS imports
+    css: false,
   },
 });

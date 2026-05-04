@@ -275,36 +275,36 @@ export default function AdminDashboardPage() {
               className="h-[300px] w-full"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={gmvData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        formatter={(value, name) => (
-                          <span className="font-medium">
-                            {name === 'gmv' ? 'GMV: ' : language === 'vi' ? 'Lợi nhuận: ' : 'Revenue: '}
-                            {formatVND(Number(value) || 0)}
-                          </span>
-                        )}
-                      />
-                    }
-                  />
-                  <Legend verticalAlign="top" height={36}/>
-                  <Bar yAxisId="left" dataKey="gmv" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="GMV" barSize={40} />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#16a34a"
-                    strokeWidth={4}
-                    dot={{ r: 6, fill: '#16a34a', strokeWidth: 2, stroke: '#fff' }}
-                    activeDot={{ r: 8 }}
-                    name={language === 'vi' ? 'Lợi nhuận (5%)' : 'Revenue (5%)'}
-                  />
-                </ComposedChart>
+              <ComposedChart data={gmvData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
+                <YAxis yAxisId="right" orientation="right" tickFormatter={formatRevenueTick} tickLine={false} axisLine={false} width={80} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name) => (
+                        <span className="font-medium">
+                          {name === 'gmv' ? 'GMV: ' : language === 'vi' ? 'Lợi nhuận: ' : 'Revenue: '}
+                          {formatVND(Number(value) || 0)}
+                        </span>
+                      )}
+                    />
+                  }
+                />
+                <Legend verticalAlign="top" height={36}/>
+                <Bar yAxisId="left" dataKey="gmv" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="GMV" barSize={40} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#16a34a"
+                  strokeWidth={4}
+                  dot={{ r: 6, fill: '#16a34a', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 8 }}
+                  name={language === 'vi' ? 'Lợi nhuận (5%)' : 'Revenue (5%)'}
+                />
+              </ComposedChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
