@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, XCircle } from 'lucide-react'
 import { authApi } from '@/lib/api/auth-api'
 import type { AuthSession } from '@/lib/api/auth-api'
+import { ApiError } from '@/lib/api/http'
 import { useAuth } from '@/lib/auth-context'
 import type { AuthRole } from '@/lib/api/auth-api'
 import { sellerShippingApi } from '@/lib/api/sellerShippingApi'
@@ -68,6 +69,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const [pendingGoogleRole, setPendingGoogleRole] = useState<'2' | '3'>('2')
   const [pendingGooglePhone, setPendingGooglePhone] = useState('')
   const [pendingGooglePhoneError, setPendingGooglePhoneError] = useState<string | null>(null)
+  const [pendingGoogleNeedsPhone, setPendingGoogleNeedsPhone] = useState(false)
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false)
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [showRegisterPassword, setShowRegisterPassword] = useState(false)
@@ -124,22 +126,44 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     return message.includes('not found') || message.includes('404')
   }
 
-  const isMissingGoogleRoleError = (message: string | null) => {
-    if (!message) return false
-    const normalized = message
+  const normalizeMessage = (value: string) =>
+    value
       .trim()
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
 
+  const isMissingGoogleRoleError = (error: unknown, message: string | null) => {
+    const normalizedMessage = message ? normalizeMessage(message) : ''
+
+    if (error instanceof ApiError) {
+      const payload = error.payload
+      if (payload && typeof payload === 'object') {
+        const obj = payload as Record<string, unknown>
+        const code = typeof obj.code === 'string' ? normalizeMessage(obj.code) : ''
+        const payloadMessage = typeof obj.message === 'string' ? normalizeMessage(obj.message) : ''
+        const errors = obj.errors
+
+        if (code === 'role_required' || code === 'missing_role') return true
+
+        if (errors && typeof errors === 'object' && 'role' in (errors as Record<string, unknown>)) {
+          return true
+        }
+
+        if (payloadMessage === 'role is required' || payloadMessage === 'thieu vai tro' || payloadMessage === 'vai tro bat buoc') {
+          return true
+        }
+      }
+    }
+
+    if (!normalizedMessage) return false
+
     return (
-      normalized.includes('role') &&
-      (normalized.includes('required') ||
-        normalized.includes('missing') ||
-        normalized.includes('must') ||
-        normalized.includes('thieu') ||
-        normalized.includes('bat buoc') ||
-        normalized.includes('vai tro'))
+      normalizedMessage === 'role is required' ||
+      normalizedMessage === 'role required' ||
+      normalizedMessage === 'thieu vai tro' ||
+      normalizedMessage === 'vai tro bat buoc' ||
+      normalizedMessage === 'vai tro la bat buoc'
     )
   }
 
@@ -168,6 +192,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     setPendingGoogleIntent(null)
     setPendingGooglePhone('')
     setPendingGooglePhoneError(null)
+    setPendingGoogleNeedsPhone(false)
   }
 
   const onModeChange = (nextMode: AuthMode) => {
@@ -286,7 +311,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       await loginWithSession(session)
       const destination = await resolvePostLoginDestination(session, role)
       router.push(destination)
-      return { success: true as const, errorMessage: null }
+      return { success: true as const, error: null, errorMessage: null }
     } catch (error) {
       const message =
         error instanceof Error
@@ -302,7 +327,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
           setRegisterErrorMessage(message)
         }
       }
-      return { success: false as const, errorMessage: message }
+      return { success: false as const, error, errorMessage: message }
     } finally {
       setIsGoogleSubmitting(false)
     }
@@ -338,10 +363,11 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
           return
         }
 
-        if (isMissingGoogleRoleError(directResult.errorMessage)) {
+        if (isMissingGoogleRoleError(directResult.error, directResult.errorMessage)) {
           setPendingGoogleIdToken(idToken)
           setPendingGoogleIntent('login')
           setPendingGoogleRole('2')
+          setPendingGoogleNeedsPhone(true)
           return
         }
 
@@ -367,9 +393,10 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
   const onConfirmGoogleLoginRole = async () => {
     if (!pendingGoogleIdToken || !pendingGoogleIntent) return
 
-    // Chỉ validate SĐT cho register flow (tài khoản mới cần nhập SĐT)
-    // Login flow không cần — tài khoản đã tồn tại đã có SĐT trong hệ thống
-    if (pendingGoogleIntent === 'register') {
+    const requiresPhone = pendingGoogleIntent === 'register' || pendingGoogleNeedsPhone
+
+    // Validate SĐT cho register flow hoặc login lần đầu (thiếu role trên BE)
+    if (requiresPhone) {
       const PHONE_REGEX = /^0\d{9}$/
       if (!PHONE_REGEX.test(pendingGooglePhone)) {
         setPendingGooglePhoneError(
@@ -386,9 +413,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     const { success } = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
 
     if (success) {
-      // Chỉ update SĐT cho register flow (tài khoản mới)
-      // Login flow không gọi updatePhone — không ghi đè SĐT tài khoản cũ
-      if (pendingGoogleIntent === 'register') {
+      // Update SĐT cho register flow hoặc login lần đầu khi thiếu role
+      if (requiresPhone) {
         setIsUpdatingPhone(true)
         try {
           await authApi.updatePhone(pendingGooglePhone)
@@ -569,6 +595,26 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
                                   ? 'Chọn vai trò để tiếp tục đăng nhập với Google.'
                                   : 'Select your role to continue signing in with Google.'}
                               </p>
+                              {pendingGoogleNeedsPhone && (
+                                <div className="space-y-1">
+                                  <label className="text-sm font-medium">
+                                    {language === 'vi' ? 'Số điện thoại' : 'Phone number'}
+                                  </label>
+                                  <Input
+                                    placeholder="09xxxxxxxx"
+                                    inputMode="numeric"
+                                    value={pendingGooglePhone}
+                                    onChange={(e) => {
+                                      setPendingGooglePhone(e.target.value)
+                                      setPendingGooglePhoneError(null)
+                                    }}
+                                    disabled={isGoogleSubmitting || isUpdatingPhone}
+                                  />
+                                  {pendingGooglePhoneError && (
+                                    <p className="text-xs text-destructive">{pendingGooglePhoneError}</p>
+                                  )}
+                                </div>
+                              )}
                               <Select value={pendingGoogleRole} onValueChange={(value) => setPendingGoogleRole(value as '2' | '3')}>
                                 <SelectTrigger>
                                   <SelectValue placeholder={language === 'vi' ? 'Chọn vai trò' : 'Select role'} />

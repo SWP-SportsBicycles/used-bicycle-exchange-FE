@@ -2,6 +2,20 @@
 
 const API_BASE = "/api/proxy";
 
+export class ApiError extends Error {
+  status: number;
+  url: string;
+  payload: unknown;
+
+  constructor(message: string, info: { status: number; url: string; payload: unknown }) {
+    super(message);
+    this.name = "ApiError";
+    this.status = info.status;
+    this.url = info.url;
+    this.payload = info.payload;
+  }
+}
+
 const PUBLIC_AUTH_PATH_PREFIXES = [
   "/api/Auth/signin",
   "/api/Auth/signup",
@@ -205,7 +219,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
       (typeof errorPayload === "string" && errorPayload.trim()) ||
       res.statusText ||
       "Yêu cầu xử lý thất bại. Vui lòng thử lại sau.";
-    throw new Error(message);
+    throw new ApiError(message, { status: res.status, url: normalizedUrl, payload: errorPayload });
   }
 
   const payload = await safeParseBody(res);
@@ -228,7 +242,7 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}, hasRetri
         const msg =
           (typeof obj.message === "string" && obj.message.trim()) ||
           "Thao tác không thành công.";
-        throw new Error(msg);
+        throw new ApiError(msg, { status: res.status, url: normalizedUrl, payload });
       }
 
       // Unwrap the data payload only if the field is present.
