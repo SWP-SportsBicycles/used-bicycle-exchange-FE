@@ -124,6 +124,25 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     return message.includes('not found') || message.includes('404')
   }
 
+  const isMissingGoogleRoleError = (message: string | null) => {
+    if (!message) return false
+    const normalized = message
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+
+    return (
+      normalized.includes('role') &&
+      (normalized.includes('required') ||
+        normalized.includes('missing') ||
+        normalized.includes('must') ||
+        normalized.includes('thieu') ||
+        normalized.includes('bat buoc') ||
+        normalized.includes('vai tro'))
+    )
+  }
+
   const resolvePostLoginDestination = useCallback(async (session?: AuthSession, roleHint?: AuthRole) => {
     const resolvedRole =
       mapAuthRoleToContextRole(session?.user?.role) ??
@@ -252,7 +271,12 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
   }
 
-  const submitGoogleSession = async (idToken: string, role: AuthRole | undefined, target: GoogleIntent) => {
+  const submitGoogleSession = async (
+    idToken: string,
+    role: AuthRole | undefined,
+    target: GoogleIntent,
+    options?: { suppressError?: boolean },
+  ) => {
     setLoginErrorMessage(null)
     setRegisterErrorMessage(null)
     setIsGoogleSubmitting(true)
@@ -262,7 +286,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       await loginWithSession(session)
       const destination = await resolvePostLoginDestination(session, role)
       router.push(destination)
-      return true
+      return { success: true as const, errorMessage: null }
     } catch (error) {
       const message =
         error instanceof Error
@@ -271,12 +295,14 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
             ? 'Dang nhap Google that bai'
             : 'Google sign-in failed'
 
-      if (target === 'login') {
-        setLoginErrorMessage(message)
-      } else {
-        setRegisterErrorMessage(message)
+      if (!options?.suppressError) {
+        if (target === 'login') {
+          setLoginErrorMessage(message)
+        } else {
+          setRegisterErrorMessage(message)
+        }
       }
-      return false
+      return { success: false as const, errorMessage: message }
     } finally {
       setIsGoogleSubmitting(false)
     }
@@ -307,11 +333,21 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       const idToken = await result.user.getIdToken()
 
       if (target === 'login') {
-        // Ask First: BE luôn yêu cầu role kể cả tài khoản cũ → hiện picker chọn role trước,
-        // sau đó gọi API 1 lần duy nhất với role đã chọn.
-        setPendingGoogleIdToken(idToken)
-        setPendingGoogleIntent('login')
-        setPendingGoogleRole('2')
+        const directResult = await submitGoogleSession(idToken, undefined, 'login', { suppressError: true })
+        if (directResult.success) {
+          return
+        }
+
+        if (isMissingGoogleRoleError(directResult.errorMessage)) {
+          setPendingGoogleIdToken(idToken)
+          setPendingGoogleIntent('login')
+          setPendingGoogleRole('2')
+          return
+        }
+
+        const message = directResult.errorMessage
+          ?? (language === 'vi' ? 'Dang nhap Google that bai' : 'Google sign-in failed')
+        setLoginErrorMessage(message)
       } else {
         // Register flow: luôn hỏi role + SĐT trước khi gọi API
         setPendingGoogleIdToken(idToken)
@@ -347,7 +383,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
 
     const role = pendingGoogleRole === '3' ? 3 : 2
-    const success = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
+    const { success } = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
 
     if (success) {
       // Chỉ update SĐT cho register flow (tài khoản mới)
