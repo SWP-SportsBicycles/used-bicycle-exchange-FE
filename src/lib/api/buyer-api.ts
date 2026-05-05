@@ -54,6 +54,11 @@ export interface BuyerListing {
   frameMaterial: string;
   groupset: string;
   wheelSize: string;
+  // ── Extended bike specs (from bikes[0] in detail response) ──
+  paint?: string;             // Màu sắc khung xe (e.g. "Green")
+  operating?: string;         // Đánh giá vận hành (e.g. "Very Smooth")
+  brakeType?: string;         // Loại phanh (e.g. "Disc Brake")
+  weight?: number;            // Trọng lượng kg (0 = không xác định)
   description: string;
   images: string[];
   videoUrls?: string[];
@@ -91,10 +96,33 @@ export interface BuyerListingPage {
   totalPages: number;
 }
 
+export interface BuyerOrderListing {
+  id: string;
+  title: string;
+  images: string[];
+  price: number;
+  // Extended bike specs — populated from items[0].bike in order detail response
+  brand?: string;
+  model?: string;
+  category?: string;
+  condition?: BuyerListing["condition"];
+  frameSize?: string;
+  frameMaterial?: string;
+  groupset?: string;
+  wheelSize?: string;
+  serial?: string;
+  paint?: string;
+  operating?: string;
+  brakeType?: string;
+  isVeloSafeVerified?: boolean;
+  city?: string;
+  description?: string;
+}
+
 export interface BuyerOrder {
   id: string;
   listingId: string;
-  listing: Pick<BuyerListing, "id" | "title" | "images" | "price">;
+  listing: BuyerOrderListing;
   status:
     | "pending"
     | "paid"
@@ -112,8 +140,13 @@ export interface BuyerOrder {
   toWardCode?: string;
   shippingFee: number;
   totalPrice: number;
+  subTotal?: number;
   payosQrUrl?: string;
+  orderCode?: string;
   waybillCode?: string;         // GHN tracking code
+  trackingUrl?: string;         // GHN tracking link
+  paidAt?: string;
+  transactionId?: string;
   expiresAt?: string;           // timer_draft expiry (ISO 8601)
   seller?: {                    // Full PII — hiện sau khi thanh toán
     name: string;
@@ -219,6 +252,27 @@ export interface BuyerReport {
     bankAccountName?: string;
     bankAccountNumber?: string;
   };
+}
+
+/**
+ * Helper to derive the UI status of an order based on its backend status and any associated reports.
+ * This ensures consistency between list and detail views.
+ */
+export function deriveOrderStatus(orderStatus: BuyerOrder["status"], report?: BuyerReport): BuyerOrder["status"] {
+  if (!report) return orderStatus;
+
+  // If the dispute was resolved with a refund -> show as "refunded"
+  if (report.transactionStatus === 'Refunded' || report.refundStatus === 'Success') {
+    return 'refunded';
+  }
+
+  // If the report is rejected, we revert to the original status
+  if (report.status === 'Rejected') {
+    return orderStatus;
+  }
+
+  // Any other active report (Pending, Reviewing, Resolved but not refunded) is considered "disputed"
+  return 'disputed';
 }
 
 export interface WishlistPage {
@@ -398,6 +452,16 @@ function normalizeListing(raw: Record<string, unknown>): BuyerListing {
   const category = ((merged.category ?? bike0?.category) as string) || "road";
   const updatedAt = ((merged.updatedAt ?? merged.createdAt) as string) || createdAt;
 
+  // ── Extended specs: paint, operating, brakeType, weight ─────────────────
+  const paint = ((merged.paint ?? bike0?.paint) as string) || undefined;
+  const operating = ((merged.operating ?? bike0?.operating) as string) || undefined;
+  const brakeType = ((merged.brakeType ?? bike0?.brakeType) as string) || undefined;
+  const rawWeight = merged.weight ?? bike0?.weight;
+  const weight =
+    rawWeight != null && rawWeight !== ""
+      ? parseFloat(String(rawWeight))
+      : undefined;
+
   const listing: BuyerListing = {
     ...merged,
     id,
@@ -419,6 +483,10 @@ function normalizeListing(raw: Record<string, unknown>): BuyerListing {
     frameSize: ((merged.frameSize ?? bike0?.frameSize) as string) || "",
     frameMaterial: ((merged.frameMaterial ?? bike0?.frameMaterial) as string) || "",
     groupset: ((merged.groupset ?? bike0?.groupset) as string) || "",
+    paint,
+    operating,
+    brakeType,
+    weight,
     description: (merged.description as string) || "",
     seller: (merged.seller as BuyerListing["seller"]) ?? {
       id: "",
@@ -768,6 +836,27 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
       ? (src.payment as Record<string, unknown>)
       : undefined;
 
+  // ── Extended bike specs from nested bike object ─────────────────────────
+  const bikeSpecSrc = items0Bike ?? listingSrc;
+  const getBikeStr = (key: string): string | undefined => {
+    const v = bikeSpecSrc[key] ?? listingSrc[key];
+    return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+  };
+  const rawOverall = getBikeStr('overall');
+  const bikeIsVeloSafe =
+    (bikeSpecSrc.isVeloSafeVerified as boolean | undefined) ??
+    (bikeSpecSrc.isInspected as boolean | undefined) ??
+    (rawOverall?.toLowerCase() === 'checked');
+  const rawBikeCity = getBikeStr('city');
+  const cityMap: Record<string, string> = {
+    'TP.HCM': 'TP.HCM', 'tp.hcm': 'TP.HCM', 'hồ chí minh': 'TP.HCM', 'hcm': 'TP.HCM',
+    'Hà Nội': 'Hà Nội', 'hà nội': 'Hà Nội', 'hanoi': 'Hà Nội',
+    'Đà Nẵng': 'Đà Nẵng', 'đà nẵng': 'Đà Nẵng', 'danang': 'Đà Nẵng',
+  };
+  const bikeCity = rawBikeCity ? (cityMap[rawBikeCity] ?? rawBikeCity) : undefined;
+  const bikeSerial = getBikeStr('serial') ?? getBikeStr('serialNumber');
+  const bikeWheelSize = getBikeStr('wheelSize') ?? getBikeStr('tireRim');
+
   return {
     ...src,
     id,
@@ -777,6 +866,22 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
       title: title || "Xe đạp",
       images: listingImages,
       price: listingPrice,
+      // Extended specs
+      brand: getBikeStr('brand'),
+      model: getBikeStr('model'),
+      category: getBikeStr('category'),
+      condition: getBikeStr('condition') as BuyerListing['condition'] | undefined,
+      frameSize: getBikeStr('frameSize'),
+      frameMaterial: getBikeStr('frameMaterial'),
+      groupset: getBikeStr('groupset'),
+      wheelSize: bikeWheelSize,
+      serial: bikeSerial,
+      paint: getBikeStr('paint'),
+      operating: getBikeStr('operating'),
+      brakeType: getBikeStr('brakeType'),
+      isVeloSafeVerified: bikeIsVeloSafe,
+      city: bikeCity,
+      description: getBikeStr('description'),
     },
     status,
     statusLabel: (src.statusLabel as string) || {
@@ -791,18 +896,31 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     }[status as string] || 'Chờ thanh toán',
     receiverName: (src.receiverName as string) || "",
     receiverPhone: (src.receiverPhone as string) || "",
-    receiverAddress: ((src.address as Record<string, unknown>)?.fullAddress as string) || ((src.address as Record<string, unknown>)?.detail as string) || (src.receiverAddress as string) || "",
+    receiverAddress: (() => {
+      const addr = src.address as Record<string, unknown> | undefined;
+      if (addr?.fullAddress) return addr.fullAddress as string;
+      const detail = addr?.detail || src.receiverAddress || "";
+      const parts = [detail, addr?.wardName, addr?.districtName, addr?.provinceName].filter(Boolean);
+      return parts.length > 0 ? parts.join(", ") : "";
+    })(),
     toDistrictId: (src.address as Record<string, unknown>)?.districtId ? parseNumber((src.address as Record<string, unknown>).districtId) : (src.toDistrictId ? parseNumber(src.toDistrictId) : undefined),
     toWardCode: ((src.address as Record<string, unknown>)?.wardCode as string) || (src.toWardCode as string) || undefined,
     shippingFee: parseNumber(src.shippingFee ?? src.shipFee
       ?? (src.shipment && typeof src.shipment === "object"
-          ? (src.shipment as Record<string, unknown>).fee
+          ? (src.shipment as Record<string, unknown>).shippingFee
           : undefined)),
     totalPrice: parseNumber(src.totalPrice ?? src.totalAmount ?? src.amount),
+    subTotal: parseNumber(src.subTotal ?? src.subtotal),
     payosQrUrl: parseOptionalString(
       paymentSource?.paymentLink ?? paymentSource?.checkoutUrl ?? src.checkoutUrl ?? src.payosQrUrl
     ),
-    waybillCode: (src.waybillCode as string) || undefined,
+    orderCode: src.orderCode ? String(src.orderCode) : undefined,
+    waybillCode: (src.waybillCode as string) || 
+      ((src.shipment as Record<string, unknown>)?.providerOrderCode as string) || 
+      undefined,
+    trackingUrl: ((src.shipment as Record<string, unknown>)?.trackingUrl as string) || undefined,
+    paidAt: (paymentSource?.paidAt as string) || undefined,
+    transactionId: (paymentSource?.transactionId as string) || undefined,
     expiresAt: (src.expiresAt as string) || undefined,
     seller:
       src.seller && typeof src.seller === "object"
@@ -1092,4 +1210,75 @@ export const buyerApi = {
   // Swagger: POST /api/payment/cancel/{orderId} — CancelOrderDTO { reason? }
   cancelOrder: (orderId: string, reason?: string) =>
     http.post<unknown>(`/api/buyer-order/${orderId}/cancel`, reason ? { reason } : {}),
+
+  // ---------- Review ----------
+
+  /**
+   * POST /api/Review — CreateReviewDTO
+   * Buyer submits a review for a completed order.
+   */
+  createReview: (data: { orderId: string; rating: number; comment?: string }) =>
+    http.post<unknown>('/api/Review', data),
+
+  /**
+   * GET /api/Review/my-reviewed-orders
+   * Returns list of orderIds that the buyer has already reviewed.
+   * Also caches full review data for detail lookup.
+   */
+  getMyReviewedOrders: async (): Promise<string[]> => {
+    const raw = await http.get<unknown>('/api/Review/my-reviewed-orders');
+    const data = unwrap<unknown>(raw);
+    if (Array.isArray(data)) {
+      return data.map((item: unknown) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'orderId' in item) return String((item as Record<string, unknown>).orderId);
+        return String(item);
+      });
+    }
+    return [];
+  },
+
+  /**
+   * GET /api/Review/my-reviewed-orders (full objects)
+   * Returns full review detail objects keyed by orderId — for buyer to view their review.
+   */
+  getMyReviewsAsBuyer: async (): Promise<Record<string, { rating: number; comment: string | null; reviewedAt: string | null }>> => {
+    const raw = await http.get<unknown>('/api/Review/my-reviewed-orders');
+    const data = unwrap<unknown>(raw);
+    const result: Record<string, { rating: number; comment: string | null; reviewedAt: string | null }> = {};
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item && typeof item === 'object') {
+          const obj = item as Record<string, unknown>;
+          const orderId = typeof obj.orderId === 'string' ? obj.orderId : null;
+          if (orderId) {
+            result[orderId] = {
+              rating: typeof obj.rating === 'number' ? obj.rating : 0,
+              comment: typeof obj.comment === 'string' ? obj.comment : null,
+              reviewedAt: typeof obj.reviewedAt === 'string' ? obj.reviewedAt : 
+                          typeof obj.createdAt === 'string' ? obj.createdAt : null,
+            };
+          }
+        }
+      }
+    }
+    return result;
+  },
+
+  /**
+   * GET /api/Review/my-reviews-for-seller
+   * Returns reviews that buyers have submitted for the seller's listings.
+   */
+  getMyReviewsForSeller: async () => {
+    const raw = await http.get<unknown>('/api/Review/my-reviews-for-seller');
+    const data = unwrap<unknown>(raw);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[Review] my-reviews-for-seller raw data:', JSON.stringify(data, null, 2));
+    }
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && 'items' in data) {
+      return (data as Record<string, unknown>).items as unknown[];
+    }
+    return [];
+  },
 };

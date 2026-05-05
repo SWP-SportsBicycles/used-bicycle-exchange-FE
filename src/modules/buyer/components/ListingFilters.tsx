@@ -3,13 +3,13 @@
 import { useState } from 'react'
 import type React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, Filter, SlidersHorizontal, Bike, MapPin, Tag, Ruler, Settings2, CheckCircle2, DollarSign } from 'lucide-react'
+import { ChevronDown, Filter, SlidersHorizontal, Bike, MapPin, Tag, Ruler, CheckCircle2, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
+import { BRANDS, FRAME_SIZES, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
 import { formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +17,6 @@ export interface FilterState {
   categories: string[]
   brands: string[]
   frameSizes: string[]
-  groupsets: string[]
   conditions: string[]
   cities: string[]
   priceRange: [number, number]
@@ -34,7 +33,6 @@ const filterSections = [
   { key: 'cities',     title: 'Thành Phố',   icon: MapPin,       options: CITIES },
   { key: 'brands',     title: 'Thương Hiệu', icon: Tag,          options: BRANDS.map(b => ({ value: b, label: b })) },
   { key: 'frameSizes', title: 'Size Khung',  icon: Ruler,        options: FRAME_SIZES.map(s => ({ value: s, label: s })) },
-  { key: 'groupsets',  title: 'Groupset',    icon: Settings2,    options: GROUPSETS.map(g => ({ value: g, label: g })) },
   { key: 'conditions', title: 'Tình Trạng',  icon: CheckCircle2, options: CONDITIONS },
 ]
 
@@ -57,9 +55,10 @@ function FilterSection({
 
   const toggleValue = (value: string) => {
     if (selected.includes(value)) {
-      onChange(selected.filter(v => v !== value))
+      onChange([])
     } else {
-      onChange([...selected, value])
+      // Force single select: replace current selection with the new one
+      onChange([value])
     }
   }
 
@@ -133,17 +132,15 @@ function FilterContent({ filters, onFilterChange }: FilterSidebarProps) {
     filters.categories,
     filters.brands,
     filters.frameSizes,
-    filters.groupsets,
     filters.conditions,
     filters.cities,
-  ].reduce((acc, arr) => acc + arr.length, 0)
+  ].reduce((acc, arr) => acc + (arr?.length || 0), 0)
 
   const clearAllFilters = () => {
     onFilterChange({
       categories: [],
       brands: [],
       frameSizes: [],
-      groupsets: [],
       conditions: [],
       cities: [],
       priceRange: [0, 100000000],
@@ -256,10 +253,9 @@ export function MobileFilterSheet({ filters, onFilterChange }: FilterSidebarProp
     filters.categories,
     filters.brands,
     filters.frameSizes,
-    filters.groupsets,
     filters.conditions,
     filters.cities,
-  ].reduce((acc, arr) => acc + arr.length, 0)
+  ].reduce((acc, arr) => acc + (arr?.length || 0), 0)
 
   return (
     <Sheet>

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -7,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Package, ChevronRight, CheckCircle, Loader2, Search, ShieldAlert, Wallet } from 'lucide-react'
+import { Package, ChevronRight, CheckCircle, Loader2, Search, ShieldAlert, Wallet, Star } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,6 +26,8 @@ import { formatVND } from '@/lib/mock-data'
 import { BuyerOrder, buyerApi } from '@/lib/api/buyer-api'
 import { OrderCardSkeleton } from '../components/skeletons/OrderCardSkeleton'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
+import { ReviewDialog } from '../components/ReviewDialog'
+import { useMyReviewedOrders } from '../hooks/useReview'
 import { BuyerAccountLayout } from '../components/BuyerAccountLayout'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -80,20 +81,15 @@ export default function OrderListScreen() {
   const queryStatus = searchParams.get('status')
   const queryPage   = Number(searchParams.get('page') ?? '1') || 1
 
-  const [statusFilter, setStatusFilter] = useState<BuyerOrder['status'] | 'all'>('all')
+  const valid: Array<BuyerOrder['status'] | 'all'> = [
+    'all', 'pending', 'paid', 'shipping', 'delivered', 'completed', 'cancelled', 'disputed'
+  ]
+  const statusFilter = valid.includes(queryStatus as BuyerOrder['status']) ? queryStatus as BuyerOrder['status'] : 'all'
+
   const [searchQuery,  setSearchQuery]  = useState('')
 
   // page is DERIVED from URL — no useState needed
   const page = queryPage
-
-  // Sync statusFilter state from URL
-  useEffect(() => {
-    const valid: Array<BuyerOrder['status'] | 'all'> = [
-      'all', 'pending', 'paid', 'shipping', 'delivered', 'completed', 'cancelled', 'disputed'
-    ]
-    const next = valid.includes(queryStatus as BuyerOrder['status']) ? queryStatus as BuyerOrder['status'] : 'all'
-    setStatusFilter(next)
-  }, [queryStatus])
 
   // Scroll to top on page change
   useEffect(() => {
@@ -109,16 +105,13 @@ export default function OrderListScreen() {
     return qs ? `${pathname}?${qs}` : pathname
   }
 
-  const handleTabChange = (status: string) => {
-    router.push(buildUrl(status, 1))
-  }
-
   const handlePageChange = (newPage: number) => {
     router.push(buildUrl(statusFilter, newPage), { scroll: false })
   }
 
   // ── Server-side filter via hook (status passed to API) ───────────
   const { data: orderPage, isLoading } = useOrders(page, 10, statusFilter)
+  const { data: reviewedOrders = [] } = useMyReviewedOrders()
 
   // Client-side filter (server may ignore status param — this is the safety net)
   const visibleItems = (orderPage?.items ?? []).filter(order => {
@@ -203,9 +196,10 @@ export default function OrderListScreen() {
           <div className="relative w-full">
             <div className="flex gap-1 overflow-x-auto border-b border-border/50 pb-px scrollbar-hide">
               {TABS.map(({ key, label }) => (
-                <button
+                <Link
                   key={key}
-                  onClick={() => handleTabChange(key)}
+                  href={buildUrl(key, 1)}
+                  scroll={false}
                   className={cn(
                     'pb-3 px-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative flex items-center gap-1.5',
                     statusFilter === key
@@ -220,7 +214,7 @@ export default function OrderListScreen() {
                       className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"
                     />
                   )}
-                </button>
+                </Link>
               ))}
             </div>
           </div>
@@ -256,8 +250,8 @@ export default function OrderListScreen() {
                   <Link href="/marketplace">Mua sắm ngay</Link>
                 </Button>
               ) : (
-                <Button variant="outline" className="rounded-xl h-11 px-6" onClick={() => handleTabChange('all')}>
-                  Xem tất cả đơn hàng
+                <Button asChild variant="outline" className="rounded-xl h-11 px-6">
+                  <Link href={buildUrl('all', 1)}>Xem tất cả đơn hàng</Link>
                 </Button>
               )}
             </motion.div>
@@ -392,14 +386,29 @@ export default function OrderListScreen() {
                           </Button>
                         )}
 
-                        {/* completed: dispute button */}
+                        {/* completed: review + dispute (mutual exclusion) */}
                         {order.status === 'completed' && (
-                          <Button asChild variant="outline" className="w-full h-11 rounded-xl font-semibold text-sm border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-400">
-                            <Link href={`/buyer/orders/${order.id}/dispute`}>
-                              <ShieldAlert className="h-4 w-4 mr-2" />
-                              Khiếu nại
-                            </Link>
-                          </Button>
+                          <>
+                            {!reviewedOrders.includes(order.id) ? (
+                              <ReviewDialog orderId={order.id} listingTitle={order.listing.title}>
+                                <Button className="w-full h-11 rounded-xl font-bold text-sm bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20">
+                                  <Star className="h-4 w-4 mr-2" />Gửi đánh giá
+                                </Button>
+                              </ReviewDialog>
+                            ) : (
+                              <Button disabled variant="outline" className="w-full h-11 rounded-xl font-bold text-sm border-amber-400/50 text-amber-600">
+                                <Star className="h-4 w-4 mr-2 fill-amber-400" />Đã đánh giá ✓
+                              </Button>
+                            )}
+                            {!reviewedOrders.includes(order.id) && (
+                              <Button asChild variant="outline" className="w-full h-11 rounded-xl font-semibold text-sm border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-400">
+                                <Link href={`/buyer/orders/${order.id}/dispute`}>
+                                  <ShieldAlert className="h-4 w-4 mr-2" />
+                                  Khiếu nại
+                                </Link>
+                              </Button>
+                            )}
+                          </>
                         )}
 
                         {/* View detail — always shown */}

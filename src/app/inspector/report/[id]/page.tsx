@@ -16,10 +16,12 @@ import {
   Video,
   XCircle,
 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { inspectorApi } from "@/lib/api/inspector-api";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
@@ -88,10 +90,12 @@ function formatDate(dateString: string, language: "vi" | "en"): string {
 
 export default function InspectorReportDetailPage() {
   const { language } = useLanguage();
+  const { toast } = useToast();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const reportId = params.id;
   const queryClient = useQueryClient();
+  const [actionStatus, setActionStatus] = useState<"confirmed" | "rejected" | null>(null);
   const [resultModal, setResultModal] = useState<{
     open: boolean;
     title: string;
@@ -133,6 +137,14 @@ export default function InspectorReportDetailPage() {
         queryKey: ["inspector-reports"],
         queryFn: inspectorApi.getReports,
       });
+      setActionStatus("confirmed");
+      toast({
+        title: language === "vi" ? "Đã chấp nhận" : "Confirmed",
+        description:
+          language === "vi"
+            ? "Báo cáo này đã được duyệt thành công."
+            : "This report has been approved successfully.",
+      });
       setResultModal({
         open: true,
         title: language === "vi" ? "Chấp thuận thành công" : "Confirmed successfully",
@@ -140,6 +152,16 @@ export default function InspectorReportDetailPage() {
           language === "vi"
             ? "Báo cáo đã được chấp thuận. Hệ thống sẽ quay về danh sách sau 2 giây."
             : "The report was confirmed. Redirecting to the report list in 2 seconds.",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: language === "vi" ? "Không thể chấp nhận" : "Confirm failed",
+        description:
+          language === "vi"
+            ? "Không thể chấp nhận báo cáo này. Vui lòng thử lại."
+            : "Unable to confirm this report. Please try again.",
       });
     },
   });
@@ -155,6 +177,15 @@ export default function InspectorReportDetailPage() {
         queryKey: ["inspector-reports"],
         queryFn: inspectorApi.getReports,
       });
+      setActionStatus("rejected");
+      toast({
+        variant: "destructive",
+        title: language === "vi" ? "Đã từ chối" : "Rejected",
+        description:
+          language === "vi"
+            ? "Báo cáo này đã bị từ chối."
+            : "This report has been rejected.",
+      });
       setResultModal({
         open: true,
         title: language === "vi" ? "Bác bỏ thành công" : "Rejected successfully",
@@ -162,6 +193,16 @@ export default function InspectorReportDetailPage() {
           language === "vi"
             ? "Báo cáo đã được bác bỏ. Hệ thống sẽ quay về danh sách sau 2 giây."
             : "The report was rejected. Redirecting to the report list in 2 seconds.",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: language === "vi" ? "Không thể từ chối" : "Reject failed",
+        description:
+          language === "vi"
+            ? "Không thể từ chối báo cáo này. Vui lòng thử lại."
+            : "Unable to reject this report. Please try again.",
       });
     },
   });
@@ -237,6 +278,24 @@ export default function InspectorReportDetailPage() {
           </CardHeader>
 
           <CardContent className="space-y-4">
+            {actionStatus === "confirmed" && (
+              <Alert className="border-success/40 bg-success/10">
+                <AlertDescription className="text-success">
+                  {language === "vi"
+                    ? "Đơn này đã được duyệt thành công."
+                    : "This report has been approved successfully."}
+                </AlertDescription>
+              </Alert>
+            )}
+            {actionStatus === "rejected" && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {language === "vi"
+                    ? "Đơn này đã bị từ chối."
+                    : "This report has been rejected."}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">

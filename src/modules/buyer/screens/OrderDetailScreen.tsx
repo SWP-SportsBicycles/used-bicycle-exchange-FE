@@ -3,17 +3,18 @@
 import { use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, User, Phone, MapPin, ExternalLink, ShieldAlert, CheckCircle2, Lock, Clock, XCircle } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, ShieldAlert, CheckCircle2, Lock, Clock, XCircle, Package, Star, ShieldCheck } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Footer } from '@/components/footer'
 import { useConfirmReceivedMutation, useOrderDetail } from '../hooks/useOrders'
-import { useShipmentTracking } from '../hooks/useDispute'
 import { OrderStatusStepper } from '../components/OrderStatusStepper'
-import { GhnTracker } from '../components/GhnTracker'
 import { CancelOrderDialog } from '../components/CancelOrderDialog'
 import { OrderDetailSkeleton } from '../components/skeletons/OrderDetailSkeleton'
+import { ReviewDialog } from '../components/ReviewDialog'
+import { ViewReviewDialog } from '../components/ViewReviewDialog'
+import { useMyReviewedOrders, useMyReviewsAsBuyer } from '../hooks/useReview'
 import { formatVND } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +25,8 @@ interface PageProps {
 export default function OrderDetailScreen({ params }: PageProps) {
   const { id } = use(params)
   const { data: order, isLoading: isOrderLoading } = useOrderDetail(id)
-  const { data: shipment, isLoading: isShipmentLoading } = useShipmentTracking(order?.waybillCode ? id : undefined)
+  const { data: reviewedOrders = [] } = useMyReviewedOrders()
+  const { data: myReviews = {} } = useMyReviewsAsBuyer()
   const confirmReceivedMutation = useConfirmReceivedMutation()
 
   if (isOrderLoading) {
@@ -47,8 +49,11 @@ export default function OrderDetailScreen({ params }: PageProps) {
     )
   }
 
-  const showCreateDisputeButton = ['delivered', 'completed'].includes(order.status)
-  const showViewDisputeButton = order.status === 'disputed'
+  const isReviewed = reviewedOrders.includes(order.id)
+  const isDisputed = order.status === 'disputed'
+  const showCreateDisputeButton = order.status === 'completed' && !isReviewed
+  const showReviewButton = order.status === 'completed' && !isDisputed
+  const showViewDisputeButton = order.status === 'disputed' || order.status === 'refunded'
   // Bug fix: cancel chỉ cho phép khi 'pending' — đơn đã paid không thể cancel từ FE
   const showCancelButton = order.status === 'pending'
   const isAwaitingPayment = order.status === 'pending'
@@ -112,17 +117,10 @@ export default function OrderDetailScreen({ params }: PageProps) {
 
         <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
           <div className="space-y-8 lg:col-span-8">
-            {order.waybillCode && <GhnTracker shipment={shipment} isLoading={isShipmentLoading} />}
 
             <div className="overflow-hidden rounded-3xl border border-border/40 bg-card shadow-sm">
-              <div className="flex items-center justify-between border-b border-border/40 bg-secondary/30 px-6 py-4">
+              <div className="flex items-center gap-3 border-b border-border/40 bg-secondary/30 px-6 py-4">
                 <h2 className="text-lg font-bold">Thông tin sản phẩm</h2>
-                <Link
-                  href={`/marketplace/${order.listingId}`}
-                  className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary hover:underline"
-                >
-                  Xem listing gốc <ExternalLink className="h-3 w-3" />
-                </Link>
               </div>
               <div className="p-6">
                 <div className="flex flex-col gap-6 sm:flex-row">
@@ -144,7 +142,7 @@ export default function OrderDetailScreen({ params }: PageProps) {
                       <div className="space-y-1">
                         <p className="text-muted-foreground">Giá trị xe</p>
                         <p className="text-lg font-bold text-foreground" style={{ fontFamily: 'var(--font-archivo)' }}>
-                          {formatVND(order.listing.price)}
+                          {formatVND(order.subTotal || order.listing.price)}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -156,8 +154,139 @@ export default function OrderDetailScreen({ params }: PageProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* ── Chi tiết xe ── */}
+                <div className="mt-6 border-t border-border/40 pt-5">
+                  <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Thông số kỹ thuật</h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+                    {order.listing.brand && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Thương hiệu</p>
+                        <p className="font-semibold">{order.listing.brand}</p>
+                      </div>
+                    )}
+                    {order.listing.category && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Loại xe</p>
+                        <p className="font-semibold capitalize">{order.listing.category}</p>
+                      </div>
+                    )}
+                    {order.listing.condition && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tình trạng</p>
+                        <p className="font-semibold">{{
+                          like_new: 'Như mới',
+                          excellent: 'Rất tốt',
+                          good: 'Tốt',
+                          fair: 'Trung bình',
+                        }[order.listing.condition] ?? order.listing.condition}</p>
+                      </div>
+                    )}
+                    {order.listing.frameSize && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Cỡ khung</p>
+                        <p className="font-semibold">{order.listing.frameSize}</p>
+                      </div>
+                    )}
+                    {order.listing.frameMaterial && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Chất liệu khung</p>
+                        <p className="font-semibold">{order.listing.frameMaterial}</p>
+                      </div>
+                    )}
+                    {order.listing.groupset && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Bộ groupset</p>
+                        <p className="font-semibold">{order.listing.groupset}</p>
+                      </div>
+                    )}
+                    {order.listing.wheelSize && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Cỡ lốp/vành</p>
+                        <p className="font-semibold">{order.listing.wheelSize}</p>
+                      </div>
+                    )}
+                    {order.listing.paint && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Màu sơn</p>
+                        <p className="font-semibold">{order.listing.paint}</p>
+                      </div>
+                    )}
+                    {order.listing.brakeType && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Loại phanh</p>
+                        <p className="font-semibold">{order.listing.brakeType}</p>
+                      </div>
+                    )}
+                    {order.listing.operating && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tình trạng vận hành</p>
+                        <p className="font-semibold">{order.listing.operating}</p>
+                      </div>
+                    )}
+                    {order.listing.city && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Thành phố</p>
+                        <p className="font-semibold">{order.listing.city}</p>
+                      </div>
+                    )}
+                    {order.listing.serial && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Số serial</p>
+                        <p className="font-mono font-semibold text-xs tracking-wide">{order.listing.serial}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VeloSafe badge */}
+                  {order.listing.isVeloSafeVerified && (
+                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5">
+                      <ShieldCheck className="h-4 w-4 text-success shrink-0" />
+                      <span className="text-sm font-semibold text-success">Đã kiểm định VeloSafe</span>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {order.listing.description && (
+                    <div className="mt-4 rounded-xl border border-border/40 bg-muted/20 p-4">
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Mô tả của người bán</p>
+                      <p className="text-sm leading-relaxed text-foreground">{order.listing.description}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Thông tin vận chuyển GHN */}
+            {order.waybillCode && (
+              <div className="overflow-hidden rounded-3xl border border-border/40 bg-card shadow-sm">
+                <div className="flex items-center gap-3 border-b border-border/40 bg-secondary/30 px-6 py-4">
+                  <Package className="h-5 w-5 text-indigo-500" />
+                  <h2 className="text-lg font-bold">Thông tin vận chuyển</h2>
+                </div>
+                <div className="p-6">
+                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-900/10">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Đơn vị vận chuyển:</span>
+                        <span className="text-sm font-bold text-foreground">Giao Hàng Nhanh (GHN)</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Mã vận đơn:</span>
+                        <span className="text-sm font-bold font-mono text-indigo-600 dark:text-indigo-400">{order.waybillCode}</span>
+                      </div>
+                      {order.trackingUrl && (
+                        <Button asChild variant="outline" className="w-full mt-2 bg-white dark:bg-background border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50">
+                          <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
+                            Theo dõi đơn hàng trên GHN
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {order.seller && (
               <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6 md:p-8">
@@ -228,14 +357,35 @@ export default function OrderDetailScreen({ params }: PageProps) {
               </div>
               <div
                 className={cn(
-                  "flex items-center justify-center gap-2 rounded-xl py-3 font-bold border",
+                  "flex items-center justify-center gap-2 rounded-xl py-3 font-bold border mb-4",
                   paymentStatusColor
                 )}
               >
                 <PaymentIcon className="h-5 w-5" />
                 {paymentStatusLabel}
               </div>
+
+              {/* Chi tiết thanh toán */}
+              {(order.transactionId || order.paidAt) && (
+                <div className="rounded-xl bg-muted/20 p-4 border border-border/30 space-y-3 mt-4">
+                  <h4 className="text-sm font-bold text-foreground border-b border-border/40 pb-2">Chi tiết giao dịch</h4>
+                  {order.transactionId && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Mã giao dịch (PayOS):</span>
+                      <span className="font-mono font-medium">{order.transactionId.substring(0, 12)}...</span>
+                    </div>
+                  )}
+                  {order.paidAt && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Thời gian:</span>
+                      <span className="font-medium">{new Date(order.paidAt).toLocaleString('vi-VN')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+
+
 
             <div className="mt-8 flex flex-col gap-3">
               {isAwaitingPayment && (
@@ -244,6 +394,37 @@ export default function OrderDetailScreen({ params }: PageProps) {
                     Thanh toán ngay
                   </Link>
                 </Button>
+              )}
+
+              {showReviewButton && (
+                isReviewed ? (
+                  // "Đã đánh giá" → click để xem lại review
+                  (() => {
+                    const myReview = myReviews[order.id]
+                    return myReview ? (
+                      <ViewReviewDialog
+                        rating={myReview.rating}
+                        comment={myReview.comment}
+                        reviewedAt={myReview.reviewedAt}
+                        listingTitle={order.listing.title}
+                      >
+                        <Button variant="outline" className="h-12 w-full rounded-xl text-base font-bold border-amber-400/50 text-amber-600 hover:bg-amber-50 hover:border-amber-500">
+                          <Star className="mr-2 h-5 w-5 fill-amber-400" /> Đã đánh giá ✓ (Xem lại)
+                        </Button>
+                      </ViewReviewDialog>
+                    ) : (
+                      <Button disabled variant="outline" className="h-12 w-full rounded-xl text-base font-bold border-amber-400/50 text-amber-600">
+                        <Star className="mr-2 h-5 w-5 fill-amber-400" /> Đã đánh giá ✓
+                      </Button>
+                    )
+                  })()
+                ) : (
+                  <ReviewDialog orderId={order.id} listingTitle={order.listing.title}>
+                    <Button className="h-12 w-full rounded-xl text-base font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20">
+                      <Star className="mr-2 h-5 w-5" /> Gửi đánh giá
+                    </Button>
+                  </ReviewDialog>
+                )
               )}
 
               {showCreateDisputeButton && (

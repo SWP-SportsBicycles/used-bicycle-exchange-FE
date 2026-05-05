@@ -1,6 +1,6 @@
-# VeloTrust Marketplace FE (Used Bicycle Exchange)
+# SBE Marketplace FE (Used Bicycle Exchange)
 
-Frontend MVP for **VeloTrust - Hệ thống mua bán xe đạp thể thao** using a trust-first escrow model.
+Frontend MVP for **SBE - Hệ thống mua bán xe đạp thể thao** using a trust-first escrow model.
 
 ## Tech Stack
 

@@ -42,11 +42,11 @@ export function useWishlistToggle() {
     },
   });
 
-  const toggle = (bikeId: string, currentlyInWishlist: boolean) => {
+  const toggle = async (bikeId: string, currentlyInWishlist: boolean) => {
     if (currentlyInWishlist) {
-      remove.mutate(bikeId);
+      return remove.mutateAsync(bikeId);
     } else {
-      add.mutate(bikeId);
+      return add.mutateAsync(bikeId);
     }
   };
 

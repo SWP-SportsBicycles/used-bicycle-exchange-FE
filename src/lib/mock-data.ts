@@ -95,9 +95,9 @@ export const CONDITIONS = [
 ]
 
 export const CITIES = [
-  { value: 'Hà Nội', label: 'Hà Nội' },
-  { value: 'TP.HCM', label: 'TP. Hồ Chí Minh' },
-  { value: 'Đà Nẵng', label: 'Đà Nẵng' },
+  { value: 'hanoi', label: 'Hà Nội' },
+  { value: 'hcm', label: 'TP. Hồ Chí Minh' },
+  { value: 'danang', label: 'Đà Nẵng' },
 ]
 
 export const CATEGORIES = [

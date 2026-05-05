@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowUpRight, CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
@@ -65,11 +65,10 @@ export default function SellerListingsPage() {
 
   const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
 
-  useEffect(() => {
-    if (!confirmState) {
-      setTermsAccepted(false)
-    }
-  }, [confirmState])
+  const openConfirmState = (action: ConfirmAction, listing: SellerListingItem) => {
+    setTermsAccepted(false)
+    setConfirmState({ action, listing })
+  }
 
   const myListings = useMemo(() => {
     if (isError) {
@@ -111,6 +110,7 @@ export default function SellerListingsPage() {
         await deleteMutation.mutateAsync(confirmState.listing.id)
       }
       setConfirmState(null)
+      setTermsAccepted(false)
     } catch (mutationError) {
       setActionError(
         mutationError instanceof Error
@@ -231,7 +231,7 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'withdraw', listing}); 
+                        openConfirmState('withdraw', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -246,7 +246,7 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'resubmit', listing}); 
+                        openConfirmState('resubmit', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -261,7 +261,7 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        setConfirmState({ action: 'delete', listing}); 
+                        openConfirmState('delete', listing)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
@@ -276,7 +276,15 @@ export default function SellerListingsPage() {
         </div>
         )}
 
-        <AlertDialog open={Boolean(confirmState)} onOpenChange={(open) => !open && setConfirmState(null)}>
+        <AlertDialog
+          open={Boolean(confirmState)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfirmState(null)
+              setTermsAccepted(false)
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>

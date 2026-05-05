@@ -1,165 +1,222 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-'use client'
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Image from 'next/image'
-import { useForm, FormProvider } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import { ArrowLeft, ShieldCheck, MapPin, Truck, CheckCircle2, AlertTriangle, X, Lock } from 'lucide-react'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { toast } from 'sonner'
-import { Header } from '@/components/header'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { Footer } from '@/components/footer'
-import { AddressForm } from '../components/AddressForm'
-import { PayosQrDisplay } from '../components/PayosQrDisplay'
-import { CheckoutSkeleton } from '../components/skeletons/CheckoutSkeleton'
-import { useCheckoutMutation, useOrderStatusPolling, usePaymentLinkMutation, useCreateOrderDirectMutation } from '../hooks/useCheckout'
-import { useCart } from '../hooks/useCart'
-import { useCancelOrder } from '../hooks/useCancelOrder'
-import { useListingDetail } from '../hooks/useListingDetail'
-import { useOrderDetail } from '../hooks/useOrders'
-import { useQueryClient } from '@tanstack/react-query'
-import { formatVND } from '@/lib/mock-data'
-import { type BuyerListing, type CheckoutResponse } from '@/lib/api/buyer-api'
-import { cn } from '@/lib/utils'
+import { useEffect, useRef, useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
+import { useForm, FormProvider } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  ArrowLeft,
+  ShieldCheck,
+  MapPin,
+  Truck,
+  CheckCircle2,
+  AlertTriangle,
+  X,
+  Lock,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Footer } from "@/components/footer";
+import { AddressForm } from "../components/AddressForm";
+import { CheckoutTimer } from "../components/CheckoutTimer";
+import { PayosQrDisplay } from "../components/PayosQrDisplay";
+import { CheckoutSkeleton } from "../components/skeletons/CheckoutSkeleton";
+import {
+  useCheckoutMutation,
+  useOrderStatusPolling,
+  usePaymentLinkMutation,
+  useCreateOrderDirectMutation,
+} from "../hooks/useCheckout";
+import { useCart } from "../hooks/useCart";
+import { useCancelOrder } from "../hooks/useCancelOrder";
+import { useListingDetail } from "../hooks/useListingDetail";
+import { useOrderDetail } from "../hooks/useOrders";
+import { useQueryClient } from "@tanstack/react-query";
+import { formatVND } from "@/lib/mock-data";
+import { type BuyerListing, type CheckoutResponse } from "@/lib/api/buyer-api";
+import { cn } from "@/lib/utils";
 
 const checkoutSchema = z.object({
-  receiverName: z.string().min(2, 'Vui lòng nhập họ tên hợp lệ'),
-  receiverPhone: z.string().regex(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, 'Số điện thoại không hợp lệ'),
-  provinceId: z.number({ required_error: 'Vui lòng chọn Tỉnh/Thành phố' }).optional(),
+  receiverName: z.string().min(2, "Vui lòng nhập họ tên hợp lệ"),
+  receiverPhone: z
+    .string()
+    .regex(/^(84[0-9]{9}|0[35789][0-9]{8})$/, "Số điện thoại không hợp lệ"),
+  provinceId: z
+    .number({ required_error: "Vui lòng chọn Tỉnh/Thành phố" })
+    .optional(),
   toProvinceName: z.string().optional(),
-  toDistrictId: z.number({ required_error: 'Vui lòng chọn Quận/Huyện' }),
+  toDistrictId: z.number({ required_error: "Vui lòng chọn Quận/Huyện" }),
   toDistrictName: z.string().optional(),
-  toWardCode: z.string({ required_error: 'Vui lòng chọn Phường/Xã' }).min(1, 'Vui lòng chọn Phường/Xã'),
+  toWardCode: z
+    .string({ required_error: "Vui lòng chọn Phường/Xã" })
+    .min(1, "Vui lòng chọn Phường/Xã"),
   toWardName: z.string().optional(),
-  receiverAddress: z.string().min(5, 'Vui lòng nhập chi tiết số nhà, tên đường'),
-})
+  receiverAddress: z
+    .string()
+    .min(5, "Vui lòng nhập chi tiết số nhà, tên đường"),
+});
 
-type CheckoutFormValues = z.infer<typeof checkoutSchema>
+type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 export default function CheckoutScreen() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const queryClient = useQueryClient()
-  const listingId = searchParams.get('listingId')
-  const bikeId = searchParams.get('bikeId')          // Direct buy-now flow
-  const orderId = searchParams.get('orderId')
-  const isOrderPaymentMode = Boolean(orderId)
-  const isDirectMode = Boolean(bikeId) && !orderId   // Mua Ngay → /api/buyer-order
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const listingId = searchParams.get("listingId");
+  const bikeId = searchParams.get("bikeId"); // Direct buy-now flow
+  const orderId = searchParams.get("orderId");
+  const isOrderPaymentMode = Boolean(orderId);
+  const isDirectMode = Boolean(bikeId) && !orderId; // Mua Ngay → /api/buyer-order
 
   // Direct mode: dùng listingId để fetch thông tin hiển thị (listingId ưu tiên hơn bikeId)
-  const { data: listing, isLoading: isLoadingListing } = useListingDetail(listingId ?? bikeId)
-  const { data: cart, isLoading: isLoadingCart } = useCart()
-  const { data: existingOrder, isLoading: isLoadingOrder } = useOrderDetail(orderId)
-  const checkoutMutation = useCheckoutMutation()
-  const createOrderDirectMutation = useCreateOrderDirectMutation()
-  const paymentLinkMutation = usePaymentLinkMutation()
-  const cancelOrderMutation = useCancelOrder()
+  const { data: listing, isLoading: isLoadingListing } = useListingDetail(
+    listingId ?? bikeId,
+  );
+  const { data: cart, isLoading: isLoadingCart } = useCart();
+  const { data: existingOrder, isLoading: isLoadingOrder } =
+    useOrderDetail(orderId);
+  const checkoutMutation = useCheckoutMutation();
+  const createOrderDirectMutation = useCreateOrderDirectMutation();
+  const paymentLinkMutation = usePaymentLinkMutation();
+  const cancelOrderMutation = useCancelOrder();
 
-  const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(null)
-  const [showQrModal, setShowQrModal] = useState(false)
+  const [checkoutData, setCheckoutData] = useState<CheckoutResponse | null>(
+    null,
+  );
+  const [showQrModal, setShowQrModal] = useState(false);
 
-  const selectedCartItems = cart?.items.filter((item) => item.isSelected) ?? []
-  const primaryCartItem = selectedCartItems[0] ?? cart?.items[0]
-  const summaryListing: Pick<BuyerListing, 'title' | 'images' | 'price'> | undefined =
-    existingOrder?.listing ?? listing ?? primaryCartItem?.listing
-  const summaryPrice = existingOrder?.totalPrice ?? (isDirectMode ? listing?.price : cart?.subtotal) ?? summaryListing?.price ?? 0
+  const selectedCartItems = cart?.items.filter((item) => item.isSelected) ?? [];
+  const primaryCartItem = selectedCartItems[0] ?? cart?.items[0];
+  const summaryListing:
+    | Pick<BuyerListing, "title" | "images" | "price">
+    | undefined = existingOrder?.listing ?? listing ?? primaryCartItem?.listing;
+  const summaryPrice =
+    existingOrder?.totalPrice ??
+    (isDirectMode ? listing?.price : cart?.subtotal) ??
+    summaryListing?.price ??
+    0;
   // Direct mode: always allow submit (no cart selection needed)
   const canSubmitCheckout = isOrderPaymentMode
-    ? existingOrder?.status === 'pending'
+    ? existingOrder?.status === "pending"
     : isDirectMode
       ? Boolean(listing)
-      : selectedCartItems.length > 0
+      : selectedCartItems.length > 0;
   const isLoadingScreen = isOrderPaymentMode
     ? isLoadingOrder
-    : Boolean(listingId ?? bikeId) && isLoadingListing || (!isDirectMode && isLoadingCart)
-  const isExistingOrderLocked = Boolean(existingOrder && existingOrder.status !== 'pending')
+    : (Boolean(listingId ?? bikeId) && isLoadingListing) ||
+      (!isDirectMode && isLoadingCart);
+  const isExistingOrderLocked = Boolean(
+    existingOrder && existingOrder.status !== "pending",
+  );
   // Chỉ hiện timer khi: có expiresAt VÀ đơn còn pending (không hết hạn redirect ngay)
-  const timerExpiresAt = checkoutData?.expiresAt ?? (
-    existingOrder?.status === 'pending' ? existingOrder?.expiresAt : undefined
-  )
-  const showInspectionFeeFree = true // All listings on SBE platform are certified by default
+  const timerExpiresAt =
+    checkoutData?.expiresAt ??
+    (existingOrder?.status === "pending"
+      ? existingOrder?.expiresAt
+      : undefined);
+  const showInspectionFeeFree = true; // All listings on SBE platform are certified by default
   // Task 2.3: nút hủy hiện ngay cả khi chưa bấm "Tiếp tục thanh toán" (chưa có checkoutData)
   const canCancelActivePayment = Boolean(
     checkoutData?.orderId ||
-    (isOrderPaymentMode && existingOrder?.status === 'pending')
-  )
+    (isOrderPaymentMode && existingOrder?.status === "pending"),
+  );
 
-  const { data: orderStatusData } = useOrderStatusPolling(checkoutData?.orderId)
+  const { data: orderStatusData } = useOrderStatusPolling(
+    checkoutData?.orderId,
+  );
 
   // ── QR Modal helpers ───────────────────────────────────────────────────────
   const openQrModal = useCallback((data: CheckoutResponse) => {
-    setCheckoutData(data)
-    setShowQrModal(true)
-  }, [])
+    setCheckoutData(data);
+    setShowQrModal(true);
+  }, []);
 
   /** Redirect đúng mode khi đóng QR modal hoặc quay lại */
-  const modalCloseRedirect =
-    isDirectMode
-      ? '/marketplace'
-      : isOrderPaymentMode && orderId
-        ? `/buyer/orders/${orderId}`
-        : '/buyer/cart'
+  const modalCloseRedirect = isDirectMode
+    ? "/marketplace"
+    : isOrderPaymentMode && orderId
+      ? `/buyer/orders/${orderId}`
+      : "/buyer/cart";
 
   /** Redirect nút "Quay lại" (trước khi checkout) */
-  const backRedirect =
-    isDirectMode
-      ? (listingId ? `/marketplace/${listingId}` : '/marketplace')
-      : isOrderPaymentMode && orderId
-        ? `/buyer/orders/${orderId}`
-        : '/buyer/cart'
-
+  const backRedirect = isDirectMode
+    ? listingId
+      ? `/marketplace/${listingId}`
+      : "/marketplace"
+    : isOrderPaymentMode && orderId
+      ? `/buyer/orders/${orderId}`
+      : "/buyer/cart";
 
   const methods = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      receiverName: '',
-      receiverPhone: '',
-      receiverAddress: '',
-      toWardCode: '',
-      toWardName: '',
+      receiverName: "",
+      receiverPhone: "",
+      receiverAddress: "",
+      toWardCode: "",
+      toWardName: "",
       toDistrictId: undefined as unknown as number,
-      toDistrictName: '',
+      toDistrictName: "",
       provinceId: undefined,
-      toProvinceName: '',
+      toProvinceName: "",
     },
-  })
+  });
 
   useEffect(() => {
-    if (orderStatusData?.status === 'paid') {
-      toast.success('Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.')
-      queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
-      router.push(`/buyer/orders?status=paid`)
-    } else if (orderStatusData?.status === 'cancelled') {
-      toast.error('Đơn hàng đã bị hủy.')
-      queryClient.invalidateQueries({ queryKey: ['buyer-orders'] })
-      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
+    if (orderStatusData?.status === "paid") {
+      toast.success(
+        "Thanh toán thành công! Đơn hàng của bạn đã được ghi nhận.",
+      );
+      queryClient.invalidateQueries({ queryKey: ["buyer-orders"] });
+      router.push(`/buyer/orders?status=paid`);
+    } else if (orderStatusData?.status === "cancelled") {
+      toast.error("Đơn hàng đã bị hủy.");
+      queryClient.invalidateQueries({ queryKey: ["buyer-orders"] });
+      router.push(
+        isOrderPaymentMode && orderId
+          ? `/buyer/orders/${orderId}`
+          : isDirectMode
+            ? "/marketplace"
+            : "/buyer/cart",
+      );
     }
-  }, [isDirectMode, isOrderPaymentMode, orderId, orderStatusData?.orderId, orderStatusData?.status, router, queryClient])
+  }, [
+    isDirectMode,
+    isOrderPaymentMode,
+    orderId,
+    orderStatusData?.orderId,
+    orderStatusData?.status,
+    router,
+    queryClient,
+  ]);
 
   const onSubmit = (data: CheckoutFormValues) => {
     if (isOrderPaymentMode) {
-      return
+      return;
     }
 
     if (!canSubmitCheckout) {
-      toast.error(isDirectMode
-        ? 'Không tìm thấy thông tin sản phẩm. Vui lòng quay lại.'
-        : 'Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng.')
-      return
+      toast.error(
+        isDirectMode
+          ? "Không tìm thấy thông tin sản phẩm. Vui lòng quay lại."
+          : "Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng.",
+      );
+      return;
     }
 
     // ── Direct buy-now: gọi /api/buyer-order ──────────────────────────────
     if (isDirectMode) {
       if (!bikeId) {
-        toast.error('Thông tin sản phẩm không hợp lệ.')
-        return
+        toast.error("Thông tin sản phẩm không hợp lệ.");
+        return;
       }
       createOrderDirectMutation.mutate(
         {
@@ -168,23 +225,23 @@ export default function CheckoutScreen() {
           receiverPhone: data.receiverPhone,
           receiverAddress: data.receiverAddress,
           toProvinceId: data.provinceId || 0,
-          toProvinceName: data.toProvinceName || '',
+          toProvinceName: data.toProvinceName || "",
           toDistrictId: data.toDistrictId,
-          toDistrictName: data.toDistrictName || '',
+          toDistrictName: data.toDistrictName || "",
           toWardCode: data.toWardCode,
-          toWardName: data.toWardName || '',
+          toWardName: data.toWardName || "",
         },
         {
           onSuccess: (res) => {
-            router.push(`/buyer/checkout?orderId=${res.orderId}`)
+            router.push(`/buyer/checkout?orderId=${res.orderId}`);
           },
           onError: (err) => {
-            const msg = err instanceof Error ? err.message : ''
-            toast.error(msg || 'Có lỗi khi tạo đơn hàng trực tiếp.')
+            const msg = err instanceof Error ? err.message : "";
+            toast.error(msg || "Có lỗi khi tạo đơn hàng trực tiếp.");
           },
-        }
-      )
-      return
+        },
+      );
+      return;
     }
 
     // ── Cart-based checkout (existing) ────────────────────────────────
@@ -194,69 +251,118 @@ export default function CheckoutScreen() {
         receiverPhone: data.receiverPhone,
         receiverAddress: data.receiverAddress,
         toProvinceId: data.provinceId || 0,
-        toProvinceName: data.toProvinceName || '',
+        toProvinceName: data.toProvinceName || "",
         toDistrictId: data.toDistrictId,
-        toDistrictName: data.toDistrictName || '',
+        toDistrictName: data.toDistrictName || "",
         toWardCode: data.toWardCode,
-        toWardName: data.toWardName || '',
+        toWardName: data.toWardName || "",
       },
       {
         onSuccess: (res) => {
-          router.push(`/buyer/checkout?orderId=${res.orderId}`)
+          router.push(`/buyer/checkout?orderId=${res.orderId}`);
         },
-        onError: () => toast.error('Có lỗi khi tạo đơn hàng từ giỏ hàng.'),
+        onError: () => toast.error("Có lỗi khi tạo đơn hàng từ giỏ hàng."),
       },
-    )
-  }
+    );
+  };
 
   const handleOpenPendingOrderPayment = () => {
-    if (!existingOrder || existingOrder.status !== 'pending') {
-      toast.error('Đơn hàng này không còn ở trạng thái chờ thanh toán.')
-      return
+    if (!existingOrder || existingOrder.status !== "pending") {
+      toast.error("Đơn hàng này không còn ở trạng thái chờ thanh toán.");
+      return;
     }
-    if (existingOrder.payosQrUrl?.startsWith('http')) {
-      const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt: existingOrder.expiresAt ?? '', payosQrUrl: existingOrder.payosQrUrl }
-      openQrModal(data)
-      return
+    if (existingOrder.payosQrUrl?.startsWith("http")) {
+      const data = {
+        orderId: existingOrder.id,
+        shippingFee: existingOrder.shippingFee,
+        totalPrice: existingOrder.totalPrice,
+        expiresAt: existingOrder.expiresAt ?? "",
+        payosQrUrl: existingOrder.payosQrUrl,
+      };
+      openQrModal(data);
+      return;
     }
     paymentLinkMutation.mutate(existingOrder.id, {
       onSuccess: (payRes) => {
-        const data = { orderId: existingOrder.id, shippingFee: existingOrder.shippingFee, totalPrice: existingOrder.totalPrice, expiresAt: existingOrder.expiresAt ?? '', payosQrUrl: payRes.checkoutUrl || payRes.qrCode || existingOrder.payosQrUrl || '' }
-        openQrModal(data)
+        const data = {
+          orderId: existingOrder.id,
+          shippingFee: existingOrder.shippingFee,
+          totalPrice: existingOrder.totalPrice,
+          expiresAt: existingOrder.expiresAt ?? "",
+          payosQrUrl:
+            payRes.checkoutUrl ||
+            payRes.qrCode ||
+            existingOrder.payosQrUrl ||
+            "",
+        };
+        openQrModal(data);
       },
-      onError: () => toast.error('Không thể tạo lại mã thanh toán cho đơn hàng này.'),
-    })
-  }
+      onError: () =>
+        toast.error("Không thể tạo lại mã thanh toán cho đơn hàng này."),
+    });
+  };
 
   const handleTimerExpire = () => {
-    const activeOrderId = checkoutData?.orderId ?? existingOrder?.id
+    // Bảo vệ: Nếu đã thanh toán thành công thì không chạy logic hủy
+    if (
+      orderStatusData?.status === "paid" ||
+      existingOrder?.status === "paid"
+    ) {
+      return;
+    }
+
+    const activeOrderId = checkoutData?.orderId ?? existingOrder?.id;
     if (activeOrderId) {
-      toast.info('Hết thời gian thanh toán. Đang hủy đơn...')
+      toast.info("Hết thời gian thanh toán. Đang hủy đơn...");
       cancelOrderMutation.mutate(activeOrderId, {
         onSuccess: () => {
-          toast.error('Hết thời gian thanh toán. Đơn hàng đã bị hủy.')
-          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
+          toast.error("Hết thời gian thanh toán. Đơn hàng đã bị hủy.");
+          router.push(
+            isOrderPaymentMode && orderId
+              ? `/buyer/orders/${orderId}`
+              : isDirectMode
+                ? "/marketplace"
+                : "/buyer/cart",
+          );
         },
         onError: () => {
-          toast.error('Hết thời gian thanh toán.')
-          router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
+          toast.error("Hết thời gian thanh toán.");
+          router.push(
+            isOrderPaymentMode && orderId
+              ? `/buyer/orders/${orderId}`
+              : isDirectMode
+                ? "/marketplace"
+                : "/buyer/cart",
+          );
         },
-      })
+      });
     } else {
-      toast.error('Hết thời gian thanh toán. Đơn hàng đã bị hủy.')
-      router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
+      toast.error("Hết thời gian thanh toán. Đơn hàng đã bị hủy.");
+      router.push(
+        isOrderPaymentMode && orderId
+          ? `/buyer/orders/${orderId}`
+          : isDirectMode
+            ? "/marketplace"
+            : "/buyer/cart",
+      );
     }
-  }
+  };
 
   const handleCancelOrder = () => {
-    const activeOrderId = checkoutData?.orderId ?? existingOrder?.id
-    if (!activeOrderId) return
+    const activeOrderId = checkoutData?.orderId ?? existingOrder?.id;
+    if (!activeOrderId) return;
     cancelOrderMutation.mutate(activeOrderId, {
       onSuccess: () => {
-        router.push(isOrderPaymentMode && orderId ? `/buyer/orders/${orderId}` : isDirectMode ? '/marketplace' : '/buyer/cart')
+        router.push(
+          isOrderPaymentMode && orderId
+            ? `/buyer/orders/${orderId}`
+            : isDirectMode
+              ? "/marketplace"
+              : "/buyer/cart",
+        );
       },
-    })
-  }
+    });
+  };
 
   if (isLoadingScreen) {
     return (
@@ -265,7 +371,7 @@ export default function CheckoutScreen() {
         <CheckoutSkeleton />
         <Footer />
       </div>
-    )
+    );
   }
 
   if (!summaryListing) {
@@ -273,36 +379,53 @@ export default function CheckoutScreen() {
       <div className="bg-page flex min-h-screen flex-col">
         <Header />
         <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-4 py-20 text-center">
-          <h2 className="text-2xl font-bold">Không có sản phẩm nào sẵn sàng checkout</h2>
+          <h2 className="text-2xl font-bold">
+            Không có sản phẩm nào sẵn sàng checkout
+          </h2>
           <p className="mt-3 max-w-md text-muted-foreground">
             {isOrderPaymentMode
-              ? 'Đơn hàng này không tồn tại hoặc không thuộc tài khoản của bạn.'
+              ? "Đơn hàng này không tồn tại hoặc không thuộc tài khoản của bạn."
               : cart?.items.length
-              ? 'Vui lòng quay lại giỏ hàng để kiểm tra item đã chọn.'
-              : 'Hãy thêm xe vào giỏ hàng trước khi checkout.'}
+                ? "Vui lòng quay lại giỏ hàng để kiểm tra item đã chọn."
+                : "Hãy thêm xe vào giỏ hàng trước khi checkout."}
           </p>
           <Button asChild className="mt-6">
-            <Link href={isOrderPaymentMode ? '/buyer/orders' : cart?.items.length ? '/buyer/cart' : '/marketplace'}>
-              {isOrderPaymentMode ? 'Quay lại đơn hàng' : cart?.items.length ? 'Quay lại giỏ hàng' : 'Khám phá Marketplace'}
+            <Link
+              href={
+                isOrderPaymentMode
+                  ? "/buyer/orders"
+                  : cart?.items.length
+                    ? "/buyer/cart"
+                    : "/marketplace"
+              }
+            >
+              {isOrderPaymentMode
+                ? "Quay lại đơn hàng"
+                : cart?.items.length
+                  ? "Quay lại giỏ hàng"
+                  : "Khám phá Marketplace"}
             </Link>
           </Button>
         </main>
         <Footer />
       </div>
-    )
+    );
   }
 
   // ── Đơn hàng không còn ở trạng thái có thể thanh toán ────────────────────
   if (isOrderPaymentMode && isExistingOrderLocked && !checkoutData) {
     const statusLabelMap: Record<string, string> = {
-      paid: 'Đã thanh toán',
-      shipping: 'Đang vận chuyển',
-      delivered: 'Đã giao hàng',
-      completed: 'Hoàn tất',
-      cancelled: 'Đã hủy',
-      disputed: 'Đang khiếu nại',
-    }
-    const currentLabel = statusLabelMap[existingOrder?.status ?? ''] ?? existingOrder?.status ?? 'Không xác định'
+      paid: "Đã thanh toán",
+      shipping: "Đang vận chuyển",
+      delivered: "Đã giao hàng",
+      completed: "Hoàn tất",
+      cancelled: "Đã hủy",
+      disputed: "Đang khiếu nại",
+    };
+    const currentLabel =
+      statusLabelMap[existingOrder?.status ?? ""] ??
+      existingOrder?.status ??
+      "Không xác định";
 
     return (
       <div className="bg-page flex min-h-screen flex-col">
@@ -311,294 +434,377 @@ export default function CheckoutScreen() {
           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
             <CheckCircle2 className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h2 className="text-2xl font-bold text-foreground">Đơn hàng không cần thanh toán</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            Đơn hàng không cần thanh toán
+          </h2>
           <p className="mt-3 max-w-sm text-muted-foreground">
-            Đơn hàng #{existingOrder?.id?.split('-')[0]?.toUpperCase()} đang ở trạng thái{' '}
-            <strong className="text-foreground">{currentLabel}</strong> — không thể thanh toán lại.
+            Đơn hàng #{existingOrder?.id?.split("-")[0]?.toUpperCase()} đang ở
+            trạng thái{" "}
+            <strong className="text-foreground">{currentLabel}</strong> — không
+            thể thanh toán lại.
           </p>
           <div className="mt-6 flex gap-3">
-            <Button asChild variant="outline" className="rounded-xl font-semibold">
+            <Button
+              asChild
+              variant="outline"
+              className="rounded-xl font-semibold"
+            >
               <Link href="/buyer/orders">Danh sách đơn hàng</Link>
             </Button>
             {existingOrder?.id && (
               <Button asChild className="rounded-xl font-bold shadow-athletic">
-                <Link href={`/buyer/orders/${existingOrder.id}`}>Xem chi tiết đơn</Link>
+                <Link href={`/buyer/orders/${existingOrder.id}`}>
+                  Xem chi tiết đơn
+                </Link>
               </Button>
             )}
           </div>
         </main>
         <Footer />
       </div>
-    )
+    );
   }
 
   return (
     <>
       <div className="bg-page flex min-h-screen flex-col">
-      <Header />
+        <Header />
 
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 lg:px-6">
-        <div className="mb-8">
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                className="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground shrink-0"
-                onClick={() => router.push(backRedirect)}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Quay lại
-              </Button>
-              <h1 className="text-2xl font-extrabold lg:text-3xl" style={{ fontFamily: 'var(--font-archivo)' }}>
-                {checkoutData ? 'Thanh toán an toàn' : isOrderPaymentMode ? 'Tiếp tục thanh toán' : 'Xác nhận đơn hàng'}
-              </h1>
-            </div>
-            
-            {isOrderPaymentMode && existingOrder && (
-              <div className="flex items-center gap-3 self-start sm:self-auto ml-18 sm:ml-0">
-                <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Mã đơn hàng</span>
-                  <span className="text-sm font-bold text-foreground">#{existingOrder.id.split('-')[0]}</span>
+        <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 lg:px-6">
+          <div className="mb-8">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  className="gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground shrink-0"
+                  onClick={() => router.push(backRedirect)}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Quay lại
+                </Button>
+                <h1
+                  className="text-2xl font-extrabold lg:text-3xl"
+                  style={{ fontFamily: "var(--font-archivo)" }}
+                >
+                  {checkoutData
+                    ? "Thanh toán an toàn"
+                    : isOrderPaymentMode
+                      ? "Tiếp tục thanh toán"
+                      : "Xác nhận đơn hàng"}
+                </h1>
+              </div>
+
+              {isOrderPaymentMode && existingOrder && (
+                <div className="flex items-center gap-3 self-start sm:self-auto ml-18 sm:ml-0">
+                  <div className="hidden sm:flex flex-col items-end">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Mã đơn hàng
+                    </span>
+                    <span className="text-sm font-bold text-foreground">
+                      #{existingOrder.id.split("-")[0]}
+                    </span>
+                  </div>
+                  <div className="px-3 py-1 rounded-full text-xs font-bold border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                    {existingOrder.statusLabel || "Chờ thanh toán"}
+                  </div>
                 </div>
-                <div className="px-3 py-1 rounded-full text-xs font-bold border bg-amber-500/10 text-amber-600 border-amber-500/20">
-                  {existingOrder.statusLabel || 'Chờ thanh toán'}
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
+            <div className="lg:col-span-7 space-y-8">
+              <div className="rounded-3xl border border-border/40 bg-card p-6 shadow-sm md:p-8">
+                <div className="mb-6 flex items-center gap-3 border-b border-border/40 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-xl font-bold">Địa chỉ nhận hàng</h2>
+                </div>
+
+                {!checkoutData && !isOrderPaymentMode ? (
+                  <FormProvider {...methods}>
+                    <form
+                      id="checkout-form"
+                      onSubmit={methods.handleSubmit(onSubmit)}
+                      className="space-y-4"
+                    >
+                      <AddressForm />
+                    </form>
+                  </FormProvider>
+                ) : (
+                  <div className="rounded-2xl border border-border/40 bg-muted/20 overflow-hidden">
+                    {/* Name + Phone row */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/30">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                          <span className="text-sm font-bold text-primary">
+                            {(
+                              existingOrder?.receiverName ||
+                              methods.getValues("receiverName")
+                            )
+                              .substring(0, 1)
+                              .toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="font-bold text-foreground">
+                          {existingOrder?.receiverName ||
+                            methods.getValues("receiverName") ||
+                            "—"}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-primary tabular-nums">
+                        {existingOrder?.receiverPhone ||
+                          methods.getValues("receiverPhone") ||
+                          "—"}
+                      </p>
+                    </div>
+                    {/* Address row */}
+                    <div className="flex items-start gap-3 px-5 py-4">
+                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="text-sm text-foreground leading-relaxed">
+                        {existingOrder?.receiverAddress ||
+                          methods.getValues("receiverAddress") ||
+                          "Chưa có địa chỉ"}
+                      </p>
+                    </div>
+                    {/* Locked note */}
+                    <div className="flex items-center gap-2 border-t border-border/30 bg-muted/30 px-5 py-2.5">
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <p className="text-xs text-muted-foreground">
+                        {isOrderPaymentMode
+                          ? "Địa chỉ đã cố định — chỉ có thể tiếp tục thanh toán"
+                          : "Địa chỉ không thể thay đổi sau khi xác nhận"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 space-y-6">
+              <div className="sticky top-24 rounded-3xl border border-border/50 bg-card p-6 shadow-sm">
+                {timerExpiresAt && (
+                  <div className="mb-5">
+                    <CheckoutTimer
+                      expiresAt={timerExpiresAt}
+                      onExpire={handleTimerExpire}
+                    />
+                  </div>
+                )}
+                <h2 className="text-base font-bold mb-5">Tổng quan đơn hàng</h2>
+
+                {/* Product summary */}
+                <div className="flex gap-4 mb-5">
+                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border/50 bg-secondary">
+                    <Image
+                      src={summaryListing.images[0] || "/placeholder.png"}
+                      alt={summaryListing.title}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const t = e.target as HTMLImageElement;
+                        t.src =
+                          "https://placehold.co/200x200/1a1a1a/aee86c?text=SBE";
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-col justify-between min-w-0">
+                    <p className="line-clamp-2 text-sm font-semibold leading-snug">
+                      {summaryListing.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#aee86c]/20 border border-[#aee86c]/40 px-2 py-0.5 text-[10px] font-semibold text-[#2a4a10] dark:text-[#aee86c]">
+                        <ShieldCheck className="h-3 w-3" />
+                        SBESafe
+                      </span>
+                    </div>
+                    <p className="text-sm font-bold text-primary">
+                      {formatVND(summaryListing.price)}
+                    </p>
+                    {selectedCartItems.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        +{selectedCartItems.length - 1} sản phẩm khác
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="my-4 border-t border-border/40" />
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tạm tính</span>
+                    <span className="font-medium">
+                      {formatVND(summaryPrice)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Truck className="h-3.5 w-3.5" /> Phí vận chuyển (GHN)
+                    </span>
+                    <span className="font-medium">
+                      {checkoutData
+                        ? formatVND(checkoutData.shippingFee)
+                        : existingOrder
+                          ? formatVND(existingOrder.shippingFee)
+                          : "Tính ở bước sau"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="my-4 border-t border-border/40" />
+
+                <div className="mb-5 flex items-end justify-between">
+                  <span className="font-bold text-foreground">
+                    Tổng thanh toán
+                  </span>
+                  <span
+                    className="text-2xl font-extrabold text-primary"
+                    style={{ fontFamily: "var(--font-archivo)" }}
+                  >
+                    {checkoutData
+                      ? formatVND(checkoutData.totalPrice)
+                      : formatVND(summaryPrice)}
+                  </span>
+                </div>
+
+                {!checkoutData && (
+                  <>
+                    {isOrderPaymentMode ? (
+                      <Button
+                        type="button"
+                        className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
+                        disabled={
+                          paymentLinkMutation.isPending ||
+                          !canSubmitCheckout ||
+                          isExistingOrderLocked
+                        }
+                        onClick={handleOpenPendingOrderPayment}
+                      >
+                        {paymentLinkMutation.isPending
+                          ? "Đang tải mã thanh toán..."
+                          : "Tiếp tục thanh toán đơn hàng"}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        form="checkout-form"
+                        className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
+                        disabled={
+                          checkoutMutation.isPending ||
+                          createOrderDirectMutation.isPending ||
+                          !canSubmitCheckout
+                        }
+                      >
+                        {checkoutMutation.isPending ||
+                        createOrderDirectMutation.isPending
+                          ? "Đang xử lý..."
+                          : "Xác nhận và chuyển tới thanh toán"}
+                      </Button>
+                    )}
+
+                    {!canSubmitCheckout && (
+                      <p className="mt-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                        {isOrderPaymentMode
+                          ? "Đơn hàng này không còn ở trạng thái chờ thanh toán."
+                          : "Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng trước khi checkout."}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {canCancelActivePayment && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 w-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                    disabled={
+                      cancelOrderMutation.isPending || isExistingOrderLocked
+                    }
+                    onClick={handleCancelOrder}
+                  >
+                    {cancelOrderMutation.isPending
+                      ? "Đang hủy đơn..."
+                      : "Hủy thanh toán"}
+                  </Button>
+                )}
+
+                {/* Escrow trust note */}
+                <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-primary/5 border border-primary/15 px-4 py-3">
+                  <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Thanh toán bảo mật qua{" "}
+                    <span className="font-semibold text-foreground">
+                      Escrow SBESafe
+                    </span>
+                    . Tiền chỉ giải phóng khi bạn xác nhận nhận xe.
+                  </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+
+      {/* ── QR Payment Modal ─────────────────────────────────────────────── */}
+      <Dialog
+        open={showQrModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowQrModal(false);
+            router.push(modalCloseRedirect);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-sm rounded-3xl p-0 overflow-hidden border-primary/20 shadow-2xl"
+          showCloseButton={false}
+        >
+          {/* Header */}
+          <div className="bg-primary/5 border-b border-primary/10 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <DialogTitle className="font-bold text-foreground">
+                Thanh toán qua PayOS
+              </DialogTitle>
+            </div>
+            <button
+              onClick={() => {
+                setShowQrModal(false);
+                router.push(modalCloseRedirect);
+              }}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* QR */}
+          <div className="px-6 pb-4 pt-2">
+            {checkoutData && (
+              <PayosQrDisplay
+                qrUrl={checkoutData.payosQrUrl}
+                totalPrice={checkoutData.totalPrice}
+                orderId={checkoutData.orderId}
+              />
             )}
           </div>
 
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
-          <div className="lg:col-span-7 space-y-8">
-            <div className="rounded-3xl border border-border/40 bg-card p-6 shadow-sm md:p-8">
-              <div className="mb-6 flex items-center gap-3 border-b border-border/40 pb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <h2 className="text-xl font-bold">Địa chỉ nhận hàng</h2>
-              </div>
-
-              {!checkoutData && !isOrderPaymentMode ? (
-                <FormProvider {...methods}>
-                  <form id="checkout-form" onSubmit={methods.handleSubmit(onSubmit)} className="space-y-4">
-                    <AddressForm />
-                  </form>
-                </FormProvider>
-              ) : (
-                <div className="rounded-2xl border border-border/40 bg-muted/20 overflow-hidden">
-                  {/* Name + Phone row */}
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-border/30">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 shrink-0">
-                        <span className="text-sm font-bold text-primary">
-                          {(existingOrder?.receiverName || methods.getValues('receiverName')).substring(0, 1).toUpperCase()}
-                        </span>
-                      </div>
-                      <p className="font-bold text-foreground">
-                        {existingOrder?.receiverName || methods.getValues('receiverName') || '—'}
-                      </p>
-                    </div>
-                    <p className="text-sm font-semibold text-primary tabular-nums">
-                      {existingOrder?.receiverPhone || methods.getValues('receiverPhone') || '—'}
-                    </p>
-                  </div>
-                  {/* Address row */}
-                  <div className="flex items-start gap-3 px-5 py-4">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <p className="text-sm text-foreground leading-relaxed">
-                      {existingOrder?.receiverAddress || methods.getValues('receiverAddress') || 'Chưa có địa chỉ'}
-                    </p>
-                  </div>
-                  {/* Locked note */}
-                  <div className="flex items-center gap-2 border-t border-border/30 bg-muted/30 px-5 py-2.5">
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <p className="text-xs text-muted-foreground">
-                      {isOrderPaymentMode
-                        ? 'Địa chỉ đã cố định — chỉ có thể tiếp tục thanh toán'
-                        : 'Địa chỉ không thể thay đổi sau khi xác nhận'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
+          {/* Escrow note */}
+          <div className="mx-6 mb-4 flex gap-3 rounded-2xl bg-primary/5 border border-primary/15 p-4 text-xs text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+            <p className="leading-relaxed">
+              Tiền của bạn được giữ an toàn trong{" "}
+              <strong className="text-foreground">Escrow SBESafe</strong>. Người
+              bán nhận tiền sau khi bạn xác nhận hài lòng.
+            </p>
           </div>
-
-          <div className="lg:col-span-5 space-y-6">
-            <div className="sticky top-24 rounded-3xl border border-border/50 bg-card p-6 shadow-sm">
-              <h2 className="text-base font-bold mb-5">Tổng quan đơn hàng</h2>
-
-              {/* Product summary */}
-              <div className="flex gap-4 mb-5">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border/50 bg-secondary">
-                  <Image
-                    src={summaryListing.images[0] || '/placeholder.png'}
-                    alt={summaryListing.title}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const t = e.target as HTMLImageElement
-                      t.src = 'https://placehold.co/200x200/1a1a1a/aee86c?text=SBE'
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col justify-between min-w-0">
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug">{summaryListing.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#aee86c]/20 border border-[#aee86c]/40 px-2 py-0.5 text-[10px] font-semibold text-[#2a4a10] dark:text-[#aee86c]">
-                      <ShieldCheck className="h-3 w-3" />
-                      SBESafe
-                    </span>
-                  </div>
-                  <p className="text-sm font-bold text-primary">{formatVND(summaryListing.price)}</p>
-                  {selectedCartItems.length > 1 && (
-                    <p className="text-xs text-muted-foreground">+{selectedCartItems.length - 1} sản phẩm khác</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="my-4 border-t border-border/40" />
-
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tạm tính</span>
-                  <span className="font-medium">{formatVND(summaryPrice)}</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Truck className="h-3.5 w-3.5" /> Phí vận chuyển (GHN)
-                  </span>
-                  <span className="font-medium">
-                    {checkoutData
-                      ? formatVND(checkoutData.shippingFee)
-                      : existingOrder
-                        ? formatVND(existingOrder.shippingFee)
-                        : 'Tính ở bước sau'}
-                  </span>
-                </div>
-
-
-              </div>
-
-              <div className="my-4 border-t border-border/40" />
-
-              <div className="mb-5 flex items-end justify-between">
-                <span className="font-bold text-foreground">Tổng thanh toán</span>
-                <span className="text-2xl font-extrabold text-primary" style={{ fontFamily: 'var(--font-archivo)' }}>
-                  {checkoutData ? formatVND(checkoutData.totalPrice) : formatVND(summaryPrice)}
-                </span>
-              </div>
-
-              {!checkoutData && (
-                <>
-                  {isOrderPaymentMode ? (
-                    <Button
-                      type="button"
-                      className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
-                      disabled={paymentLinkMutation.isPending || !canSubmitCheckout || isExistingOrderLocked}
-                      onClick={handleOpenPendingOrderPayment}
-                    >
-                      {paymentLinkMutation.isPending ? 'Đang tải mã thanh toán...' : 'Tiếp tục thanh toán đơn hàng'}
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      form="checkout-form"
-                      className="h-12 w-full text-base font-bold shadow-athletic animate-pulse-glow"
-                      disabled={checkoutMutation.isPending || createOrderDirectMutation.isPending || !canSubmitCheckout}
-                    >
-                      {checkoutMutation.isPending || createOrderDirectMutation.isPending ? 'Đang xử lý...' : 'Xác nhận và chuyển tới thanh toán'}
-                    </Button>
-                  )}
-
-                  {!canSubmitCheckout && (
-                    <p className="mt-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                      {isOrderPaymentMode
-                        ? 'Đơn hàng này không còn ở trạng thái chờ thanh toán.'
-                        : 'Vui lòng chọn ít nhất 1 sản phẩm trong giỏ hàng trước khi checkout.'}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {canCancelActivePayment && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-3 w-full border-destructive/30 text-destructive hover:bg-destructive/10"
-                  disabled={cancelOrderMutation.isPending || isExistingOrderLocked}
-                  onClick={handleCancelOrder}
-                >
-                  {cancelOrderMutation.isPending ? 'Đang hủy đơn...' : 'Hủy thanh toán'}
-                </Button>
-              )}
-
-              {/* Escrow trust note */}
-              <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-primary/5 border border-primary/15 px-4 py-3">
-                <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Thanh toán bảo mật qua{' '}
-                  <span className="font-semibold text-foreground">Escrow SBESafe</span>
-                  . Tiền chỉ giải phóng khi bạn xác nhận nhận xe.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
-
-    {/* ── QR Payment Modal ─────────────────────────────────────────────── */}
-    <Dialog open={showQrModal} onOpenChange={(open) => {
-      if (!open) {
-        setShowQrModal(false)
-        router.push(modalCloseRedirect)
-      }
-    }}>
-      <DialogContent className="max-w-sm rounded-3xl p-0 overflow-hidden border-primary/20 shadow-2xl" showCloseButton={false}>
-        {/* Header */}
-        <div className="bg-primary/5 border-b border-primary/10 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <DialogTitle className="font-bold text-foreground">Thanh toán qua PayOS</DialogTitle>
-          </div>
-          <button
-            onClick={() => {
-              setShowQrModal(false)
-              router.push(modalCloseRedirect)
-            }}
-            className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-
-        {/* QR */}
-        <div className="px-6 pb-4 pt-2">
-          {checkoutData && (
-            <PayosQrDisplay
-              qrUrl={checkoutData.payosQrUrl}
-              totalPrice={checkoutData.totalPrice}
-              orderId={checkoutData.orderId}
-            />
-          )}
-        </div>
-
-        {/* Escrow note */}
-        <div className="mx-6 mb-4 flex gap-3 rounded-2xl bg-primary/5 border border-primary/15 p-4 text-xs text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-          <p className="leading-relaxed">
-            Tiền của bạn được giữ an toàn trong <strong className="text-foreground">Escrow SBESafe</strong>. Người bán nhận tiền sau khi bạn xác nhận hài lòng.
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
     </>
-  )
+  );
 }

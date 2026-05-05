@@ -176,7 +176,12 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
           return true
         }
 
-        if (payloadMessage === 'role is required' || payloadMessage === 'thieu vai tro' || payloadMessage === 'vai tro bat buoc') {
+        if (
+          payloadMessage === 'role_required' ||
+          payloadMessage === 'role is required' ||
+          payloadMessage === 'thieu vai tro' ||
+          payloadMessage === 'vai tro bat buoc'
+        ) {
           return true
         }
       }
@@ -185,6 +190,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     if (!normalizedMessage) return false
 
     return (
+      normalizedMessage === 'role_required' ||
       normalizedMessage === 'role is required' ||
       normalizedMessage === 'role required' ||
       normalizedMessage === 'thieu vai tro' ||
@@ -326,7 +332,7 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     idToken: string,
     role: AuthRole | undefined,
     target: GoogleIntent,
-    options?: { suppressError?: boolean },
+    options?: { suppressError?: boolean; redirect?: boolean },
   ) => {
     setLoginErrorMessage(null)
     setRegisterErrorMessage(null)
@@ -335,9 +341,12 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     try {
       const session = await authApi.googleLogin(idToken, role)
       await loginWithSession(session)
-      const destination = await resolvePostLoginDestination(session, role)
-      router.push(destination)
-      return { success: true as const, error: null, errorMessage: null }
+      
+      if (options?.redirect !== false) {
+        const destination = await resolvePostLoginDestination(session, role)
+        router.push(destination)
+      }
+      return { success: true as const, session, error: null, errorMessage: null }
     } catch (error) {
       const message =
         error instanceof Error
@@ -412,10 +421,23 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
           ?? (language === 'vi' ? 'Dang nhap Google that bai' : 'Google sign-in failed')
         setLoginErrorMessage(message)
       } else {
-        // Register flow: luôn hỏi role + SĐT trước khi gọi API
-        setPendingGoogleIdToken(idToken)
-        setPendingGoogleIntent('register')
-        setPendingGoogleRole(registerRole === '3' ? '3' : '2')
+        // Register flow: thử API trước (tài khoản đã tồn tại thì login luôn)
+        const directResult = await submitGoogleSession(idToken, undefined, 'register', { suppressError: true })
+        if (directResult.success) {
+          return
+        }
+
+        if (isMissingGoogleRoleError(directResult.error, directResult.errorMessage)) {
+          // Tài khoản mới — cần chọn role + nhập SĐT
+          setPendingGoogleIdToken(idToken)
+          setPendingGoogleIntent('register')
+          setPendingGoogleRole(registerRole === '3' ? '3' : '2')
+          return
+        }
+
+        const message = directResult.errorMessage
+          ?? (language === 'vi' ? 'Đăng ký Google thất bại' : 'Google sign-up failed')
+        setRegisterErrorMessage(message)
       }
     } catch (err) {
       const message = language === 'vi' ? 'Không thể mở cửa sổ đăng nhập Google' : 'Unable to open Google sign-in'
@@ -447,9 +469,9 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
     }
 
     const role = pendingGoogleRole === '3' ? 3 : 2
-    const { success } = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent)
+    const result = await submitGoogleSession(pendingGoogleIdToken, role, pendingGoogleIntent, { redirect: false })
 
-    if (success) {
+    if (result.success) {
       // Update SĐT cho register flow hoặc login lần đầu khi thiếu role
       if (requiresPhone) {
         setIsUpdatingPhone(true)
@@ -462,6 +484,8 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
         }
       }
       resetPendingGoogle()
+      const destination = await resolvePostLoginDestination(result.session, role)
+      router.push(destination)
     }
   }
 

@@ -324,11 +324,10 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   const [confirmAction, setConfirmAction] = React.useState<'submit' | 'resubmit' | null>(null)
   const [termsAccepted, setTermsAccepted] = React.useState(false)
 
-  React.useEffect(() => {
-    if (!confirmAction) {
-      setTermsAccepted(false)
-    }
-  }, [confirmAction])
+  const openConfirmAction = (action: 'submit' | 'resubmit') => {
+    setTermsAccepted(false)
+    setConfirmAction(action)
+  }
 
   const listing = normalizeListingDetail(rawData)
 
@@ -358,6 +357,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
     if (!confirmAction) return
     await handleAction(confirmAction)
     setConfirmAction(null)
+    setTermsAccepted(false)
   }
 
   if (isLoading) {
@@ -418,14 +418,14 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         
         <div className="flex flex-wrap gap-2">
           {currentStatus === 'draft' && (
-            <Button onClick={() => setConfirmAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
+            <Button onClick={() => openConfirmAction('submit')} disabled={isSubmitDisabled} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               Gửi duyệt
             </Button>
           )}
 
           {currentStatus === 'rejected' && (
-            <Button onClick={() => setConfirmAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
+            <Button onClick={() => openConfirmAction('resubmit')} disabled={resubmitMutation.isPending} className="bg-primary text-primary-foreground">
               <Send className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
             </Button>
@@ -599,7 +599,15 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         </Card>
       </div>
 
-      <AlertDialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && setConfirmAction(null)}>
+      <AlertDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmAction(null)
+            setTermsAccepted(false)
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>

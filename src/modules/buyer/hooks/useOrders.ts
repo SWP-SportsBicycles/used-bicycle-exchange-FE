@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { buyerApi, type BuyerOrderPage, type BuyerOrder } from "@/lib/api/buyer-api";
+import { buyerApi, type BuyerOrderPage, type BuyerOrder, deriveOrderStatus } from "@/lib/api/buyer-api";
 import { toast } from "sonner";
 
 /**
@@ -18,19 +19,19 @@ export function useOrders(page = 1, pageSize = 10, status?: string) {
         buyerApi.getMyReports().catch(() => [])
       ])
 
-      // Build a map: orderId → report (to access transactionStatus)
+      // Build a map: orderId → report
       const reportByOrderId = new Map(
-        reports.map((r: { orderId: string; transactionStatus?: string }) => [r.orderId, r])
+        reports.map((r: any) => [r.orderId, r])
       )
 
       return {
         ...orderPage,
         items: orderPage.items.map(order => {
           const report = reportByOrderId.get(order.id)
-          if (!report) return order
-          // If the dispute was resolved with a refund → show green "Đã hoàn tiền"
-          if (report.transactionStatus === 'Refunded') return { ...order, status: 'refunded' as const }
-          return { ...order, status: 'disputed' as const }
+          return {
+            ...order,
+            status: deriveOrderStatus(order.status, report)
+          }
         })
       }
     },
@@ -50,10 +51,11 @@ export function useOrderDetail(orderId: string | null | undefined) {
         buyerApi.getMyReports().catch(() => [])
       ])
       
-      if (reports.some(r => r.orderId === orderId)) {
-        order.status = 'disputed'
+      const report = reports.find(r => r.orderId === orderId)
+      return {
+        ...order,
+        status: deriveOrderStatus(order.status, report)
       }
-      return order
     },
     enabled: Boolean(orderId),
     staleTime: 1000 * 20,

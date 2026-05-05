@@ -16,14 +16,38 @@ import { cn } from '@/lib/utils'
 
 const statusClass: Record<string, string> = {
   Locked: 'bg-destructive/15 text-destructive border-destructive/30',
+  Pending: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  pending: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  Paid: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  paid: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
   Confirmed: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
+  Shipping: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  shipping: 'bg-blue-500/15 text-blue-700 border-blue-500/30',
+  Delivered: 'bg-teal-500/15 text-teal-700 border-teal-500/30',
+  delivered: 'bg-teal-500/15 text-teal-700 border-teal-500/30',
   Completed: 'bg-success/15 text-success border-success/30',
+  Cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+  cancelled: 'bg-destructive/15 text-destructive border-destructive/30',
+  Disputed: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
+  disputed: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
 }
 
 const statusLabel: Record<string, { vi: string; en: string }> = {
   Locked: { vi: 'Đã khóa', en: 'Locked' },
+  Pending: { vi: 'Chờ xử lý', en: 'Pending' },
+  pending: { vi: 'Chờ xử lý', en: 'Pending' },
+  Paid: { vi: 'Đã thanh toán', en: 'Paid' },
+  paid: { vi: 'Đã thanh toán', en: 'Paid' },
   Confirmed: { vi: 'Đã xác nhận', en: 'Confirmed' },
+  Shipping: { vi: 'Đang giao hàng', en: 'Shipping' },
+  shipping: { vi: 'Đang giao hàng', en: 'Shipping' },
+  Delivered: { vi: 'Đã giao hàng', en: 'Delivered' },
+  delivered: { vi: 'Đã giao hàng', en: 'Delivered' },
   Completed: { vi: 'Hoàn thành', en: 'Completed' },
+  Cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
+  cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
+  Disputed: { vi: 'Khiếu nại', en: 'Disputed' },
+  disputed: { vi: 'Khiếu nại', en: 'Disputed' },
 }
 
 function formatVND(value: number) {
@@ -41,10 +65,17 @@ export default function AdminOrderDetailPage() {
   const orderId = params.id
   const [actionFeedback, setActionFeedback] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [notifySuccess, setNotifySuccess] = useState(false)
 
   const orderQuery = useQuery({
     queryKey: ['admin-order', orderId],
     queryFn: () => adminApi.getOrderById(orderId),
+    enabled: Boolean(orderId),
+  })
+
+  const payoutInfoQuery = useQuery({
+    queryKey: ['admin-order-payout-info', orderId],
+    queryFn: () => adminApi.getOrderPayoutInfo(orderId),
     enabled: Boolean(orderId),
   })
 
@@ -57,6 +88,7 @@ export default function AdminOrderDetailPage() {
           : 'Successful-order notification sent to seller (notify-seller).',
       )
       setActionError(null)
+      setNotifySuccess(true)
       toast({
         title: language === 'vi' ? 'Thành công' : 'Success',
         description: language === 'vi' ? 'Đã gửi email thông báo cho người bán.' : 'Seller notification email sent.',
@@ -107,8 +139,10 @@ export default function AdminOrderDetailPage() {
   })
 
   const order = orderQuery.data
+  const payoutInfo = payoutInfoQuery.data
   const canProcessCompleted = order?.status === 'Completed'
   const isPayoutDone = Boolean(order?.paidOutAt)
+  const canTriggerPayout = Boolean(canProcessCompleted && notifySuccess && !isPayoutDone)
 
   return (
     <div className="space-y-6">
@@ -155,7 +189,7 @@ export default function AdminOrderDetailPage() {
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Tổng tiền' : 'Total amount'}</span>
-                <span className="font-semibold">{formatVND(order.totalAmount)}</span>
+                <span className="font-semibold text-blue-700">{formatVND(order.totalAmount)}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Trạng thái' : 'Status'}</span>
@@ -171,30 +205,45 @@ export default function AdminOrderDetailPage() {
                 <span className="text-muted-foreground">{language === 'vi' ? 'Thời gian giải ngân' : 'Paid out at'}</span>
                 <span>{order.paidOutAt ? new Date(order.paidOutAt).toLocaleString('vi-VN') : '-'}</span>
               </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">{language === 'vi' ? 'Đã hoàn tiền' : 'Refunded'}</span>
-                <Badge
-                  variant="outline"
-                  className={cn('text-xs', order.isRefunded ? 'bg-amber-500/15 text-amber-700 border-amber-500/30' : 'bg-muted')}
-                >
-                  {order.isRefunded ? (language === 'vi' ? 'Có' : 'Yes') : language === 'vi' ? 'Không' : 'No'}
-                </Badge>
-              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <WalletCards className="h-5 w-5" />
+                {language === 'vi' ? 'Thông tin giải ngân' : 'Payout information'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Ngân hàng' : 'Bank name'}</span>
-                <span>{order.bankName || '-'}</span>
+                <span>{payoutInfo?.bankName || '-'}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Số tài khoản' : 'Bank account number'}</span>
-                <span>{order.bankAccountNumber || '-'}</span>
+                <span>{payoutInfo?.bankAccountNumber || '-'}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Chủ tài khoản' : 'Bank account name'}</span>
-                <span>{order.bankAccountName || '-'}</span>
+                <span>{payoutInfo?.bankAccountName || '-'}</span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">{language === 'vi' ? 'Số tiền giải ngân' : 'Payout amount'}</span>
-                <span className="font-semibold">{order.payoutAmount !== null ? formatVND(order.payoutAmount) : '-'}</span>
+                <span
+                  className={cn(
+                    'font-semibold',
+                    payoutInfo?.payoutAmount !== null && payoutInfo?.payoutAmount !== undefined
+                      ? payoutInfo.payoutAmount < 0
+                        ? 'text-destructive'
+                        : 'text-success'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {payoutInfo?.payoutAmount !== null && payoutInfo?.payoutAmount !== undefined
+                    ? formatVND(payoutInfo.payoutAmount)
+                    : '-'}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -215,6 +264,15 @@ export default function AdminOrderDetailPage() {
                     <AlertDescription>{actionError}</AlertDescription>
                   </Alert>
                 ) : null}
+                {isPayoutDone ? (
+                  <Alert className="border-amber-300/60 bg-amber-50">
+                    <AlertDescription className="text-amber-700">
+                      {language === 'vi'
+                        ? 'Đơn hàng này đã được giải ngân.'
+                        : 'This order has already been paid out.'}
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
                 <div className="flex flex-wrap gap-3">
                 <Button
                   onClick={() => notifyMutation.mutate()}
@@ -228,8 +286,8 @@ export default function AdminOrderDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => payoutMutation.mutate()}
-                  disabled={payoutMutation.isPending || isPayoutDone}
-                  className="gap-2"
+                  disabled={payoutMutation.isPending || !canTriggerPayout}
+                  className="gap-2 disabled:opacity-50"
                 >
                   {payoutMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
                   {isPayoutDone

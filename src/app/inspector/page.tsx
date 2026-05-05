@@ -2,253 +2,318 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import Image from 'next/image'
-import { 
-  ClipboardCheck, 
-  Calendar,
+import { useQuery } from '@tanstack/react-query'
+import {
+  ClipboardCheck,
   CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  ArrowUpRight,
+  AlertCircle,
+  Star,
+  FileWarning,
   ChevronRight,
-  AlertCircle
+  Clock,
+  ArrowUpRight,
+  Loader2,
+  Calendar,
+  XCircle,
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
-import { 
-  MOCK_INSPECTOR_ASSIGNMENTS, 
-  formatVND
-} from '@/lib/mock-data'
+import { inspectorApi } from '@/lib/api/inspector-api'
 import { cn } from '@/lib/utils'
-
-const statusColors: Record<string, string> = {
-  assigned: 'bg-muted text-muted-foreground',
-  scheduled: 'bg-primary/20 text-primary',
-  in_progress: 'bg-accent/20 text-accent-foreground',
-  completed: 'bg-success/20 text-success',
-  cancelled: 'bg-destructive/20 text-destructive',
-}
-
-const statusLabels: Record<string, { vi: string; en: string }> = {
-  assigned: { vi: 'Đã giao', en: 'Assigned' },
-  scheduled: { vi: 'Đã lên lịch', en: 'Scheduled' },
-  in_progress: { vi: 'Đang kiểm', en: 'In Progress' },
-  completed: { vi: 'Hoàn thành', en: 'Completed' },
-  cancelled: { vi: 'Đã hủy', en: 'Cancelled' },
-}
 
 export default function InspectorDashboardPage() {
   const { user } = useAuth()
   const { language } = useLanguage()
 
-  const assignments = MOCK_INSPECTOR_ASSIGNMENTS
-  const todayAssignments = assignments.filter(a => a.scheduledDate === '2024-01-14' || a.scheduledDate === '2024-01-15')
-  const pendingCount = assignments.filter(a => ['assigned', 'scheduled', 'in_progress'].includes(a.status)).length
+  const pendingListingsQuery = useQuery({
+    queryKey: ['inspector-listings', 'pending'],
+    queryFn: inspectorApi.getPendingListings,
+    refetchInterval: 15000,
+  })
+
+  const allQuery = useQuery({
+    queryKey: ['inspector-all', 1, 10],
+    queryFn: () => inspectorApi.getAll(1, 10),
+    refetchInterval: 30000,
+  })
+
+  const reportsQuery = useQuery({
+    queryKey: ['inspector-reports', 1, 50],
+    queryFn: () => inspectorApi.getReportsPaged(1, 50),
+    refetchInterval: 30000,
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ['inspector-history', 1, 5],
+    queryFn: () => inspectorApi.getHistory(1, 5),
+  })
+
+  const pendingListings = pendingListingsQuery.data ?? []
+  const pendingCount = pendingListings.length
+  const completedCount = historyQuery.data?.totalItems ?? 0
+  const recentHistory = historyQuery.data?.items ?? []
+  const allCount = allQuery.data?.totalItems ?? pendingCount + completedCount
+  const reportItems = reportsQuery.data?.items ?? []
+  const reportTotal = reportsQuery.data?.totalItems ?? reportItems.length
+
+  const stats = [
+    {
+      label: { vi: 'Chờ Kiểm Định', en: 'Pending' },
+      value: pendingCount,
+      icon: ClipboardCheck,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50 dark:bg-amber-950/30',
+      borderColor: 'border-amber-200/60',
+      href: '/inspector/assigned',
+    },
+    {
+      label: { vi: 'Báo Cáo', en: 'Reports' },
+      value: reportTotal,
+      icon: FileWarning,
+      color: 'text-rose-600',
+      bg: 'bg-rose-50 dark:bg-rose-950/30',
+      borderColor: 'border-rose-200/60',
+      href: '/inspector/report',
+    },
+    {
+      label: { vi: 'Đã Hoàn Thành', en: 'Completed' },
+      value: completedCount,
+      icon: CheckCircle2,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+      borderColor: 'border-emerald-200/60',
+      href: '/inspector/assigned',
+    },
+    {
+      label: { vi: 'Tổng Kiểm Định', en: 'Total' },
+      value: allCount,
+      icon: Star,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50 dark:bg-blue-950/30',
+      borderColor: 'border-blue-200/60',
+      href: '/inspector/assigned',
+    },
+  ]
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {language === 'vi' ? 'Xin chào,' : 'Hello,'} {user.name}
-          </h1>
-          <p className="text-muted-foreground">
-            {language === 'vi' 
-              ? 'Cổng quản lý kiểm định xe đạp' 
-              : 'Bicycle inspection management portal'}
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {language === 'vi' ? 'Xin chào,' : 'Hello,'} {user.name}
+        </h1>
+        <p className="text-muted-foreground">
+          {language === 'vi'
+            ? 'Cổng quản lý kiểm định xe đạp'
+            : 'Bicycle inspection management portal'}
+        </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.label.en}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 * (index + 1) }}
+          >
+            <Link href={stat.href}>
+              <Card className={cn(
+                'group relative overflow-hidden border transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
+                stat.borderColor
+              )}>
+                <div className={cn('absolute inset-0 opacity-40', stat.bg)} />
+                <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.label[language]}
+                  </CardTitle>
+                  <div className={cn('rounded-lg p-2', stat.bg)}>
+                    <stat.icon className={cn('h-4 w-4', stat.color)} />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative">
+                  <div className="flex items-end justify-between">
+                    <div className="text-3xl font-bold tracking-tight">{stat.value}</div>
+                  </div>
+                  <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                    {language === 'vi' ? 'Xem chi tiết' : 'View details'}
+                    <ArrowUpRight className="h-3 w-3" />
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Two-column: Action Items + Recent Activity */}
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Left: Needs Action */}
         <motion.div
+          className="lg:col-span-3"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.5 }}
         >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Đang Chờ' : 'Pending'}
-              </CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    </span>
+                    {language === 'vi' ? 'Cần Xử Lý Ngay' : 'Needs Action'}
+                  </CardTitle>
+                  <CardDescription>
+                    {language === 'vi'
+                      ? 'Tin đăng đang chờ xử lý'
+                      : 'Listings awaiting your action'}
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/inspector/assigned">
+                    {language === 'vi' ? 'Xem tất cả' : 'View all'}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{pendingCount}</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'xe cần kiểm định' : 'bikes to inspect'}
-              </p>
+              {pendingListingsQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+                </div>
+              ) : pendingListings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <CheckCircle2 className="h-10 w-10 mb-3 text-emerald-400" />
+                  <p className="font-medium">{language === 'vi' ? 'Tuyệt vời!' : 'All clear!'}</p>
+                  <p className="text-sm">{language === 'vi' ? 'Không có mục nào cần xử lý' : 'No pending items'}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingListings.slice(0, 3).map((listing) => (
+                    <Link
+                      key={listing.id}
+                      href={`/inspector/assigned/${listing.id}`}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-muted/50 transition-all group"
+                    >
+                      <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-amber-50 dark:bg-amber-950/40">
+                        <ClipboardCheck className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{listing.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {listing.brand || '-'} • {listing.city || (language === 'vi' ? 'Chưa cập nhật' : 'N/A')}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 shrink-0">
+                        {language === 'vi' ? 'Tin đăng' : 'Listing'}
+                      </Badge>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </Link>
+                  ))}
+
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
+        {/* Right: Recent Activity */}
         <motion.div
+          className="lg:col-span-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.6 }}
         >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Hôm Nay' : 'Today'}
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                {language === 'vi' ? 'Kiểm Định Gần Đây' : 'Recent Inspections'}
               </CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardDescription>
+                {language === 'vi' ? 'Lịch sử kiểm định gần nhất' : 'Latest inspection history'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{todayAssignments.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'lịch hẹn' : 'appointments'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+              {historyQuery.isLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {language === 'vi' ? 'Đang tải...' : 'Loading...'}
+                </div>
+              ) : recentHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <Clock className="h-10 w-10 mb-3 text-muted-foreground/40" />
+                  <p className="text-sm">{language === 'vi' ? 'Chưa có hoạt động nào' : 'No activity yet'}</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {recentHistory.map((item, index) => {
+                    const scoreColor = item.score >= 80 ? 'text-emerald-600' : item.score >= 50 ? 'text-amber-600' : 'text-rose-600'
+                    const scoreBg = item.score >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/40' : item.score >= 50 ? 'bg-amber-50 dark:bg-amber-950/40' : 'bg-rose-50 dark:bg-rose-950/40'
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Đã Hoàn Thành' : 'Completed'}
-              </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{user.completedInspections || 47}</div>
-              <p className="text-xs text-success flex items-center gap-1">
-                +8 {language === 'vi' ? 'tháng này' : 'this month'}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {language === 'vi' ? 'Đánh Giá' : 'Rating'}
-              </CardTitle>
-              <svg className="h-4 w-4 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">4.9</div>
-              <p className="text-xs text-muted-foreground">
-                {language === 'vi' ? 'từ 47 đánh giá' : 'from 47 reviews'}
-              </p>
+                    return (
+                      <div key={item.id} className="flex items-start gap-3 py-2.5">
+                        <div className="relative flex flex-col items-center">
+                          <div className={cn('h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold', scoreBg, scoreColor)}>
+                            {item.score}
+                          </div>
+                          {index < recentHistory.length - 1 && (
+                            <div className="w-px h-full bg-border/60 absolute top-9" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 pb-2">
+                          <p className="text-sm font-medium">
+                            {language === 'vi' ? 'Kiểm định' : 'Inspection'} #{item.id.slice(0, 8)}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className={cn('flex items-center gap-1 text-xs', item.frame ? 'text-emerald-600' : 'text-rose-500')}>
+                              {item.frame ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {language === 'vi' ? 'Khung xe' : 'Frame'}
+                            </span>
+                            <span className={cn('flex items-center gap-1 text-xs', item.paintCondition ? 'text-emerald-600' : 'text-rose-500')}>
+                              {item.paintCondition ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {language === 'vi' ? 'Nước sơn' : 'Paint'}
+                            </span>
+                            <span className={cn('flex items-center gap-1 text-xs', item.drivetrain ? 'text-emerald-600' : 'text-rose-500')}>
+                              {item.drivetrain ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {language === 'vi' ? 'Bộ truyền động' : 'Drivetrain'}
+                            </span>
+                            <span className={cn('flex items-center gap-1 text-xs', item.brakes ? 'text-emerald-600' : 'text-rose-500')}>
+                              {item.brakes ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              {language === 'vi' ? 'Hệ thống phanh' : 'Brakes'}
+                            </span>
+                          </div>
+                          {item.inspectionDate && (
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(item.inspectionDate).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      {/* Upcoming Inspections */}
+      {/* Tips */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{language === 'vi' ? 'Lịch Kiểm Định Sắp Tới' : 'Upcoming Inspections'}</CardTitle>
-              <CardDescription>
-                {language === 'vi' ? 'Các xe được giao để kiểm định' : 'Bikes assigned for inspection'}
-              </CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/inspector/assigned" className="gap-1">
-                {language === 'vi' ? 'Xem tất cả' : 'View all'}
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {assignments.map((assignment) => (
-                <div 
-                  key={assignment.id} 
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  {/* Bike Image & Info */}
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
-                      <Image 
-                        src={assignment.listing.images[0]} 
-                        alt={assignment.listing.title}
-                        width={64}
-                        height={64}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{assignment.listing.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {assignment.listing.brand} {assignment.listing.model}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={cn('text-xs', statusColors[assignment.status])}>
-                          {statusLabels[assignment.status][language]}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {formatVND(assignment.listing.price)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Schedule & Location */}
-                  <div className="flex flex-col sm:items-end gap-1 sm:text-right">
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{assignment.scheduledDate} - {assignment.scheduledTime}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span className="truncate max-w-50">{assignment.seller.address}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5" />
-                      <span>{assignment.seller.phone}</span>
-                    </div>
-                  </div>
-
-                  {/* Action */}
-                  <div className="flex sm:flex-col gap-2">
-                    <Button size="sm" className="flex-1 sm:flex-none" asChild>
-                      <Link href={`/inspector/assigned/${assignment.id}`}>
-                        {assignment.status === 'in_progress' 
-                          ? (language === 'vi' ? 'Tiếp tục' : 'Continue')
-                          : (language === 'vi' ? 'Bắt đầu' : 'Start')
-                        }
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Quick Tips */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
+        transition={{ delay: 0.7 }}
       >
         <Card className="bg-primary/5 border-primary/20">
           <CardHeader>
@@ -264,7 +329,7 @@ export default function InspectorDashboardPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
-                  {language === 'vi' 
+                  {language === 'vi'
                     ? 'Luôn chụp ảnh số serial và so sánh với thông tin đăng ký'
                     : 'Always photograph serial number and compare with registration'}
                 </span>
@@ -272,7 +337,7 @@ export default function InspectorDashboardPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
-                  {language === 'vi' 
+                  {language === 'vi'
                     ? 'Kiểm tra kỹ khung xe xem có vết nứt hay biến dạng không'
                     : 'Carefully inspect frame for cracks or deformation'}
                 </span>
@@ -280,7 +345,7 @@ export default function InspectorDashboardPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
-                  {language === 'vi' 
+                  {language === 'vi'
                     ? 'Test phanh và hệ thống chuyển số trước khi đánh giá'
                     : 'Test brakes and shifting before evaluation'}
                 </span>
@@ -288,7 +353,7 @@ export default function InspectorDashboardPage() {
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
                 <span>
-                  {language === 'vi' 
+                  {language === 'vi'
                     ? 'Ghi chú chi tiết mọi vấn đề phát hiện được'
                     : 'Document all issues found in detail'}
                 </span>

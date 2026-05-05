@@ -143,6 +143,10 @@ export default function ListingDetailScreen({ params }: PageProps) {
     { label: 'Chất liệu',    value: listing.frameMaterial,  icon: Disc3 },
     { label: 'Groupset',      value: listing.groupset,      icon: Settings2 },
     { label: 'Cỡ bánh',       value: listing.wheelSize,     icon: Disc3 },
+    { label: 'Phanh',         value: listing.brakeType,     icon: Disc3 },
+    { label: 'Màu sắc',       value: listing.paint,         icon: Tag },
+    { label: 'Vận hành',      value: listing.operating,     icon: Settings2 },
+    { label: 'Trọng lượng',   value: listing.weight != null ? `${listing.weight} kg` : undefined, icon: Info },
     { label: 'Tình trạng',    value: conditionLabel,         icon: CheckCircle2 },
     { label: 'Serial',        value: listing.serial,        icon: Tag },
   ]
@@ -273,8 +277,8 @@ export default function ListingDetailScreen({ params }: PageProps) {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <WishlistButton
-                    key={listing.bikeId ?? listing.id}
-                    listingId={listing.bikeId ?? listing.id}
+                    key={listing.bikeId || listing.id}
+                    listingId={listing.bikeId || listing.id}
                     initialIsWishlisted={Boolean(listing.isWishlisted)}
                   />
                   <Button
