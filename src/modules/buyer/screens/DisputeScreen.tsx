@@ -70,7 +70,7 @@ export default function DisputeScreen({ params }: PageProps) {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   const existingReport = reports?.find((r) => r.orderId === id);
-  const isViewMode = order?.status === "disputed" || !!existingReport;
+  const isViewMode = order?.status === "disputed" || order?.status === "refunded" || !!existingReport;
 
   // Logic: Chỉ cho phép khiếu nại nếu đơn hàng đã được xác nhận (completed)
   const canStartDispute = order?.status === "completed";

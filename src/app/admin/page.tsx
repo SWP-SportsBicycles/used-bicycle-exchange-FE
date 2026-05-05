@@ -238,7 +238,7 @@ export default function AdminDashboardPage() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.05 * i }}
-                    className="group rounded-xl border border-border/60 bg-gradient-to-br from-card to-muted/20 p-5 hover:shadow-lg hover:border-primary/30 transition-all duration-300"
+                    className="group rounded-xl border border-border/60 bg-linear-to-br from-card to-muted/20 p-5 hover:shadow-lg hover:border-primary/30 transition-all duration-300"
                   >
                     <div className="mb-4 flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
@@ -330,7 +330,7 @@ export default function AdminDashboardPage() {
       {/* Listing Overview */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
         <Card className="overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/3 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-br from-primary/3 via-transparent to-transparent pointer-events-none" />
           <CardHeader>
             <div className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-primary" />
