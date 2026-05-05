@@ -3,7 +3,7 @@
 import { use } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, User, Phone, MapPin, ExternalLink, ShieldAlert, CheckCircle2, Lock, Clock, XCircle, Package, Star } from 'lucide-react'
+import { ArrowLeft, User, Phone, MapPin, ShieldAlert, CheckCircle2, Lock, Clock, XCircle, Package, Star, ShieldCheck } from 'lucide-react'
 import { Header } from '@/components/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,10 +51,9 @@ export default function OrderDetailScreen({ params }: PageProps) {
 
   const isReviewed = reviewedOrders.includes(order.id)
   const isDisputed = order.status === 'disputed'
-  // Completed: cho phép đánh giá HOẶC khiếu nại (mutual exclusion)
   const showCreateDisputeButton = order.status === 'completed' && !isReviewed
   const showReviewButton = order.status === 'completed' && !isDisputed
-  const showViewDisputeButton = order.status === 'disputed'
+  const showViewDisputeButton = order.status === 'disputed' || order.status === 'refunded'
   // Bug fix: cancel chỉ cho phép khi 'pending' — đơn đã paid không thể cancel từ FE
   const showCancelButton = order.status === 'pending'
   const isAwaitingPayment = order.status === 'pending'
@@ -120,14 +119,8 @@ export default function OrderDetailScreen({ params }: PageProps) {
           <div className="space-y-8 lg:col-span-8">
 
             <div className="overflow-hidden rounded-3xl border border-border/40 bg-card shadow-sm">
-              <div className="flex items-center justify-between border-b border-border/40 bg-secondary/30 px-6 py-4">
+              <div className="flex items-center gap-3 border-b border-border/40 bg-secondary/30 px-6 py-4">
                 <h2 className="text-lg font-bold">Thông tin sản phẩm</h2>
-                <Link
-                  href={`/marketplace/${order.listingId}`}
-                  className="flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary hover:underline"
-                >
-                  Xem listing gốc <ExternalLink className="h-3 w-3" />
-                </Link>
               </div>
               <div className="p-6">
                 <div className="flex flex-col gap-6 sm:flex-row">
@@ -160,6 +153,106 @@ export default function OrderDetailScreen({ params }: PageProps) {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* ── Chi tiết xe ── */}
+                <div className="mt-6 border-t border-border/40 pt-5">
+                  <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Thông số kỹ thuật</h4>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+                    {order.listing.brand && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Thương hiệu</p>
+                        <p className="font-semibold">{order.listing.brand}</p>
+                      </div>
+                    )}
+                    {order.listing.category && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Loại xe</p>
+                        <p className="font-semibold capitalize">{order.listing.category}</p>
+                      </div>
+                    )}
+                    {order.listing.condition && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tình trạng</p>
+                        <p className="font-semibold">{{
+                          like_new: 'Như mới',
+                          excellent: 'Rất tốt',
+                          good: 'Tốt',
+                          fair: 'Trung bình',
+                        }[order.listing.condition] ?? order.listing.condition}</p>
+                      </div>
+                    )}
+                    {order.listing.frameSize && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Cỡ khung</p>
+                        <p className="font-semibold">{order.listing.frameSize}</p>
+                      </div>
+                    )}
+                    {order.listing.frameMaterial && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Chất liệu khung</p>
+                        <p className="font-semibold">{order.listing.frameMaterial}</p>
+                      </div>
+                    )}
+                    {order.listing.groupset && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Bộ groupset</p>
+                        <p className="font-semibold">{order.listing.groupset}</p>
+                      </div>
+                    )}
+                    {order.listing.wheelSize && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Cỡ lốp/vành</p>
+                        <p className="font-semibold">{order.listing.wheelSize}</p>
+                      </div>
+                    )}
+                    {order.listing.paint && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Màu sơn</p>
+                        <p className="font-semibold">{order.listing.paint}</p>
+                      </div>
+                    )}
+                    {order.listing.brakeType && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Loại phanh</p>
+                        <p className="font-semibold">{order.listing.brakeType}</p>
+                      </div>
+                    )}
+                    {order.listing.operating && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tình trạng vận hành</p>
+                        <p className="font-semibold">{order.listing.operating}</p>
+                      </div>
+                    )}
+                    {order.listing.city && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Thành phố</p>
+                        <p className="font-semibold">{order.listing.city}</p>
+                      </div>
+                    )}
+                    {order.listing.serial && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Số serial</p>
+                        <p className="font-mono font-semibold text-xs tracking-wide">{order.listing.serial}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VeloSafe badge */}
+                  {order.listing.isVeloSafeVerified && (
+                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/30 bg-success/10 px-4 py-2.5">
+                      <ShieldCheck className="h-4 w-4 text-success shrink-0" />
+                      <span className="text-sm font-semibold text-success">Đã kiểm định VeloSafe</span>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {order.listing.description && (
+                    <div className="mt-4 rounded-xl border border-border/40 bg-muted/20 p-4">
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Mô tả của người bán</p>
+                      <p className="text-sm leading-relaxed text-foreground">{order.listing.description}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

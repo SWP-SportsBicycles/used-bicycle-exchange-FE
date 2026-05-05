@@ -96,10 +96,33 @@ export interface BuyerListingPage {
   totalPages: number;
 }
 
+export interface BuyerOrderListing {
+  id: string;
+  title: string;
+  images: string[];
+  price: number;
+  // Extended bike specs — populated from items[0].bike in order detail response
+  brand?: string;
+  model?: string;
+  category?: string;
+  condition?: BuyerListing["condition"];
+  frameSize?: string;
+  frameMaterial?: string;
+  groupset?: string;
+  wheelSize?: string;
+  serial?: string;
+  paint?: string;
+  operating?: string;
+  brakeType?: string;
+  isVeloSafeVerified?: boolean;
+  city?: string;
+  description?: string;
+}
+
 export interface BuyerOrder {
   id: string;
   listingId: string;
-  listing: Pick<BuyerListing, "id" | "title" | "images" | "price">;
+  listing: BuyerOrderListing;
   status:
     | "pending"
     | "paid"
@@ -813,6 +836,27 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
       ? (src.payment as Record<string, unknown>)
       : undefined;
 
+  // ── Extended bike specs from nested bike object ─────────────────────────
+  const bikeSpecSrc = items0Bike ?? listingSrc;
+  const getBikeStr = (key: string): string | undefined => {
+    const v = bikeSpecSrc[key] ?? listingSrc[key];
+    return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+  };
+  const rawOverall = getBikeStr('overall');
+  const bikeIsVeloSafe =
+    (bikeSpecSrc.isVeloSafeVerified as boolean | undefined) ??
+    (bikeSpecSrc.isInspected as boolean | undefined) ??
+    (rawOverall?.toLowerCase() === 'checked');
+  const rawBikeCity = getBikeStr('city');
+  const cityMap: Record<string, string> = {
+    'TP.HCM': 'TP.HCM', 'tp.hcm': 'TP.HCM', 'hồ chí minh': 'TP.HCM', 'hcm': 'TP.HCM',
+    'Hà Nội': 'Hà Nội', 'hà nội': 'Hà Nội', 'hanoi': 'Hà Nội',
+    'Đà Nẵng': 'Đà Nẵng', 'đà nẵng': 'Đà Nẵng', 'danang': 'Đà Nẵng',
+  };
+  const bikeCity = rawBikeCity ? (cityMap[rawBikeCity] ?? rawBikeCity) : undefined;
+  const bikeSerial = getBikeStr('serial') ?? getBikeStr('serialNumber');
+  const bikeWheelSize = getBikeStr('wheelSize') ?? getBikeStr('tireRim');
+
   return {
     ...src,
     id,
@@ -822,6 +866,22 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
       title: title || "Xe đạp",
       images: listingImages,
       price: listingPrice,
+      // Extended specs
+      brand: getBikeStr('brand'),
+      model: getBikeStr('model'),
+      category: getBikeStr('category'),
+      condition: getBikeStr('condition') as BuyerListing['condition'] | undefined,
+      frameSize: getBikeStr('frameSize'),
+      frameMaterial: getBikeStr('frameMaterial'),
+      groupset: getBikeStr('groupset'),
+      wheelSize: bikeWheelSize,
+      serial: bikeSerial,
+      paint: getBikeStr('paint'),
+      operating: getBikeStr('operating'),
+      brakeType: getBikeStr('brakeType'),
+      isVeloSafeVerified: bikeIsVeloSafe,
+      city: bikeCity,
+      description: getBikeStr('description'),
     },
     status,
     statusLabel: (src.statusLabel as string) || {
