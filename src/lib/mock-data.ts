@@ -107,6 +107,21 @@ export const CATEGORIES = [
   { value: 'urban', label: 'Urban/Commuter', icon: 'urban' },
 ]
 
+export const BRAKE_TYPES = [
+  'Rim Brake',
+  'Mechanical Disc Brake',
+  'Hydraulic Disc Brake',
+]
+
+export const WHEEL_SIZES = ['700c', '650b', '29', '27.5', '26']
+
+export const FRAME_MATERIAL_OPTIONS = [
+  { value: 'carbon', label: 'Carbon' },
+  { value: 'alloy', label: 'Hợp kim' },
+  { value: 'steel', label: 'Thép' },
+  { value: 'titanium', label: 'Titan' },
+]
+
 // Mock listings data
 export const MOCK_LISTINGS: Listing[] = [
   {

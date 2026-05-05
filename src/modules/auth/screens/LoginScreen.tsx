@@ -133,6 +133,32 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
 
+  const readRoleHintFromCookie = () => {
+    if (typeof document === 'undefined') return null
+    const match = document.cookie.match(/(?:^|; )role=([^;]+)/)
+    const value = match ? decodeURIComponent(match[1]) : ''
+    if (value === 'buyer' || value === 'seller') return value
+    return null
+  }
+
+  const isInvalidRoleError = (error: unknown, message: string | null) => {
+    const normalizedMessage = message ? normalizeMessage(message) : ''
+
+    if (error instanceof ApiError) {
+      const payload = error.payload
+      if (payload && typeof payload === 'object') {
+        const obj = payload as Record<string, unknown>
+        const code = typeof obj.code === 'string' ? normalizeMessage(obj.code) : ''
+        const payloadMessage = typeof obj.message === 'string' ? normalizeMessage(obj.message) : ''
+
+        if (code === 'role_invalid' || code === 'invalid_role') return true
+        if (payloadMessage === 'role khong hop le' || payloadMessage === 'invalid role') return true
+      }
+    }
+
+    return normalizedMessage === 'role khong hop le' || normalizedMessage === 'invalid role'
+  }
+
   const isMissingGoogleRoleError = (error: unknown, message: string | null) => {
     const normalizedMessage = message ? normalizeMessage(message) : ''
 
@@ -367,20 +393,31 @@ export function LoginScreen({ initialMode = 'login' }: { initialMode?: AuthMode 
       const idToken = await result.user.getIdToken()
 
       if (target === 'login') {
-        const directResult = await submitGoogleSession(idToken, undefined, 'login', { suppressError: true })
-        if (directResult.success) {
+        const cookieRole = readRoleHintFromCookie()
+        const roleOrder: AuthRole[] = cookieRole === 'seller' ? [3, 2] : [2, 3]
+
+        let lastResult = await submitGoogleSession(idToken, roleOrder[0], 'login', { suppressError: true })
+        if (lastResult.success) {
           return
         }
 
-        if (isMissingGoogleRoleError(directResult.error, directResult.errorMessage)) {
+        if (isInvalidRoleError(lastResult.error, lastResult.errorMessage)) {
+          const retryResult = await submitGoogleSession(idToken, roleOrder[1], 'login', { suppressError: true })
+          if (retryResult.success) {
+            return
+          }
+          lastResult = retryResult
+        }
+
+        if (isMissingGoogleRoleError(lastResult.error, lastResult.errorMessage)) {
           setPendingGoogleIdToken(idToken)
           setPendingGoogleIntent('login')
-          setPendingGoogleRole('2')
+          setPendingGoogleRole(roleOrder[0] === 3 ? '3' : '2')
           setPendingGoogleNeedsPhone(true)
           return
         }
 
-        const message = directResult.errorMessage
+        const message = lastResult.errorMessage
           ?? (language === 'vi' ? 'Dang nhap Google that bai' : 'Google sign-in failed')
         setLoginErrorMessage(message)
       } else {

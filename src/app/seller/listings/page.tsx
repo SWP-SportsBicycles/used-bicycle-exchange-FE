@@ -24,7 +24,6 @@ import { useLanguage } from '@/lib/language-context'
 import { MOCK_LISTINGS, formatVND } from '@/lib/mock-data'
 import {
   useDeleteListing,
-  useResubmitListing,
   useSubmitListing,
   useWithdrawListing,
 } from '@/modules/seller/hooks/useSellerListingMutations'
@@ -38,7 +37,7 @@ import {
   type ListingStatus 
 } from '@/modules/seller/utils/normalization'
 
-type ConfirmAction = 'submit' | 'withdraw' | 'delete' | 'resubmit'
+type ConfirmAction = 'submit' | 'withdraw' | 'delete'
 
 function mapMockToSellerListings(): SellerListingItem[] {
   return MOCK_LISTINGS.slice(0, 6).map((listing) => ({
@@ -58,12 +57,11 @@ export default function SellerListingsPage() {
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
   const deleteMutation = useDeleteListing()
-  const resubmitMutation = useResubmitListing()
   const [confirmState, setConfirmState] = useState<{ action: ConfirmAction; listing: SellerListingItem } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
 
-  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending || resubmitMutation.isPending
+  const isActionPending = submitMutation.isPending || withdrawMutation.isPending || deleteMutation.isPending
 
   const openConfirmState = (action: ConfirmAction, listing: SellerListingItem) => {
     setTermsAccepted(false)
@@ -104,8 +102,6 @@ export default function SellerListingsPage() {
         await submitMutation.mutateAsync(confirmState.listing.id)
       } else if (confirmState.action === 'withdraw') {
         await withdrawMutation.mutateAsync(confirmState.listing.id)
-      } else if (confirmState.action === 'resubmit') {
-        await resubmitMutation.mutateAsync(confirmState.listing.id)
       } else {
         await deleteMutation.mutateAsync(confirmState.listing.id)
       }
@@ -132,7 +128,7 @@ export default function SellerListingsPage() {
           </CardDescription>
         </div>
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/seller/listings/new" className="gap-1">
+          <Link href="/seller/listings/new?new=1" className="gap-1">
             {language === 'vi' ? 'Đăng tin mới' : 'Create listing'}
             <ArrowUpRight className="h-4 w-4" />
           </Link>
@@ -246,11 +242,11 @@ export default function SellerListingsPage() {
                       onClick={(e) => { 
                         e.preventDefault(); 
                         e.stopPropagation(); 
-                        openConfirmState('resubmit', listing)
+                        router.push(`/seller/listings/${listing.id}`)
                       }}
                       style={{ pointerEvents: 'auto' }}
                     >
-                      {language === 'vi' ? 'Gửi duyệt lại' : 'Resubmit'}
+                      {language === 'vi' ? 'Xem & Gửi lại' : 'View & Resubmit'}
                     </Button>
                   )}
 
@@ -292,9 +288,7 @@ export default function SellerListingsPage() {
                   ? language === 'vi' ? 'Xác nhận gửi duyệt' : 'Confirm Submission'
                   : confirmState?.action === 'withdraw'
                     ? language === 'vi' ? 'Xác nhận rút tin' : 'Confirm Withdrawal'
-                    : confirmState?.action === 'resubmit'
-                      ? language === 'vi' ? 'Xác nhận gửi lại duyệt' : 'Confirm Resubmission'
-                      : language === 'vi' ? 'Xác nhận xóa' : 'Confirm Deletion'}
+                    : language === 'vi' ? 'Xác nhận xóa' : 'Confirm Deletion'}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmState?.action === 'submit'
@@ -303,19 +297,15 @@ export default function SellerListingsPage() {
                     : 'Please review all information, photos, and pricing before submission.'
                   : confirmState?.action === 'withdraw'
                     ? language === 'vi' ? 'Bạn có chắc chắn muốn rút tin đăng này xuống không?' : 'Are you sure you want to withdraw this listing?'
-                    : confirmState?.action === 'resubmit'
-                      ? language === 'vi'
-                        ? 'Vui lòng kiểm tra lại toàn bộ thông tin, hình ảnh và giá bán trước khi gửi duyệt lại.'
-                        : 'Please review all information, photos, and pricing before resubmitting.'
-                      : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
+                    : language === 'vi' ? 'Hành động này không thể hoàn tác. Việc này sẽ xóa vĩnh viễn tin đăng của bạn.' : 'This action cannot be undone. This will permanently delete your listing.'}
               </AlertDialogDescription>
-              {(confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && (
+              {confirmState?.action === 'submit' && (
                 <label
-                  htmlFor={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                  htmlFor="listings-terms-ack-submit"
                   className="mt-4 flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/30 p-3 text-sm text-foreground"
                 >
                   <Checkbox
-                    id={`listings-terms-ack-${confirmState?.action ?? 'submit'}`}
+                    id="listings-terms-ack-submit"
                     checked={termsAccepted}
                     onCheckedChange={(value) => setTermsAccepted(Boolean(value))}
                     className="mt-0.5 h-5 w-5 shrink-0 rounded-sm border-2 border-primary/50 bg-background data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -336,7 +326,7 @@ export default function SellerListingsPage() {
                 onClick={executeAction}
                 disabled={
                   isActionPending ||
-                  ((confirmState?.action === 'submit' || confirmState?.action === 'resubmit') && !termsAccepted)
+                  (confirmState?.action === 'submit' && !termsAccepted)
                 }
               >
                 {isActionPending ? (

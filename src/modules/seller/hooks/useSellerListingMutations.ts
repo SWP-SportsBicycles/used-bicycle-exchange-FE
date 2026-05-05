@@ -49,8 +49,9 @@ export function useSubmitListing() {
 
   return useMutation({
     mutationFn: (listingId: string) => sellerApi.submitListing(listingId),
-    onSuccess: () => {
+    onSuccess: (_, listingId) => {
       queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-listing-detail", listingId] });
     },
   });
 }
@@ -60,8 +61,9 @@ export function useResubmitListing() {
 
   return useMutation({
     mutationFn: (listingId: string) => sellerApi.resubmitListing(listingId),
-    onSuccess: () => {
+    onSuccess: (_, listingId) => {
       queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-listing-detail", listingId] });
     },
   });
 }
@@ -71,8 +73,9 @@ export function useWithdrawListing() {
 
   return useMutation({
     mutationFn: (listingId: string) => sellerApi.withdrawListing(listingId),
-    onSuccess: () => {
+    onSuccess: (_, listingId) => {
       queryClient.invalidateQueries({ queryKey: ["seller-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-listing-detail", listingId] });
     },
   });
 }

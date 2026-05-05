@@ -1,7 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
 import { useCreateListing, useSubmitListing, useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
@@ -27,7 +28,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useLanguage } from '@/lib/language-context'
-import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
+import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES, BRAKE_TYPES, WHEEL_SIZES, FRAME_MATERIAL_OPTIONS } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 const steps = [
@@ -103,6 +104,7 @@ const isReadyForApiDraft = (data: Record<string, string>) =>
 
 export default function SellerCreateListingScreen() {
   const { language } = useLanguage()
+  const searchParams = useSearchParams()
   const createListingMutation = useCreateListing()
   const updateListingMutation = useUpdateListing()
   const submitListingMutation = useSubmitListing()
@@ -142,6 +144,10 @@ export default function SellerCreateListingScreen() {
   const draftIdRef = useRef(draftListingId)
   const isSubmittingRef = useRef(isSubmitting)
   const hasSavedDraftRef = useRef(false)
+  // Flag để ngăn saveDraftOnExit chạy sau khi submit thành công
+  const hasSubmittedRef = useRef(false)
+  // Khi bắt đầu form mới (?new=1), chờ user nhập gì mới save vào localStorage
+  const isNewListingRef = useRef(searchParams.get('new') === '1')
 
   useEffect(() => {
     formDataRef.current = formData
@@ -270,8 +276,16 @@ export default function SellerCreateListingScreen() {
 
   const shouldShowError = (field: string) => Boolean(touchedFields[field])
 
+
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Nếu user bấm "Tạo tin mới" (có param ?new=1), xóa draft cũ và bắt đầu form trắng
+    if (searchParams.get('new') === '1') {
+      window.localStorage.removeItem(DRAFT_FORM_KEY)
+      window.localStorage.removeItem(DRAFT_ID_KEY)
+      return
+    }
 
     const storedForm = window.localStorage.getItem(DRAFT_FORM_KEY)
     if (storedForm) {
@@ -288,10 +302,15 @@ export default function SellerCreateListingScreen() {
     if (storedId) {
       setDraftListingId(storedId)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // Nếu bắt đầu với ?new=1 và form vẫn rỗng, bỏ qua — tránh ghi đè localStorage vừa xóa
+    if (isNewListingRef.current && !hasAnyDraftData(formData)) return
+    // User đã nhập gì đó → reset flag, auto-save bình thường
+    isNewListingRef.current = false
     window.localStorage.setItem(DRAFT_FORM_KEY, JSON.stringify(formData))
   }, [formData])
 
@@ -340,7 +359,7 @@ export default function SellerCreateListingScreen() {
     } else if (type === 'groupset') {
       const file = files[0]
       setGroupsetPhoto(file)
-      if (groupsetPhotoUrl) {
+      if (groupsetPhotoUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(groupsetPhotoUrl)
         objectUrlsRef.current.delete(groupsetPhotoUrl)
       }
@@ -377,7 +396,11 @@ export default function SellerCreateListingScreen() {
     return false
   }
 
-  const isCurrentStepValid = Object.keys(validateStep(currentStep)).length === 0
+  const isCurrentStepValid = useMemo(
+    () => Object.keys(validateStep(currentStep)).length === 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentStep, formData, images, language]
+  )
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -432,7 +455,7 @@ export default function SellerCreateListingScreen() {
         city: normalizeSellerCity(formData.city),
         paint: formData.paint || 'N/A', // fallback if empty but now added to UI
         overall: formData.overall || 'N/A',
-        brakeType: formData.brakeType || 'Chưa Xách Định',
+        brakeType: formData.brakeType || 'Chưa Xác Định',
       }
 
       let listingId = draftListingId
@@ -444,13 +467,13 @@ export default function SellerCreateListingScreen() {
         const nested = rawData.data && typeof rawData.data === 'object' ? rawData.data as Record<string, unknown> : rawData
         const rawId = nested.id ?? nested.listingId
         listingId = typeof rawId === 'string' ? rawId : String(rawId ?? '')
+        // M1: persistDraftId chỉ khi vừa tạo mới, không gọi thừa khi đã có draftId
+        if (listingId) persistDraftId(listingId)
       }
 
       if (!listingId) {
         throw new Error('Không lấy được ID tin đăng')
       }
-
-      persistDraftId(listingId)
 
       // 2. Upload media
       const allMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
@@ -462,9 +485,10 @@ export default function SellerCreateListingScreen() {
       await submitListingMutation.mutateAsync(listingId)
 
       clearDraftStorage()
+      hasSubmittedRef.current = true  // Ngăn saveDraftOnExit chạy khi unmount
       setSubmitSuccess(language === 'vi' ? 'Gửi duyệt tin thành công.' : 'Listing submitted for review.')
       
-      // Reset form on success
+      // Redirect sau khi thành công
       setTimeout(() => {
         window.location.href = `/seller/listings/${listingId}`
       }, 2000)
@@ -481,6 +505,7 @@ export default function SellerCreateListingScreen() {
   }
 
   const saveDraftOnExit = async () => {
+    if (hasSubmittedRef.current) return  // Đã submit thành công, không lưu draft nữa
     if (isSubmittingRef.current) return
     if (hasSavedDraftRef.current) return
     hasSavedDraftRef.current = true
@@ -492,7 +517,8 @@ export default function SellerCreateListingScreen() {
     }
 
     const draftId = draftIdRef.current
-    if (!draftId && !isReadyForApiDraft(data)) {
+    // Chỉ gọi API nếu data đủ điều kiện — tránh ghi đè dữ liệu hợp lệ với payload thiếu field
+    if (!isReadyForApiDraft(data)) {
       hasSavedDraftRef.current = false
       return
     }
@@ -516,7 +542,7 @@ export default function SellerCreateListingScreen() {
         city: normalizeSellerCity(data.city),
         paint: data.paint || 'N/A',
         overall: data.overall || 'N/A',
-        brakeType: data.brakeType || 'Chưa Xách Định',
+        brakeType: data.brakeType || 'Chưa Xác Định',
       }
 
       if (draftId) {
