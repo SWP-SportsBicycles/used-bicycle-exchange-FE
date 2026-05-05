@@ -896,7 +896,13 @@ function normalizeOrder(raw: Record<string, unknown>): BuyerOrder {
     }[status as string] || 'Chờ thanh toán',
     receiverName: (src.receiverName as string) || "",
     receiverPhone: (src.receiverPhone as string) || "",
-    receiverAddress: ((src.address as Record<string, unknown>)?.fullAddress as string) || ((src.address as Record<string, unknown>)?.detail as string) || (src.receiverAddress as string) || "",
+    receiverAddress: (() => {
+      const addr = src.address as Record<string, unknown> | undefined;
+      if (addr?.fullAddress) return addr.fullAddress as string;
+      const detail = addr?.detail || src.receiverAddress || "";
+      const parts = [detail, addr?.wardName, addr?.districtName, addr?.provinceName].filter(Boolean);
+      return parts.length > 0 ? parts.join(", ") : "";
+    })(),
     toDistrictId: (src.address as Record<string, unknown>)?.districtId ? parseNumber((src.address as Record<string, unknown>).districtId) : (src.toDistrictId ? parseNumber(src.toDistrictId) : undefined),
     toWardCode: ((src.address as Record<string, unknown>)?.wardCode as string) || (src.toWardCode as string) || undefined,
     shippingFee: parseNumber(src.shippingFee ?? src.shipFee
