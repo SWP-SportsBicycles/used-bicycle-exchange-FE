@@ -1,5 +1,10 @@
+import { Suspense } from 'react'
 import SellerCreateListingScreen from '@/modules/seller/screens/SellerCreateListingScreen'
 
 export default function NewSellerListingPage() {
-  return <SellerCreateListingScreen />
+  return (
+    <Suspense>
+      <SellerCreateListingScreen />
+    </Suspense>
+  )
 }

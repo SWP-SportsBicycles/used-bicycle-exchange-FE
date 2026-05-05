@@ -304,16 +304,9 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   
   const { data: rawData, isLoading, isError, refetch } = useQuery({
     queryKey: ['seller-listing-detail', listingId],
-    queryFn: () => {
-      console.log('DEBUG Listing Detail Page - Fetching listing with ID:', listingId)
-      return sellerApi.getListingDetail(listingId)
-    },
+    queryFn: () => sellerApi.getListingDetail(listingId),
     enabled: Boolean(listingId)
   })
-
-  // DEBUG: Log the API response
-  console.log('DEBUG Listing Detail Page - Raw API response:', rawData)
-  console.log('DEBUG Listing Detail Page - Is error:', isError)
 
   const submitMutation = useSubmitListing()
   const withdrawMutation = useWithdrawListing()
@@ -321,8 +314,10 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   const resubmitMutation = useResubmitListing()
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
+  const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = React.useState(false)
   const [confirmAction, setConfirmAction] = React.useState<'submit' | 'resubmit' | null>(null)
   const [termsAccepted, setTermsAccepted] = React.useState(false)
+  const [actionError, setActionError] = React.useState<string | null>(null)
 
   const openConfirmAction = (action: 'submit' | 'resubmit') => {
     setTermsAccepted(false)
@@ -332,6 +327,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   const listing = normalizeListingDetail(rawData)
 
   const handleAction = async (action: 'submit' | 'withdraw' | 'delete' | 'resubmit') => {
+    setActionError(null)
     try {
       if (action === 'submit') {
         await submitMutation.mutateAsync(listingId)
@@ -348,16 +344,23 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
         router.push('/seller/listings')
       }
     } catch (error) {
-      console.error(error)
-      // handle error notification if needed
+      const message = error instanceof Error ? error.message : 'Thao tác thất bại. Vui lòng thử lại.'
+      setActionError(message)
+      throw error  // re-throw để handleConfirmAction biết thất bại
     }
   }
 
   const handleConfirmAction = async () => {
     if (!confirmAction) return
-    await handleAction(confirmAction)
-    setConfirmAction(null)
-    setTermsAccepted(false)
+    try {
+      await handleAction(confirmAction)
+      // Chỉ đóng dialog khi thành công
+      setConfirmAction(null)
+      setTermsAccepted(false)
+    } catch {
+      // Lỗi đã được set vào actionError bửi handleAction
+      // Giữ dialog mở để user thấy lỗi
+    }
   }
 
   if (isLoading) {
@@ -397,7 +400,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
   }
 
   const currentStatus = listing.status || 'draft'
-  const isSubmitDisabled = submitMutation.isPending || currentStatus !== 'draft'
+  const isSubmitDisabled = submitMutation.isPending
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -432,7 +435,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           )}
 
           {(currentStatus === 'published' || currentStatus === 'pending_review') && (
-            <Button onClick={() => handleAction('withdraw')} disabled={withdrawMutation.isPending} variant="destructive">
+            <Button onClick={() => setIsWithdrawDialogOpen(true)} disabled={withdrawMutation.isPending} variant="destructive">
               <EyeOff className="h-4 w-4 mr-2" />
               {language === 'vi' ? 'Rút tin này' : 'Withdraw'}
             </Button>
@@ -605,6 +608,7 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           if (!open) {
             setConfirmAction(null)
             setTermsAccepted(false)
+            setActionError(null)
           }
         }}
       >
@@ -621,6 +625,11 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
                 : 'Please review all information, photos, and pricing. Your listing will be sent for admin review. Read the user terms carefully before confirming.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {actionError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {actionError}
+            </div>
+          )}
           <label
             htmlFor={`detail-terms-ack-${confirmAction ?? 'submit'}`}
             className="flex cursor-pointer items-start gap-2 rounded-md border border-border/70 bg-muted/30 p-3 text-sm text-foreground"
@@ -656,6 +665,35 @@ export default function SellerListingDetailPage({ params }: { params: Promise<{ 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{language === 'vi' ? 'Xác nhận rút tin?' : 'Confirm Withdrawal?'}</DialogTitle>
+            <DialogDescription>
+              {language === 'vi'
+                ? 'Tin đăng sẽ bị ẩn khỏi sàn giao dịch. Bạn có thể đăng lại sau.'
+                : 'Your listing will be hidden from the marketplace. You can repost it later.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsWithdrawDialogOpen(false)}>
+              {language === 'vi' ? 'Hủy' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await handleAction('withdraw')
+                setIsWithdrawDialogOpen(false)
+              }}
+              disabled={withdrawMutation.isPending}
+            >
+              {withdrawMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+              {language === 'vi' ? 'Xác nhận rút tin' : 'Yes, Withdraw'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>

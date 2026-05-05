@@ -4,8 +4,9 @@ import Image from 'next/image'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, X, Camera, Info, ChevronRight, ChevronLeft, Check, AlertCircle, Video } from 'lucide-react'
-import { useUpdateListing, useUploadMedia } from '@/modules/seller/hooks/useSellerListingMutations'
+import { useUpdateListing, useUploadMedia, useResubmitListing } from '@/modules/seller/hooks/useSellerListingMutations'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useLanguage } from '@/lib/language-context'
-import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
+import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES, BRAKE_TYPES, WHEEL_SIZES, FRAME_MATERIAL_OPTIONS } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 const steps = [
@@ -26,20 +27,7 @@ const steps = [
   { id: 'pricing', label: { vi: 'Giá & Xuất Bản', en: 'Pricing & Publish' } },
 ]
 
-const FRAME_MATERIAL_OPTIONS = [
-  { value: 'carbon', label: 'Carbon' },
-  { value: 'alloy', label: 'Hợp kim' },
-  { value: 'steel', label: 'Thép' },
-  { value: 'titanium', label: 'Titan' },
-]
 
-const BRAKE_TYPES = [
-  'Rim Brake',
-  'Mechanical Disc Brake',
-  'Hydraulic Disc Brake',
-]
-
-const WHEEL_SIZES = ['700c', '650b', '29', '27.5', '26']
 
 const REQUIRED_FIELD_LABELS: Record<string, string> = {
   Title: 'tiêu đề',
@@ -263,6 +251,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const { language } = useLanguage()
   const updateListingMutation = useUpdateListing()
   const uploadMediaMutation = useUploadMedia()
+  const resubmitMutation = useResubmitListing()
   const mediaSeed = useMemo(() => extractMediaSeed(initialData), [initialData])
   
   // Track original status to determine which API to call after update
@@ -286,11 +275,15 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Chỉ hiện với listing bị rejected: cho phép gửi duyệt lại ngay sau khi cập nhật
+  const [shouldResubmit, setShouldResubmit] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   
   // Combined loading state
   const isLoading = isSubmitting || 
     updateListingMutation.isPending || 
-    uploadMediaMutation.isPending
+    uploadMediaMutation.isPending ||
+    resubmitMutation.isPending
   
   const [formData, setFormData] = useState(() => {
     const records = collectNestedRecords(initialData)
@@ -431,8 +424,56 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     setImageUrls((prev) => prev.filter((_, i) => i !== localIndex))
   }
 
+  const validateStep = (stepIndex: number) => {
+    const errors: Record<string, string> = {}
+    const isVi = language === 'vi'
+
+    if (stepIndex === 0) {
+      if (!formData.title.trim()) errors.title = isVi ? 'Vui lòng nhập tiêu đề.' : 'Please enter a title.'
+      if (!formData.category) errors.category = isVi ? 'Vui lòng chọn loại xe.' : 'Please select a category.'
+      if (!formData.condition) errors.condition = isVi ? 'Vui lòng chọn tình trạng.' : 'Please select a condition.'
+      if (!formData.brand) errors.brand = isVi ? 'Vui lòng chọn thương hiệu.' : 'Please select a brand.'
+      if (!formData.description.trim()) errors.description = isVi ? 'Vui lòng nhập mô tả.' : 'Please enter a description.'
+    }
+
+    if (stepIndex === 1) {
+      if (!formData.frameSize) errors.frameSize = isVi ? 'Vui lòng chọn kích cỡ khung.' : 'Please select a frame size.'
+      if (!formData.groupset) errors.groupset = isVi ? 'Vui lòng chọn groupset.' : 'Please select a groupset.'
+      if (!formData.wheelSize) errors.wheelSize = isVi ? 'Vui lòng chọn cỡ bánh.' : 'Please select a wheel size.'
+      if (!formData.brakeType) errors.brakeType = isVi ? 'Vui lòng chọn loại phanh.' : 'Please select a brake type.'
+      if (!formData.paint.trim()) errors.paint = isVi ? 'Vui lòng nhập màu sơn.' : 'Please enter the paint color.'
+      if (!formData.overall.trim()) errors.overall = isVi ? 'Vui lòng nhập khấu hao/đánh giá.' : 'Please enter the overall condition.'
+      if (!formData.serial.trim()) errors.serial = isVi ? 'Vui lòng nhập số serial.' : 'Please enter the serial number.'
+      if (!formData.city) errors.city = isVi ? 'Vui lòng chọn thành phố.' : 'Please select a city.'
+      const weightValue = Number(formData.weight)
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        errors.weight = isVi ? 'Vui lòng nhập trọng lượng hợp lệ.' : 'Please enter a valid weight.'
+      }
+    }
+
+    if (stepIndex === 2) {
+      if (displayImageUrls.length === 0) errors.images = isVi ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.'
+    }
+
+    if (stepIndex === 3) {
+      const priceValue = Number(String(formData.price).replace(/,/g, ''))
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        errors.price = isVi ? 'Vui lòng nhập giá bán hợp lệ.' : 'Please enter a valid price.'
+      }
+    }
+
+    return errors
+  }
+
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
+      const errors = validateStep(currentStep)
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors)
+        return
+      }
+      setFieldErrors({})
+      setSubmitError(null)
       setCurrentStep((prev) => prev + 1)
     }
   }
@@ -447,18 +488,13 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
     setSubmitError(null)
     setSubmitSuccess(null)
 
-    // Basic validation
-    if (
-      !formData.title || !formData.category || !formData.brand || !formData.price ||
-      !formData.city || !formData.brakeType || !formData.paint || !formData.overall || !formData.serial ||
-      !formData.weight || !formData.frameSize || !formData.condition || !formData.groupset || !formData.wheelSize
-    ) {
-      setSubmitError('Vui lòng điền đầy đủ các trường bắt buộc (*).')
-      return
-    }
-
-    if (displayImageUrls.length === 0) {
-      setSubmitError(language === 'vi' ? 'Cần ít nhất 1 ảnh xe.' : 'At least 1 bike photo is required.')
+    // Validate tất cả step trước khi submit
+    const stepErrors = [0, 1, 2, 3].map((step) => validateStep(step))
+    const firstErrorIndex = stepErrors.findIndex((errs) => Object.keys(errs).length > 0)
+    if (firstErrorIndex !== -1) {
+      setFieldErrors(stepErrors[firstErrorIndex])
+      setCurrentStep(firstErrorIndex)
+      setSubmitError(language === 'vi' ? 'Vui lòng hoàn tất các trường bắt buộc.' : 'Please complete the required fields.')
       return
     }
 
@@ -482,9 +518,9 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
         tireRim: formData.wheelSize,
         price: priceVal,
         city: normalizeCityValue(formData.city),
-        paint: formData.paint || 'N/A', // fallback if empty but now added to UI
+        paint: formData.paint || 'N/A',
         overall: formData.overall || 'N/A',
-        brakeType: formData.brakeType || 'Chưa Xách Định',
+        brakeType: formData.brakeType || 'Chưa Xác Định',
       }
 
       await updateListingMutation.mutateAsync({
@@ -492,16 +528,26 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
         data: payload
       })
 
-      setSubmitSuccess(
-        originalStatus === 'draft'
-          ? 'Cập nhật bản nháp thành công. Vui lòng gửi duyệt tại trang chi tiết.'
-          : 'Cập nhật tin đăng thành công.'
-      )
-
-      // Upload new media files if any (common for all flows)
+      // Upload new media files if any
       const newMediaFiles = [...images, video, groupsetPhoto].filter(Boolean) as File[]
       if (newMediaFiles.length > 0) {
         await uploadMediaMutation.mutateAsync({ listingId, files: newMediaFiles })
+      }
+
+      // Nếu rejected và user chọn gửi duyệt lại ngay
+      if (originalStatus === 'rejected' && shouldResubmit) {
+        await resubmitMutation.mutateAsync(listingId)
+        setSubmitSuccess(
+          language === 'vi'
+            ? 'Cập nhật thành công và đã gửi duyệt lại. Vui lòng chờ kiểm duyệt.'
+            : 'Updated and resubmitted for review successfully.'
+        )
+      } else {
+        setSubmitSuccess(
+          originalStatus === 'draft'
+            ? (language === 'vi' ? 'Cập nhật bản nháp thành công. Vui lòng gửi duyệt tại trang chi tiết.' : 'Draft updated. Submit for review from the detail page.')
+            : (language === 'vi' ? 'Cập nhật tin đăng thành công.' : 'Listing updated successfully.')
+        )
       }
       
       // Navigate back after success
@@ -1076,7 +1122,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                   </CardContent>
                 </Card>
 
-                <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border mb-6">
+                <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border mb-4">
                   <div className="flex gap-3">
                     <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
@@ -1091,6 +1137,31 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                     </div>
                   </div>
                 </div>
+
+                {/* Checkbox gửi duyệt lại — chỉ hiện khi tin đang bị Rejected */}
+                {originalStatus === 'rejected' && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30 mb-2">
+                    <Checkbox
+                      id="shouldResubmit"
+                      checked={shouldResubmit}
+                      onCheckedChange={(checked) => setShouldResubmit(Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="shouldResubmit"
+                        className="text-sm font-medium leading-none cursor-pointer text-orange-800 dark:text-orange-200"
+                      >
+                        {language === 'vi' ? 'Gửi duyệt lại ngay sau khi cập nhật' : 'Resubmit for review after saving'}
+                      </label>
+                      <p className="text-xs text-orange-600 dark:text-orange-400">
+                        {language === 'vi'
+                          ? 'Sau khi lưu, tin sẽ được gửi tới inspector để kiểm duyệt lại. Đảm bảo bạn đã sửa đủ nội dung theo yêu cầu.'
+                          : 'After saving, your listing will be sent to an inspector for re-review. Make sure you have addressed all rejection reasons.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -1107,9 +1178,18 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                 <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button className="gap-2" onClick={handleSubmitForReview} disabled={isLoading}>
+              <Button
+                className="gap-2"
+                onClick={handleSubmitForReview}
+                disabled={isLoading}
+                variant={originalStatus === 'rejected' && shouldResubmit ? 'default' : 'default'}
+              >
                 {isLoading ? <Upload className="h-4 w-4 animate-pulse" /> : <Check className="h-4 w-4" />}
-                {isLoading ? 'Đang cập nhật...' : 'Lưu cập nhật'}
+                {isLoading
+                  ? (language === 'vi' ? 'Đang xử lý...' : 'Processing...')
+                  : originalStatus === 'rejected' && shouldResubmit
+                    ? (language === 'vi' ? 'Lưu & Gửi duyệt lại' : 'Save & Resubmit')
+                    : (language === 'vi' ? 'Lưu cập nhật' : 'Save Changes')}
               </Button>
             )}
           </div>
