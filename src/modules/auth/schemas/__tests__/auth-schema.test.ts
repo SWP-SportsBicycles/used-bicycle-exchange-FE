@@ -30,6 +30,7 @@ describe("registerSchema", () => {
     phoneNumber: "0912345678",
     email: "user@example.com",
     password: "Pass@1word",
+    confirmPassword: "Pass@1word",
     role: "2",
   };
 

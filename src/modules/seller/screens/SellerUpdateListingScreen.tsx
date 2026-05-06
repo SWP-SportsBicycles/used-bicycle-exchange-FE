@@ -277,6 +277,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Chỉ hiện với listing bị rejected: cho phép gửi duyệt lại ngay sau khi cập nhật
   const [shouldResubmit, setShouldResubmit] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   
   // Combined loading state
@@ -1032,7 +1033,7 @@ export default function SellerUpdateListingScreen({ listingId, initialData }: Se
                       )}
                     </div>
                   ) : (
-                    <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-[21/9] sm:aspect-[21/6] rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
+                    <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-21/9 sm:aspect-21/6 rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
                       <Video className="h-8 w-8 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">{language === 'vi' ? 'Tải lên video' : 'Upload video'}</span>
                     </button>

@@ -28,7 +28,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useLanguage } from '@/lib/language-context'
-import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES, BRAKE_TYPES, WHEEL_SIZES, FRAME_MATERIAL_OPTIONS } from '@/lib/mock-data'
+import { BRANDS, FRAME_SIZES, GROUPSETS, CONDITIONS, CITIES, CATEGORIES } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 const steps = [
@@ -1095,7 +1095,7 @@ export default function SellerCreateListingScreen() {
                       </Button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-[21/9] sm:aspect-[21/6] rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
+                    <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full aspect-21/9 sm:aspect-21/6 rounded-lg border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 border-border hover:border-primary hover:bg-primary/5">
                       <Video className="h-8 w-8 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">{language === 'vi' ? 'Tải lên video' : 'Upload video'}</span>
                     </button>
